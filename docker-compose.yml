@@ -6,7 +6,7 @@ services:
     container_name: my-cloud-core
     pull_policy: build
     ports:
-      - "8099:5000"
+      - 8099:5000
     volumes:
-      - ./channels.json:/app/channels.json
+      - ./data:/app/data
     restart: always
