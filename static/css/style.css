@@ -118,9 +118,32 @@ header {
 .right-tools {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 10px;
     font-size: 14px;
 }
+
+/* 🌟 新增：快捷工具按钮样式 */
+.btn-tool {
+    border: none;
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-openlist {
+    background: #059669;
+    color: #ecfdf5;
+}
+.btn-openlist:hover { background: #047857; }
+
+.btn-quark {
+    background: #0284c7;
+    color: #f0f9ff;
+}
+.btn-quark:hover { background: #0369a1; }
 
 .select-count b { color: #38bdf8; font-size: 15px; }
 
@@ -147,7 +170,6 @@ header {
     font-size: 14px;
 }
 
-/* 🌟 核心：多维筛选器样式 */
 .filter-panel {
     background: #0f172a;
     padding: 10px 24px;
@@ -196,7 +218,6 @@ header {
     font-weight: bold;
 }
 
-/* 海报墙滚动区 */
 .content-area {
     flex: 1;
     overflow-y: auto;
@@ -288,7 +309,6 @@ header {
 
 .douban-link:hover { text-decoration: underline; }
 
-/* 右侧贯穿 Sidebar */
 .log-sidebar {
     width: 350px;
     height: 100vh;
@@ -381,7 +401,6 @@ header {
     line-height: 1.5;
 }
 
-/* Modal */
 .modal {
     position: fixed;
     top: 0; left: 0; width: 100vw; height: 100vh;
