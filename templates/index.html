@@ -19,7 +19,7 @@
                 </div>
             </header>
 
-            <!-- 顶部分类 Tab -->
+            <!-- 顶部分类 Tab 与 工具快捷按钮 -->
             <div class="top-action-bar">
                 <div class="tab-group">
                     <button class="tab-btn active" id="tab-电影" onclick="switchCategory('电影')">🎬 电影</button>
@@ -29,6 +29,10 @@
                 </div>
 
                 <div class="right-tools">
+                    <!-- 🌟 新增：在线观看与唤起夸克客户端按钮 -->
+                    <button class="btn-tool btn-openlist" onclick="openOpenList()" title="点击在新窗口打开 OpenList 播放视频">📺 在线观看</button>
+                    <button class="btn-tool btn-quark" onclick="openQuarkApp()" title="调用电脑本地已安装的夸克网盘客户端">📥 夸克客户端</button>
+
                     <span class="select-count">已选 <b id="selected-count">0</b> 部</span>
                     <button class="btn-sm" onclick="selectAll()">全选</button>
                     <button class="btn-sm" onclick="clearSelection()">取消</button>
@@ -38,7 +42,7 @@
                 </div>
             </div>
 
-            <!-- 多维筛选栏 (更新 sort: R 为真正的最新) -->
+            <!-- 多维筛选栏 -->
             <div class="filter-panel" id="filter-panel">
                 <div class="filter-row">
                     <span class="filter-label">排序:</span>
@@ -136,7 +140,7 @@
     <!-- 配置 Modal -->
     <div class="modal" id="config-modal">
         <div class="modal-content">
-            <h3>⚙ 系统与频道配置</h3>
+            <h3>⚙ 系统与服务集成配置</h3>
             
             <div class="section-title">☁️ 夸克网盘配置</div>
             <label style="font-size:13px; color:#94a3b8;">夸克 Cookie:</label>
@@ -144,6 +148,14 @@
             
             <label style="font-size:13px; color:#94a3b8;">目标保存目录 FID (默认 0 表示根目录):</label>
             <input type="text" id="folder-id-input" placeholder="默认 0">
+
+            <!-- 🌟 新增：外部应用与在线观看集成 -->
+            <div class="section-title">🔗 外部工具集成</div>
+            <label style="font-size:13px; color:#94a3b8;">OpenList 在线播放地址 (例: http://192.168.1.100:5244):</label>
+            <input type="text" id="openlist-url-input" placeholder="http://192.168.x.x:5244">
+
+            <label style="font-size:13px; color:#94a3b8;">夸克客户端唤起协议 (默认 quark://):</label>
+            <input type="text" id="quark-app-input" placeholder="quark://">
 
             <div class="section-title">
                 <span>📺 检索频道配置</span>
