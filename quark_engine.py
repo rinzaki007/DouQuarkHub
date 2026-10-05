@@ -13,7 +13,6 @@ class QuarkEngine:
         }
 
     def check_cookie_valid(self):
-        """通过读取网盘根目录判定 Cookie 是否有效"""
         if not self.cookie:
             return False
         url = "https://drive-pc.quark.cn/1/clouddrive/file/sort?pr=ucpro&fr=pc&pdir_fid=0&_size=1"
@@ -27,7 +26,6 @@ class QuarkEngine:
             return False
 
     def get_stoken(self, pwd_id, passcode=""):
-        """第一步：向 sharepage/token 请求 stoken"""
         url = "https://drive-pc.quark.cn/1/clouddrive/share/sharepage/token?pr=ucpro&fr=pc"
         payload = {
             "pwd_id": pwd_id,
@@ -48,13 +46,10 @@ class QuarkEngine:
             return "", f"token 请求异常: {str(e)}"
 
     def get_share_files(self, pwd_id, passcode=""):
-        """第二步：带上 stoken 请求 sharepage/detail 获取文件列表"""
-        # 1. 优先获取 stoken
         stoken, err = self.get_stoken(pwd_id, passcode)
         if not stoken:
             return [], "", err or "未能获取到 stoken"
 
-        # 2. 携带 stoken 请求文件详情
         url = "https://drive-pc.quark.cn/1/clouddrive/share/sharepage/detail"
         params = {
             "pr": "ucpro",
@@ -86,7 +81,6 @@ class QuarkEngine:
             return [], "", f"detail 请求异常: {str(e)}"
 
     def save_files(self, pwd_id, files, stoken, target_fid='0'):
-        """第三步：执行转存"""
         url = "https://drive-pc.quark.cn/1/clouddrive/share/sharepage/save?pr=ucpro&fr=pc"
         
         fid_list = [f.get("fid") for f in files if f.get("fid")]
