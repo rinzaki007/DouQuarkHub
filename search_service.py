@@ -1,5 +1,6 @@
 import re
 import requests
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from quark_engine import QuarkEngine
 
 class SearchService:
@@ -7,27 +8,31 @@ class SearchService:
         self.cookie = cookie
         self.engine = QuarkEngine(cookie)
 
-    def search_tg_channel(self, channel_id, keyword):
-        """从 Telegram 频道公开 Web 页检索夸克分享链接"""
-        url = f"https://t.me/s/{channel_id}?q={requests.utils.quote(keyword)}"
+    def search_single_tg_channel(self, channel, keyword):
+        """单频道检索，超时设为 3 秒防止挂起"""
+        ch_name = channel.get('name', '未命名频道')
+        ch_id = channel.get('id', '').strip()
+        if not ch_id:
+            return ch_name, []
+
+        url = f"https://t.me/s/{ch_id}?q={requests.utils.quote(keyword)}"
         headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
         }
-        links = []
+        found_links = []
         try:
-            resp = requests.get(url, headers=headers, timeout=10)
+            resp = requests.get(url, headers=headers, timeout=3)
             if resp.status_code == 200:
-                # 提取夸克网盘链接中的 pwd_id
                 found = re.findall(r'https://pan\.quark\.cn/s/([a-zA-Z0-9]+)', resp.text)
                 for pwd_id in found:
-                    if pwd_id not in links:
-                        links.append(pwd_id)
-        except Exception as e:
+                    if pwd_id not in found_links:
+                        found_links.append(pwd_id)
+        except Exception:
             pass
-        return links
+        return ch_name, found_links
 
     def batch_search_and_transfer(self, movies, channels, target_fid='0'):
-        """批量检索频道并自动转存到夸克网盘"""
+        """多线程并发极速检索频道 + 转存"""
         results = {}
         
         for movie in movies:
@@ -35,26 +40,25 @@ class SearchService:
             logs.append(f"🔍 开始检索资源: {movie}")
             found_links = []
 
-            # 1. 遍历 Telegram 频道检索
-            for ch in channels:
-                ch_name = ch.get('name', '未命名频道')
-                ch_id = ch.get('id', '')
-                if not ch_id:
-                    continue
-                
-                p_ids = self.search_tg_channel(ch_id, movie)
-                if p_ids:
-                    logs.append(f"  └─ 频道 [{ch_name}] 命中 {len(p_ids)} 个夸克资源")
-                    for p_id in p_ids:
-                        if p_id not in found_links:
-                            found_links.append(p_id)
+            # 多线程并发查询多频道，极速完成，不给反向代理超时的机会
+            with ThreadPoolExecutor(max_workers=10) as executor:
+                future_to_ch = {
+                    executor.submit(self.search_single_tg_channel, ch, movie): ch 
+                    for ch in channels
+                }
+                for future in as_completed(future_to_ch):
+                    ch_name, p_ids = future.result()
+                    if p_ids:
+                        logs.append(f"  └─ 频道 [{ch_name}] 命中 {len(p_ids)} 个夸克资源")
+                        for p_id in p_ids:
+                            if p_id not in found_links:
+                                found_links.append(p_id)
 
             if not found_links:
                 logs.append("  ❌ 遍历全部指定频道，未检索到匹配的夸克分享链接")
                 results[movie] = logs
                 continue
 
-            # 2. 尝试转存命中的资源
             transfer_success = False
             for pwd_id in found_links:
                 logs.append(f"  🚀 正在解析并尝试转存链接 (ID: {pwd_id})...")
