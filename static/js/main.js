@@ -88,12 +88,20 @@ async function fetchMovies() {
 
     try {
         const res = await fetch(`/api/get-movies?${params.toString()}`);
+        
+        // 关键容错：检查 content-type 避免尝试将 HTML 转换为 JSON
+        const contentType = res.headers.get('content-type') || '';
+        if (!contentType.includes('application/json')) {
+            appendLog(`[系统] ❌ 服务端返回了非 JSON 页面 (HTTP ${res.status})，可能被豆瓣拦截`);
+            return;
+        }
+
         const data = await res.json();
         if (data.success) {
             movieList = data.movies;
             renderGrid();
         } else {
-            appendLog(`[系统] ❌ 获取列表失败: ${data.message || '豆瓣服务异常'}`);
+            appendLog(`[系统] ❌ 获取列表失败: ${data.message || '豆瓣服务响应异常'}`);
         }
     } catch (err) {
         appendLog(`[系统] ❌ 网络获取失败: ${err.message}`);
@@ -106,6 +114,13 @@ async function searchMovies() {
     appendLog(`[系统] 🔍 正在豆瓣全站搜索：${query}...`);
     try {
         const res = await fetch(`/api/search-douban?q=${encodeURIComponent(query)}`);
+        
+        const contentType = res.headers.get('content-type') || '';
+        if (!contentType.includes('application/json')) {
+            appendLog(`[系统] ❌ 搜索返回非 JSON 页面`);
+            return;
+        }
+
         const data = await res.json();
         if (data.success) {
             movieList = data.movies;
