@@ -1,4 +1,4 @@
-# 🎬 DouQuarkHub
+# 🎬 MovieSync
 
 <p align="center">
   <b>豆瓣影视流检索与夸克网盘自动转存系统</b>
@@ -8,7 +8,7 @@
 
 ## 💡 项目简介
 
-**DouQuarkHub** 是一个集成豆瓣 API 与夸克网盘的高效影视资源流转工具。
+**MovieSync** 是一个集成豆瓣 API 与夸克网盘的高效影视资源流转工具。
 
 - **核心功能**：
   - 🎥 **豆瓣热榜与全局影视探索**：通过豆瓣 API 实时获取热门影视内容与全局检索。
@@ -24,7 +24,7 @@
 
 | 文件 / 路径 | 核心功能与技术说明 |
 | :--- | :--- |
-| **DouQuarkHub/** | 项目根目录 |
+| **MovieSync/** | 项目根目录 |
 | ├── **.github/workflows/** | GitHub Actions 自动化流水线配置 |
 | │   └── `docker-build.yml` | 自动构建镜像并进行并发控制 |
 | ├── **templates/** | 前端页面模板目录 |
@@ -53,10 +53,10 @@
 
 ```yaml
 services:
-  douquarkhub:
+  moviesync:
     # 镜像地址。如果国内服务器拉取 ghcr.io 较慢，可自行替换或配置国内镜像加速（例如：ghcr.m.daocloud.io/rinzaki007/mycloudcore:latest）
-    image: ghcr.io/rinzaki007/douquarkhub:latest
-    container_name: DouQuarkHub
+    image: ghcr.io/rinzaki007/moviesync:latest
+    container_name: MovieSync
     # 容器重启策略：unless-stopped 表示随系统自动重启，但如果被手动 stop 停止，则不会自动拉起
     restart: unless-stopped
     # 左侧的 8099 为宿主机访问端口（若冲突可修改，如 9000:5000）；右侧的 5000 为容器内应用监听端口，请勿修改
@@ -73,7 +73,7 @@ services:
 
 
 📄 免责声明 (Disclaimer)
-本项目（DouQuarkHub）仅供个人学习、技术研究与交流使用，严禁用于商业用途或非法牟利行为。
+本项目（MovieSync）仅供个人学习、技术研究与交流使用，严禁用于商业用途或非法牟利行为。
 
 本项目所接入的网盘 API 或相关服务均来自公开渠道，作者不对因使用本项目而产生的任何数据丢失、账号封禁、版权纠纷或法律风险承担任何责任。
 
