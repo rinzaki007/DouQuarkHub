@@ -20,6 +20,13 @@ window.onload = () => {
 function loadConfig() {
     document.getElementById('quark-cookie-input').value = localStorage.getItem('quark_cookie') || '';
     document.getElementById('folder-id-input').value = localStorage.getItem('target_folder_id') || '0';
+
+    // 📁 加载分类独立的 FID 配置
+    document.getElementById('folder-movie-input').value = localStorage.getItem('folder_movie') || '';
+    document.getElementById('folder-tv-input').value = localStorage.getItem('folder_tv') || '';
+    document.getElementById('folder-show-input').value = localStorage.getItem('folder_show') || '';
+    document.getElementById('folder-anime-input').value = localStorage.getItem('folder_anime') || '';
+
     document.getElementById('openlist-url-input').value = localStorage.getItem('openlist_url') || '';
     document.getElementById('quark-app-input').value = localStorage.getItem('quark_app_url') || 'quark://';
 }
@@ -29,7 +36,6 @@ function refreshStatus() {
     checkChannelsHealth();
 }
 
-// 🌟 打开 OpenList 在线播放
 function openOpenList() {
     const url = localStorage.getItem('openlist_url');
     if (!url) {
@@ -40,17 +46,14 @@ function openOpenList() {
     window.open(url, '_blank');
 }
 
-// 🌟 唤起电脑本地夸克网盘客户端或网页版
 function openQuarkApp() {
     const appUrl = localStorage.getItem('quark_app_url') || 'quark://';
     
-    // 如果配置的是 HTTP/HTTPS 网址（如夸克网页版），直接在新页面打开
     if (appUrl.startsWith('http://') || appUrl.startsWith('https://')) {
         window.open(appUrl, '_blank');
         return;
     }
 
-    // 通过隐藏的 iframe 尝试唤起本地客户端 (quark://)
     const iframe = document.createElement('iframe');
     iframe.style.display = 'none';
     iframe.src = appUrl;
@@ -333,12 +336,25 @@ function importChannelsJson() {
 
 async function saveConfig() {
     const cookie = document.getElementById('quark-cookie-input').value.trim();
-    const fid = document.getElementById('folder-id-input').value.trim() || '0';
+    const defaultFid = document.getElementById('folder-id-input').value.trim() || '0';
+
+    // 📁 保存分类独立 FID 配置
+    const folderMovie = document.getElementById('folder-movie-input').value.trim();
+    const folderTv = document.getElementById('folder-tv-input').value.trim();
+    const folderShow = document.getElementById('folder-show-input').value.trim();
+    const folderAnime = document.getElementById('folder-anime-input').value.trim();
+
     const openlistUrl = document.getElementById('openlist-url-input').value.trim();
     const quarkAppUrl = document.getElementById('quark-app-input').value.trim() || 'quark://';
     
     localStorage.setItem('quark_cookie', cookie);
-    localStorage.setItem('target_folder_id', fid);
+    localStorage.setItem('target_folder_id', defaultFid);
+
+    localStorage.setItem('folder_movie', folderMovie);
+    localStorage.setItem('folder_tv', folderTv);
+    localStorage.setItem('folder_show', folderShow);
+    localStorage.setItem('folder_anime', folderAnime);
+
     localStorage.setItem('openlist_url', openlistUrl);
     localStorage.setItem('quark_app_url', quarkAppUrl);
 
@@ -348,7 +364,7 @@ async function saveConfig() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ channels: channelList })
         });
-        alert('配置已保存！');
+        alert('配置已成功保存！');
         closeConfigModal();
         refreshStatus();
     } catch (err) {
@@ -359,6 +375,23 @@ async function saveConfig() {
 function openConfigModal() { document.getElementById('config-modal').style.display = 'flex'; }
 function closeConfigModal() { document.getElementById('config-modal').style.display = 'none'; }
 
+// 🚀 智能匹配目标保存目录 FID
+function getTargetFolderId() {
+    const defaultFid = localStorage.getItem('target_folder_id') || '0';
+    const catFidMap = {
+        '电影': localStorage.getItem('folder_movie'),
+        '电视剧': localStorage.getItem('folder_tv'),
+        '综艺': localStorage.getItem('folder_show'),
+        '动漫': localStorage.getItem('folder_anime')
+    };
+
+    const specificFid = catFidMap[currentCategory];
+    if (specificFid && specificFid.trim() !== '') {
+        return specificFid.trim();
+    }
+    return defaultFid;
+}
+
 async function startBatchTransfer() {
     if (selectedMovies.size === 0) {
         alert('请先勾选需要转存的影视！');
@@ -366,17 +399,19 @@ async function startBatchTransfer() {
     }
 
     const cookie = localStorage.getItem('quark_cookie') || '';
-    const folderId = localStorage.getItem('target_folder_id') || '0';
-
     if (!cookie) {
         alert('请先填入夸克 Cookie！');
         openConfigModal();
         return;
     }
 
+    // 获取智能判断后的目标 FID
+    const targetFolderId = getTargetFolderId();
+
     document.getElementById('log-body').textContent = '';
     const targets = Array.from(selectedMovies);
-    appendLog(`[系统] 🚀 开始处理本轮批量转存，共 ${targets.length} 个目标...`);
+    appendLog(`[系统] 🚀 开始处理批量转存 [分类: ${currentCategory}]，共 ${targets.length} 个目标...`);
+    appendLog(`[系统] 📁 存储目标目录 FID: ${targetFolderId}`);
 
     try {
         const response = await fetch('/api/transfer', {
@@ -385,7 +420,7 @@ async function startBatchTransfer() {
             body: JSON.stringify({
                 movies: targets,
                 cookie: cookie,
-                folderId: folderId
+                folderId: targetFolderId
             })
         });
 
@@ -407,7 +442,7 @@ async function startBatchTransfer() {
 
         const openlistUrl = localStorage.getItem('openlist_url');
         if (openlistUrl) {
-            appendLog(`\n👉 提示：你可以点击顶部【📺 在线观看】直接打开 OpenList 播放影视！`);
+            appendLog(`\n👉 提示：你可以点击顶栏【▶️ OpenList 云播】直接播放本轮转存视频！`);
         }
     } catch (err) {
         appendLog(`\n❌ 网络请求异常: ${err.message}`);
