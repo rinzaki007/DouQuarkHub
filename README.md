@@ -1,16 +1,20 @@
-- main.py # Flask 主程序（仅保留 API 路由与启动）
-- quark_engine.py # 夸克网盘 API 引擎类（鉴权、创建目录、转存等）
-- search_service.py # 频道检索与转存调度逻辑
-- utils.py # 静态配置、频道读写与辅助工具函数
-- requirements.txt # Python 依赖包清单
-- Dockerfile # Docker 镜像构建文件
-- static/
-  - css/
-    - style.css # 页面 CSS 样式表
-  - js/
-    - main.js # 前端交互与 API 逻辑脚本
-- templates/
-  - index.html # 纯 HTML 页面结构
+cloudmovie/
+├── .github/
+│   └── workflows/
+│       └── docker-build.yml      # GitHub Actions 自动化构建与并发控制
+├── templates/
+│   └── index.html               # 页面结构（吸顶栏、8列网格、状态监控、配置弹窗）
+├── static/
+│   ├── css/
+│   │   └── style.css            # 页面全套 CSS 样式
+│   └── js/
+│       └── main.js              # 前端交互逻辑（ReadableStream 流式日志读取）
+├── main.py                      # Flask 主程序（全局 JSON 防错、流式日志响应）
+├── quark_engine.py              # 夸克 API 核心（Cookie 校验、Token 申请、两步解析与转存）
+└── search_service.py            # TG 频道多线程并发检索与流式转存调度
+
+
+
 
 docker-compose部署
 
