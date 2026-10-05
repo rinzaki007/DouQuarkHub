@@ -10,7 +10,7 @@ class SearchService:
         }
 
     def search_single_movie_pwd_id(self, title, channels):
-        """在已配置的 TG 频道中检索指定剧名，提取第一个有效的夸克链接 pwd_id"""
+        """在已配置的 TG 频道中检索指定剧名，，提取第一个有效的夸克链接 pwd_id"""
         if not title or not channels:
             return None
 
