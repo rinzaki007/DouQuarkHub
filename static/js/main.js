@@ -380,7 +380,6 @@ function openConfigModal() {
 
 function closeConfigModal() { document.getElementById('config-modal').style.display = 'none'; }
 
-/* 🎯 渲染用户在配置中保存的 4 大分类目录下拉列表 */
 function populateFolderSelectOptions() {
     const select = document.getElementById('sub-folder-select');
     select.innerHTML = '';
@@ -404,7 +403,7 @@ function populateFolderSelectOptions() {
         el.value = opt.val;
         el.textContent = opt.label;
         if (opt.cat === currentCategory) {
-            el.selected = true; // 自动根据当前顶栏所在分类做优先选中
+            el.selected = true;
         }
         select.appendChild(el);
     });
@@ -417,7 +416,6 @@ function openSubModal() {
 }
 function closeSubModal() { document.getElementById('sub-modal').style.display = 'none'; }
 
-/* 🎯 勾选剧集后一键“转存或追剧”带入处理 */
 async function subscribeSelected() {
     if (selectedMovies.size === 0) {
         alert('请先在页面上勾选你需要自动追更的剧集或动漫！');
@@ -425,7 +423,7 @@ async function subscribeSelected() {
     }
     
     const targets = Array.from(selectedMovies);
-    const title = targets[0]; // 默认取第一部勾选剧集
+    const title = targets[0];
 
     openSubModal();
     document.getElementById('sub-title-input').value = title;
@@ -434,7 +432,7 @@ async function subscribeSelected() {
     autoSearchSubLink();
 }
 
-/* 🎯 根据剧名在 Telegram 频道中精准检索夸克分享 ID */
+/* 🎯 根据剧名在 Telegram 频道中精准检索夸克分享 ID（加强了 Response 格式与报错防护） */
 async function autoSearchSubLink() {
     const title = document.getElementById('sub-title-input').value.trim();
     if (!title) {
@@ -452,6 +450,15 @@ async function autoSearchSubLink() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ title, cookie })
         });
+
+        // 防范 HTML 重定向或 500 页面导致的 JSON SyntaxError
+        const contentType = res.headers.get('content-type') || '';
+        if (!contentType.includes('application/json')) {
+            pwdInput.value = '';
+            alert(`检索服务响应异常 (HTTP ${res.status})，请检查后端容器日志或确认是否已配置 TG 频道`);
+            return;
+        }
+
         const data = await res.json();
         if (data.success && data.pwd_id) {
             pwdInput.value = data.pwd_id;
@@ -462,7 +469,7 @@ async function autoSearchSubLink() {
         }
     } catch (err) {
         pwdInput.value = '';
-        alert('检索连接超时或异常: ' + err.message);
+        alert('网络请求异常: ' + err.message);
     }
 }
 
@@ -484,7 +491,6 @@ function getTargetFolderId() {
     return defaultFid;
 }
 
-/* 🎬 选集解析与转存 */
 async function parseAndSelectFiles(pwdId, showTitle) {
     const cookie = localStorage.getItem('quark_cookie') || '';
     if (!cookie) {
@@ -579,7 +585,6 @@ async function submitSaveSelectedFiles() {
     }
 }
 
-/* 📺 追剧订阅 API */
 async function fetchSubscriptions() {
     const res = await fetch('/api/subscriptions');
     const data = await res.json();
