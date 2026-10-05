@@ -2,7 +2,6 @@ import re
 import requests
 
 def sanitize_pwd_id(pwd_id):
-    """自动清洗 pwd_id，无论是完整 URL 还是带斜杠的路径，都只提取纯短码 ID"""
     if not pwd_id:
         return ""
     pwd_id = str(pwd_id).strip()
@@ -16,7 +15,6 @@ def sanitize_pwd_id(pwd_id):
     return pwd_id
 
 def clean_tv_filename(raw_name, title=""):
-    """智能从文件名中提取集数数字并清洗文件名"""
     if not raw_name:
         return None, raw_name
     
@@ -59,10 +57,9 @@ class QuarkEngine:
         }
 
     def check_cookie_valid(self):
-        """使用根目录查询验证 Cookie 有效性"""
         url = "https://drive.quark.cn/1/clouddrive/file/sort?pr=ucpro&fr=pc&pdir_fid=0&num=1"
         try:
-            resp = requests.get(url, headers=self.headers, timeout=4)
+            resp = requests.get(url, headers=self.headers, timeout=6)
             if resp.status_code == 200:
                 data = resp.json()
                 return data.get('code') == 0
@@ -71,7 +68,6 @@ class QuarkEngine:
             return False
 
     def get_share_files(self, pwd_id, max_depth=3):
-        """递归穿透文件夹获取底层视频文件"""
         pwd_id = sanitize_pwd_id(pwd_id)
         if not pwd_id:
             return None, None, "分享链接 ID 无效"
@@ -79,7 +75,7 @@ class QuarkEngine:
         token_url = "https://drive.quark.cn/1/clouddrive/share/sharepage/token"
         payload = {"pwd_id": pwd_id, "passcode": ""}
         try:
-            resp = requests.post(token_url, json=payload, headers=self.headers, timeout=6)
+            resp = requests.post(token_url, json=payload, headers=self.headers, timeout=8)
             if resp.status_code == 404:
                 return None, None, "HTTP 404 (该链接已失效或已被原作者删除)"
             
@@ -98,7 +94,7 @@ class QuarkEngine:
                 return
             detail_url = f"https://drive.quark.cn/1/clouddrive/share/sharepage/detail?pr=ucpro&fr=pc&pwd_id={pwd_id}&stoken={requests.utils.quote(stoken)}&pdir_fid={pdir_fid}&p=1&num=200"
             try:
-                r = requests.get(detail_url, headers=self.headers, timeout=6)
+                r = requests.get(detail_url, headers=self.headers, timeout=8)
                 if r.status_code == 200:
                     d = r.json()
                     if d.get('code') == 0:
@@ -127,7 +123,7 @@ class QuarkEngine:
         }
         
         try:
-            resp = requests.post(url, json=payload, headers=self.headers, timeout=8)
+            resp = requests.post(url, json=payload, headers=self.headers, timeout=10)
             data = resp.json()
             if data.get('code') == 0:
                 return True, "转存成功"
