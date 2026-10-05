@@ -20,7 +20,6 @@ def get_movies():
     country = request.args.get('country', '')    # 中国大陆, 美国...
     year_range = request.args.get('year', '')    # 2026,2026 或 2020,2029
 
-    # 豆瓣 API 中动漫对应的标准 tag 为 '动画'
     if main_tag == '动漫':
         main_tag = '动画'
 
