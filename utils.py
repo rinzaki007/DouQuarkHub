@@ -2,27 +2,13 @@ import os
 import re
 import json
 
-CHANNELS_FILE = os.path.join(os.path.dirname(__file__), 'channels.json')
+# 自动创建 data 目录并指定配置文件路径
+DATA_DIR = os.path.join(os.path.dirname(__file__), 'data')
+os.makedirs(DATA_DIR, exist_ok=True)
+CHANNELS_FILE = os.path.join(DATA_DIR, 'channels.json')
 
-DEFAULT_CHANNELS = [
-    {"name": "夸克云盘综合资源", "id": "Quark_Movies"},
-    {"name": "YOYO资源|夸克|短剧", "id": "yoyokuakeduanju"},
-    {"name": "UC夸克百度迅雷资源分享", "id": "ucquark"},
-    {"name": "夸克网盘资源收藏夹", "id": "QuarkFree"},
-    {"name": "leo资源(夸克)", "id": "leoziyuan"},
-    {"name": "夸克（百草）", "id": "baicaoZY"},
-    {"name": "夸克(网盘高分影视)", "id": "SharePanFilms"},
-    {"name": "夸克(书籍)", "id": "BooksRealm"},
-    {"name": "Q_dongman", "id": "Q_dongman"},
-    {"name": "夸克网盘动漫资源", "id": "kuakedongman"},
-    {"name": "kduanju", "id": "kduanju"},
-    {"name": "Q_jilupian", "id": "Q_jilupian"},
-    {"name": "yunpanquark", "id": "yunpanquark"},
-    {"name": "Q_dianying", "id": "Q_dianying"},
-    {"name": "gokuapan", "id": "gokuapan"},
-    {"name": "kuyupan", "id": "kuyupan"},
-    {"name": "kuakenetpan", "id": "kuakenetpan"}
-]
+# 默认频道列表留空，由用户在网页端自行添加或导入
+DEFAULT_CHANNELS = []
 
 QUARK_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
