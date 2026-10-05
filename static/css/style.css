@@ -84,7 +84,6 @@ header {
 
 .btn:hover { background: var(--primary-hover); }
 
-/* 顶栏排版重构 */
 .top-action-bar {
     display: flex;
     justify-content: space-between;
@@ -421,7 +420,6 @@ header {
     line-height: 1.5;
 }
 
-/* Modal 弹窗优化 */
 .modal {
     position: fixed;
     top: 0; left: 0; width: 100vw; height: 100vh;
@@ -453,7 +451,6 @@ header {
     font-size: 13px;
 }
 
-/* 分类 2x2 FID 目录网格 */
 .folder-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
