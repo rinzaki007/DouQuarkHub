@@ -7,7 +7,7 @@ CHANNELS_FILE = os.path.join(DATA_DIR, 'channels.json')
 if not os.path.exists(DATA_DIR):
     os.makedirs(DATA_DIR, exist_ok=True)
 
-# 真实浏览器 User-Agent 规避豆瓣防刷
+# 真实浏览器 User-Agent，规避豆瓣防刷与拦截
 DOUBAN_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
     "Referer": "https://movie.douban.com/explore",
