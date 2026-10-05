@@ -67,6 +67,39 @@ function removeChannel(idx) {
     renderChannels();
 }
 
+// 📥 批量导入 JSON 频道核心函数
+function importChannelsJson() {
+    const jsonStr = prompt("请粘贴你的频道 JSON 数据（数组格式）：", '[{"name": "示例频道", "id": "example_channel"}]');
+    if (!jsonStr) return;
+    
+    try {
+        const parsed = JSON.parse(jsonStr);
+        if (!Array.isArray(parsed)) {
+            alert("导入失败：JSON 格式错误，必须是以方括号包裹的数组 [...]");
+            return;
+        }
+
+        let addedCount = 0;
+        parsed.forEach(item => {
+            // 兼容兼容 name/title，id/channel_id 字段
+            const name = item.name || item.title || "";
+            const id = item.id || item.channel_id || "";
+            if (name && id) {
+                // 自动去重
+                if (!channelList.some(c => c.id === id)) {
+                    channelList.push({ name, id });
+                    addedCount++;
+                }
+            }
+        });
+
+        renderChannels();
+        alert(`成功导入 ${addedCount} 个新频道！\n\n请不要忘记点击配置弹窗右下角的“💾 保存配置”按钮！`);
+    } catch (err) {
+        alert("解析 JSON 失败，请检查格式是否为标准 JSON！\n错误细节: " + err.message);
+    }
+}
+
 async function saveConfig() {
     const cookie = document.getElementById('quark-cookie-input').value.trim();
     const fid = document.getElementById('folder-id-input').value.trim() || '0';
