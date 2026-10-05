@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>豆瓣全局搜索转存夸克网盘服务</title>
+    <title>DouQuark Hub</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
@@ -12,14 +12,14 @@
         <!-- 左侧主内容区域 -->
         <div class="left-main">
             <header>
-                <div class="logo">🎬 豆瓣全局搜索转存夸克网盘服务</div>
+                <div class="logo">🎬DouQuark Hub</div>
                 <div class="search-box">
                     <input type="text" id="search-input" placeholder="输入你想找的电影、热播剧集、综艺、动漫..." onkeydown="if(event.key==='Enter') searchMovies()">
                     <button class="btn" onclick="searchMovies()">搜索</button>
                 </div>
             </header>
 
-            <!-- 顶部分类 Tab 与 工具快捷按钮 -->
+            <!-- 顶部分类 Tab 与 重构后的优化工具栏 -->
             <div class="top-action-bar">
                 <div class="tab-group">
                     <button class="tab-btn active" id="tab-电影" onclick="switchCategory('电影')">🎬 电影</button>
@@ -29,16 +29,23 @@
                 </div>
 
                 <div class="right-tools">
-                    <!-- 🌟 新增：在线观看与唤起夸克客户端按钮 -->
-                    <button class="btn-tool btn-openlist" onclick="openOpenList()" title="点击在新窗口打开 OpenList 播放视频">📺 在线观看</button>
-                    <button class="btn-tool btn-quark" onclick="openQuarkApp()" title="调用电脑本地已安装的夸克网盘客户端">📥 夸克客户端</button>
+                    <!-- 外部播放/客户端工具 -->
+                    <div class="tool-group">
+                        <button class="btn-tool btn-openlist" onclick="openOpenList()" title="点击在新窗口打开 OpenList 播放视频">▶️ OpenList 云播</button>
+                        <button class="btn-tool btn-quark" onclick="openQuarkApp()" title="唤起电脑本地夸克网盘客户端或打开网页版">💻 夸克客户端</button>
+                    </div>
 
-                    <span class="select-count">已选 <b id="selected-count">0</b> 部</span>
-                    <button class="btn-sm" onclick="selectAll()">全选</button>
-                    <button class="btn-sm" onclick="clearSelection()">取消</button>
-                    <button class="btn-transfer-top" onclick="startBatchTransfer()">
-                        🚀 一键批量转存勾选项
-                    </button>
+                    <div class="tool-divider"></div>
+
+                    <!-- 选择与转存核心区 -->
+                    <div class="action-group">
+                        <span class="select-count">已选 <b id="selected-count">0</b> 部</span>
+                        <button class="btn-sm" onclick="selectAll()">全选</button>
+                        <button class="btn-sm" onclick="clearSelection()">取消</button>
+                        <button class="btn-transfer-top" onclick="startBatchTransfer()">
+                            🚀 批量转存
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -137,19 +144,40 @@
         </div>
     </div>
 
-    <!-- 配置 Modal -->
+    <!-- ⚙️ 配置 Settings Modal -->
     <div class="modal" id="config-modal">
         <div class="modal-content">
             <h3>⚙ 系统与服务集成配置</h3>
             
-            <div class="section-title">☁️ 夸克网盘配置</div>
+            <div class="section-title">☁️ 夸克网盘基础配置</div>
             <label style="font-size:13px; color:#94a3b8;">夸克 Cookie:</label>
             <input type="text" id="quark-cookie-input" placeholder="粘贴完整的夸克 Cookie...">
             
-            <label style="font-size:13px; color:#94a3b8;">目标保存目录 FID (默认 0 表示根目录):</label>
+            <label style="font-size:13px; color:#94a3b8;">默认保存目录 FID (未独立配置时生效，默认 0 为根目录):</label>
             <input type="text" id="folder-id-input" placeholder="默认 0">
 
-            <!-- 🌟 新增：外部应用与在线观看集成 -->
+            <!-- 📁 新增：分类独立保存目录 (2x2 网格) -->
+            <div class="section-title">📁 分类独立保存目录 FID (留空则使用默认目录)</div>
+            <div class="folder-grid">
+                <div>
+                    <label style="font-size:12px; color:#94a3b8;">🎬 电影保存 FID:</label>
+                    <input type="text" id="folder-movie-input" placeholder="例: 3ef79d1b...">
+                </div>
+                <div>
+                    <label style="font-size:12px; color:#94a3b8;">📺 电视剧保存 FID:</label>
+                    <input type="text" id="folder-tv-input" placeholder="例: 4ab88f2c...">
+                </div>
+                <div>
+                    <label style="font-size:12px; color:#94a3b8;">🎤 综艺保存 FID:</label>
+                    <input type="text" id="folder-show-input" placeholder="例: 1cd99e3a...">
+                </div>
+                <div>
+                    <label style="font-size:12px; color:#94a3b8;">🎨 动漫保存 FID:</label>
+                    <input type="text" id="folder-anime-input" placeholder="例: 8fe11b4d...">
+                </div>
+            </div>
+
+            <!-- 🔗 外部集成配置 -->
             <div class="section-title">🔗 外部工具集成</div>
             <label style="font-size:13px; color:#94a3b8;">OpenList 在线播放地址 (例: http://192.168.1.100:5244):</label>
             <input type="text" id="openlist-url-input" placeholder="http://192.168.x.x:5244">
