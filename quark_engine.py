@@ -12,7 +12,6 @@ class QuarkEngine:
         }
 
     def check_cookie_valid(self):
-        """通过获取网盘根目录判定 Cookie 是否有效"""
         if not self.cookie:
             return False
         url = "https://drive-pc.quark.cn/1/clouddrive/file/sort?pr=ucpro&fr=pc&pdir_fid=0&_size=1"
@@ -26,7 +25,6 @@ class QuarkEngine:
             return False
 
     def get_share_files(self, pwd_id):
-        """获取分享链接的文件列表、stoken 及 fid_token 令牌"""
         url = "https://drive-pc.quark.cn/1/clouddrive/share/sharepage/detail"
         params = {"pr": "ucpro", "fr": "pc", "pwd_id": pwd_id}
         try:
@@ -43,10 +41,8 @@ class QuarkEngine:
             return [], ""
 
     def save_files(self, pwd_id, files, stoken, target_fid='0'):
-        """夸克转存完整接口，包含 fid_token_list 与 pwd_id 校验"""
         url = "https://drive-pc.quark.cn/1/clouddrive/share/sharepage/save?pr=ucpro&fr=pc"
         
-        # 提取文件 ID 列表与对应的 fid_token 令牌列表
         fid_list = [f.get("fid") for f in files if f.get("fid")]
         fid_token_list = [f.get("share_fid_token") or f.get("fid_token") or "" for f in files]
 
