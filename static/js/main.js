@@ -1,4 +1,11 @@
-let currentTab = 'movie';
+let currentCategory = '电影';
+let activeFilters = {
+    sort: 'U',
+    genre: '',
+    country: '',
+    year: ''
+};
+
 let movieList = [];
 let selectedMovies = new Set();
 let channelList = [];
@@ -6,7 +13,7 @@ let channelList = [];
 window.onload = () => {
     loadConfig();
     refreshStatus();
-    fetchMovies('movie');
+    fetchMovies();
     fetchChannels();
 };
 
@@ -20,7 +27,138 @@ function refreshStatus() {
     checkChannelsHealth();
 }
 
-// 4: 探针检测 TG 频道真实联通性
+// 切换大类 (电影 / 电视剧 / 综艺 / 动漫)
+function switchCategory(cat) {
+    currentCategory = cat;
+    ['电影', '电视剧', '综艺', '动漫'].forEach(c => {
+        const btn = document.getElementById(`tab-${c}`);
+        if (btn) btn.classList.toggle('active', c === cat);
+    });
+    fetchMovies();
+}
+
+// 设置组合筛选条件
+function setFilter(type, value, el) {
+    activeFilters[type] = value;
+    
+    // 更新按钮选中状态
+    const container = el.parentElement;
+    container.querySelectorAll('.filter-item').forEach(item => item.classList.remove('active'));
+    el.classList.add('active');
+
+    fetchMovies();
+}
+
+// 根据当前组合条件发起豆瓣数据请求
+async function fetchMovies() {
+    appendLog(`[系统] 正在筛选豆瓣【${currentCategory}】...`);
+    
+    const params = new URLSearchParams({
+        tag: currentCategory,
+        sort: activeFilters.sort,
+        genre: activeFilters.genre,
+        country: activeFilters.country,
+        year: activeFilters.year
+    });
+
+    try {
+        const res = await fetch(`/api/get-movies?${params.toString()}`);
+        const data = await res.json();
+        if (data.success) {
+            movieList = data.movies;
+            renderGrid();
+        } else {
+            appendLog(`[系统] ❌ 获取列表失败: ${data.message || '豆瓣服务异常'}`);
+        }
+    } catch (err) {
+        appendLog(`[系统] ❌ 网络获取失败: ${err.message}`);
+    }
+}
+
+async function searchMovies() {
+    const query = document.getElementById('search-input').value.trim();
+    if (!query) return;
+    appendLog(`[系统] 🔍 正在豆瓣全站搜索：${query}...`);
+    try {
+        const res = await fetch(`/api/search-douban?q=${encodeURIComponent(query)}`);
+        const data = await res.json();
+        if (data.success) {
+            movieList = data.movies;
+            renderGrid();
+        }
+    } catch (err) {
+        appendLog(`[系统] ❌ 搜索失败: ${err.message}`);
+    }
+}
+
+function renderGrid() {
+    const grid = document.getElementById('movie-grid');
+    grid.innerHTML = '';
+    if (movieList.length === 0) {
+        grid.innerHTML = `<div style="grid-column: span 8; text-align:center; color:#64748b; padding:40px;">未检索到符合条件的作品</div>`;
+        return;
+    }
+    movieList.forEach(m => {
+        const isSelected = selectedMovies.has(m.title);
+        const card = document.createElement('div');
+        card.className = `movie-card ${isSelected ? 'selected' : ''}`;
+        card.onclick = () => toggleSelect(m.title, card);
+
+        const coverSrc = m.cover ? `/api/proxy-img?url=${encodeURIComponent(m.cover)}` : '';
+
+        card.innerHTML = `
+            <div class="cover-box">
+                <img src="${coverSrc}" alt="${m.title}" loading="lazy">
+                <div class="rate-tag">${m.rate}</div>
+                <div class="check-box">${isSelected ? '✓' : ''}</div>
+            </div>
+            <div class="card-info">
+                <div class="movie-title">${m.title}</div>
+                <a href="${m.url}" target="_blank" class="douban-link" onclick="event.stopPropagation()">🔗 豆瓣详情</a>
+            </div>
+        `;
+        grid.appendChild(card);
+    });
+    updateCount();
+}
+
+function toggleSelect(title, card) {
+    if (selectedMovies.has(title)) {
+        selectedMovies.delete(title);
+        card.classList.remove('selected');
+        card.querySelector('.check-box').textContent = '';
+    } else {
+        selectedMovies.add(title);
+        card.classList.add('selected');
+        card.querySelector('.check-box').textContent = '✓';
+    }
+    updateCount();
+}
+
+function selectAll() {
+    movieList.forEach(m => selectedMovies.add(m.title));
+    renderGrid();
+}
+
+function clearSelection() {
+    selectedMovies.clear();
+    renderGrid();
+}
+
+function updateCount() {
+    document.getElementById('selected-count').textContent = selectedMovies.size;
+}
+
+function appendLog(text) {
+    const logBody = document.getElementById('log-body');
+    logBody.textContent += (logBody.textContent ? '\n' : '') + text;
+    logBody.scrollTop = logBody.scrollHeight;
+}
+
+function clearLog() {
+    document.getElementById('log-body').textContent = '系统就绪，等待触发转存任务...';
+}
+
 async function checkChannelsHealth() {
     const chBadge = document.getElementById('channel-status-badge');
     chBadge.className = 'badge badge-warning';
@@ -189,109 +327,6 @@ async function saveConfig() {
 function openConfigModal() { document.getElementById('config-modal').style.display = 'flex'; }
 function closeConfigModal() { document.getElementById('config-modal').style.display = 'none'; }
 
-async function fetchMovies(type) {
-    const names = { movie: '热门电影', tv: '热门电视剧', show: '热门综艺', anime: '热门动漫' };
-    appendLog(`[系统] 正在获取豆瓣【${names[type] || type}】列表...\n`);
-    try {
-        const res = await fetch(`/api/get-movies?type=${type}`);
-        const data = await res.json();
-        if (data.success) {
-            movieList = data.movies;
-            renderGrid();
-        }
-    } catch (err) {
-        appendLog(`[系统] ❌ 获取列表失败: ${err.message}\n`);
-    }
-}
-
-async function searchMovies() {
-    const query = document.getElementById('search-input').value.trim();
-    if (!query) return;
-    appendLog(`[系统] 🔍 正在豆瓣搜索：${query}...\n`);
-    try {
-        const res = await fetch(`/api/search-douban?q=${encodeURIComponent(query)}`);
-        const data = await res.json();
-        if (data.success) {
-            movieList = data.movies;
-            renderGrid();
-        }
-    } catch (err) {
-        appendLog(`[系统] ❌ 搜索失败: ${err.message}\n`);
-    }
-}
-
-function switchTab(type) {
-    currentTab = type;
-    ['movie', 'tv', 'show', 'anime'].forEach(t => {
-        document.getElementById(`tab-${t}`).classList.toggle('active', t === type);
-    });
-    fetchMovies(type);
-}
-
-function renderGrid() {
-    const grid = document.getElementById('movie-grid');
-    grid.innerHTML = '';
-    movieList.forEach(m => {
-        const isSelected = selectedMovies.has(m.title);
-        const card = document.createElement('div');
-        card.className = `movie-card ${isSelected ? 'selected' : ''}`;
-        card.onclick = () => toggleSelect(m.title, card);
-
-        const coverSrc = m.cover ? `/api/proxy-img?url=${encodeURIComponent(m.cover)}` : '';
-
-        card.innerHTML = `
-            <div class="cover-box">
-                <img src="${coverSrc}" alt="${m.title}" loading="lazy">
-                <div class="rate-tag">${m.rate}</div>
-                <div class="check-box">${isSelected ? '✓' : ''}</div>
-            </div>
-            <div class="card-info">
-                <div class="movie-title">${m.title}</div>
-                <a href="${m.url}" target="_blank" class="douban-link" onclick="event.stopPropagation()">🔗 豆瓣详情</a>
-            </div>
-        `;
-        grid.appendChild(card);
-    });
-    updateCount();
-}
-
-function toggleSelect(title, card) {
-    if (selectedMovies.has(title)) {
-        selectedMovies.delete(title);
-        card.classList.remove('selected');
-        card.querySelector('.check-box').textContent = '';
-    } else {
-        selectedMovies.add(title);
-        card.classList.add('selected');
-        card.querySelector('.check-box').textContent = '✓';
-    }
-    updateCount();
-}
-
-function selectAll() {
-    movieList.forEach(m => selectedMovies.add(m.title));
-    renderGrid();
-}
-
-function clearSelection() {
-    selectedMovies.clear();
-    renderGrid();
-}
-
-function updateCount() {
-    document.getElementById('selected-count').textContent = selectedMovies.size;
-}
-
-function appendLog(text) {
-    const logBody = document.getElementById('log-body');
-    logBody.textContent += text;
-    logBody.scrollTop = logBody.scrollHeight;
-}
-
-function clearLog() {
-    document.getElementById('log-body').textContent = '系统就绪，等待触发转存任务...';
-}
-
 async function startBatchTransfer() {
     if (selectedMovies.size === 0) {
         alert('请先勾选需要转存的影视！');
@@ -309,7 +344,7 @@ async function startBatchTransfer() {
 
     document.getElementById('log-body').textContent = '';
     const targets = Array.from(selectedMovies);
-    appendLog(`[系统] 🚀 开始处理本轮批量转存，共 ${targets.length} 个目标...\n`);
+    appendLog(`[系统] 🚀 开始处理本轮批量转存，共 ${targets.length} 个目标...`);
 
     try {
         const response = await fetch('/api/transfer', {
@@ -324,7 +359,7 @@ async function startBatchTransfer() {
 
         if (!response.ok) {
             const text = await response.text();
-            appendLog(`\n❌ 网关/服务器异常 (${response.status}): ${text.substring(0, 100)}\n`);
+            appendLog(`\n❌ 网关/服务器异常 (${response.status}): ${text.substring(0, 100)}`);
             return;
         }
 
@@ -338,6 +373,6 @@ async function startBatchTransfer() {
             appendLog(chunk);
         }
     } catch (err) {
-        appendLog(`\n❌ 网络请求异常: ${err.message}\n`);
+        appendLog(`\n❌ 网络请求异常: ${err.message}`);
     }
 }
