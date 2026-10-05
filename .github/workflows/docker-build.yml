@@ -41,5 +41,4 @@ jobs:
         with:
           context: .
           push: true
-          # 🚀 构建项目同名镜像 ghcr.io/<username>/douquarkhub:latest
-          tags: ghcr.io/${{ env.REPO_OWNER }}/douquarkhub:latest
+          tags: ghcr.io/${{ env.REPO_OWNER }}/moviesync:latest
