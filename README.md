@@ -1,0 +1,13 @@
+├── main.py                 # Flask 主程序（原 app.py，仅保留 API 路由与启动）
+├── quark_engine.py         # 夸克网盘 API 引擎类（鉴权、创建目录、转存等）
+├── search_service.py       # 频道检索与转存调度逻辑
+├── utils.py                # 静态配置、频道读写与辅助工具函数
+├── requirements.txt        # Python 依赖包清单
+├── Dockerfile              # Docker 镜像构建文件
+├── static/
+│   ├── css/
+│   │   └── style.css       # 页面 CSS 样式表
+│   └── js/
+│       └── main.js         # 前端交互与 API 逻辑脚本
+└── templates/
+    └── index.html          # 纯 HTML 页面结构
