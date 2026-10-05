@@ -16,7 +16,36 @@ window.onload = () => {
     refreshStatus();
     fetchMovies();
     fetchChannels();
+    initScrollCollapseFilter(); // 🎯 初始化滚动自动收起筛选面板
 };
+
+// 🎯 核心新功能：滚动时自动缩放/收起筛选面板
+function initScrollCollapseFilter() {
+    const gridContainer = document.getElementById('movie-grid-container');
+    const filterPanel = document.getElementById('filter-panel');
+    if (!gridContainer || !filterPanel) return;
+
+    let lastScrollTop = 0;
+    gridContainer.addEventListener('scroll', () => {
+        const currentScroll = gridContainer.scrollTop;
+        if (currentScroll > 20 && currentScroll > lastScrollTop) {
+            // 向下滚动：自动收起筛选面板
+            filterpanelAddCollapsed(filterPanel, true);
+        } else if (currentScroll < 10) {
+            // 滚动回顶部：自动展开筛选面板
+            filterpanelAddCollapsed(filterPanel, false);
+        }
+        lastScrollTop = currentScroll;
+    });
+}
+
+function filterpanelAddCollapsed(panel, collapse) {
+    if (collapse) {
+        panel.classList.add('collapsed');
+    } else {
+        panel.classList.remove('collapsed');
+    }
+}
 
 function loadConfig() {
     document.getElementById('quark-cookie-input').value = localStorage.getItem('quark_cookie') || '';
@@ -268,7 +297,7 @@ function renderChannels() {
     if (!container) return;
     container.innerHTML = '';
     if (channelList.length === 0) {
-        container.innerHTML = `<div style="text-align:center; color:#64748b; font-size:13px; padding:10px;">暂无设定频道</div>`;
+        container.innerHTML = `<div style="text-align:center; color:#64748b; font-size:12px; padding:10px;">暂无设定频道</div>`;
         return;
     }
     channelList.forEach((ch, idx) => {
@@ -367,7 +396,6 @@ function openSubModal() {
 }
 function closeSubModal() { document.getElementById('sub-modal').style.display = 'none'; }
 
-// 🎯 修复：一键追剧按钮触发函数
 function subscribeSelected() {
     if (selectedMovies.size === 0) {
         alert('请先在页面上勾选你需要自动追更的剧集或动漫！');
@@ -507,7 +535,6 @@ function getTargetFolderId() {
     return defaultFid;
 }
 
-// 🎯 修复：一键批量转存按钮触发函数
 async function startBatchTransfer() {
     if (selectedMovies.size === 0) {
         alert('请先勾选需要转存的影视！');
