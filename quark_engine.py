@@ -8,11 +8,12 @@ class QuarkEngine:
             "Referer": "https://pan.quark.cn/",
             "Origin": "https://pan.quark.cn",
             "Cookie": self.cookie,
+            "Content-Type": "application/json;charset=UTF-8",
             "Accept": "application/json, text/plain, */*"
         }
 
     def check_cookie_valid(self):
-        """通过获取网盘根目录判定 Cookie 是否有效"""
+        """通过读取网盘根目录判定 Cookie 是否有效"""
         if not self.cookie:
             return False
         url = "https://drive-pc.quark.cn/1/clouddrive/file/sort?pr=ucpro&fr=pc&pdir_fid=0&_size=1"
@@ -25,14 +26,43 @@ class QuarkEngine:
         except Exception:
             return False
 
-    def get_share_files(self, pwd_id):
-        """获取分享链接的文件列表与 stoken (补充 pdir_fid=0 与动态 Referer)"""
+    def get_stoken(self, pwd_id, passcode=""):
+        """第一步：向 sharepage/token 请求 stoken"""
+        url = "https://drive-pc.quark.cn/1/clouddrive/share/sharepage/token?pr=ucpro&fr=pc"
+        payload = {
+            "pwd_id": pwd_id,
+            "passcode": passcode
+        }
+        headers = self.headers.copy()
+        headers["Referer"] = f"https://pan.quark.cn/s/{pwd_id}"
+        
+        try:
+            resp = requests.post(url, headers=headers, json=payload, timeout=6)
+            if resp.status_code == 200:
+                res_json = resp.json()
+                if res_json.get("code") == 0 and "data" in res_json:
+                    return res_json["data"].get("stoken", ""), ""
+                return "", f"token 接口拒答: {res_json.get('message', '未知错误')}"
+            return "", f"token 接口 HTTP {resp.status_code}"
+        except Exception as e:
+            return "", f"token 请求异常: {str(e)}"
+
+    def get_share_files(self, pwd_id, passcode=""):
+        """第二步：带上 stoken 请求 sharepage/detail 获取文件列表"""
+        # 1. 优先获取 stoken
+        stoken, err = self.get_stoken(pwd_id, passcode)
+        if not stoken:
+            return [], "", err or "未能获取到 stoken"
+
+        # 2. 携带 stoken 请求文件详情
         url = "https://drive-pc.quark.cn/1/clouddrive/share/sharepage/detail"
         params = {
             "pr": "ucpro",
             "fr": "pc",
             "pwd_id": pwd_id,
+            "stoken": stoken,
             "pdir_fid": "0",
+            "_page": "1",
             "_size": "50"
         }
         headers = self.headers.copy()
@@ -46,25 +76,24 @@ class QuarkEngine:
                 if code == 0 and "data" in res_json:
                     data = res_json["data"]
                     files = data.get("list", []) or data.get("file_list", [])
-                    stoken = data.get("stoken", "")
-                    if files and stoken:
+                    if files:
                         return files, stoken, ""
-                    return [], "", "夸克未返回有效文件列表"
+                    return [], stoken, "分享目录为空"
                 msg = res_json.get("message") or f"错误码 {code}"
-                return [], "", f"夸克拒绝: {msg}"
-            return [], "", f"HTTP 响应状态 {resp.status_code}"
+                return [], "", f"detail 拒绝: {msg}"
+            return [], "", f"detail 接口 HTTP {resp.status_code}"
         except Exception as e:
-            return [], "", f"网络异常: {str(e)}"
+            return [], "", f"detail 请求异常: {str(e)}"
 
     def save_files(self, pwd_id, files, stoken, target_fid='0'):
-        """夸克转存完整接口"""
+        """第三步：执行转存"""
         url = "https://drive-pc.quark.cn/1/clouddrive/share/sharepage/save?pr=ucpro&fr=pc"
         
         fid_list = [f.get("fid") for f in files if f.get("fid")]
         fid_token_list = [f.get("share_fid_token") or f.get("fid_token") or "" for f in files]
 
         if not fid_list:
-            return False, "未获取到有效的文件 ID"
+            return False, "未找到有效的文件 FID"
 
         payload = {
             "fid_list": fid_list,
@@ -75,13 +104,16 @@ class QuarkEngine:
             "scene": "share"
         }
 
+        headers = self.headers.copy()
+        headers["Referer"] = f"https://pan.quark.cn/s/{pwd_id}"
+
         try:
-            resp = requests.post(url, headers=self.headers, json=payload, timeout=10)
+            resp = requests.post(url, headers=headers, json=payload, timeout=10)
             if resp.status_code == 200:
                 res_json = resp.json()
                 if res_json.get("code") == 0:
                     return True, "转存成功"
-                return False, res_json.get("message", "夸克接口拒绝转存")
-            return False, f"HTTP 状态码: {resp.status_code}"
+                return False, res_json.get("message", "夸克拒绝转存")
+            return False, f"转存 HTTP {resp.status_code}"
         except Exception as e:
-            return False, f"网络请求异常: {str(e)}"
+            return False, f"转存请求网络异常: {str(e)}"
