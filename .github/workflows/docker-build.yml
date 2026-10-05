@@ -3,7 +3,19 @@ name: Build and Push Docker Image
 on:
   push:
     branches: [ "main" ]
+    # 忽略非代码/无需打包的文件，修改这些文件时不会触发构建
+    paths-ignore:
+      - 'README.md'
+      - 'tg夸克频道'
+      - '.gitignore'
+      - 'docs/**'
 
+# 并发控制：如果连续快速提交，自动终止上一次未完成的构建任务
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# 声明向 GHCR 写入镜像的权限
 permissions:
   contents: read
   packages: write
