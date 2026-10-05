@@ -8,57 +8,63 @@
 </head>
 <body>
 
-    <!-- 顶部统一固定卡片，消除缝隙 -->
-    <div class="sticky-top-wrapper">
-        <header>
-            <div class="logo">🎬 豆瓣全局搜索转存夸克网盘服务</div>
-            <div class="search-box">
-                <input type="text" id="search-input" placeholder="输入你想找的电影、热播剧集、综艺、动漫..." onkeydown="if(event.key==='Enter') searchMovies()">
-                <button class="btn" onclick="searchMovies()">搜索</button>
-            </div>
-            <button class="btn config-btn" onclick="openConfigModal()">⚙️ 配置设置</button>
-        </header>
+    <div class="layout-container">
+        <!-- 3: 左侧主内容区域 -->
+        <div class="left-main">
+            <!-- 2: 顶部加宽 Header 栏 -->
+            <header>
+                <div class="logo">🎬 豆瓣全局搜索转存夸克网盘服务</div>
+                <div class="search-box">
+                    <input type="text" id="search-input" placeholder="输入你想找的电影、热播剧集、综艺、动漫..." onkeydown="if(event.key==='Enter') searchMovies()">
+                    <button class="btn" onclick="searchMovies()">搜索</button>
+                </div>
+            </header>
 
-        <div class="top-action-bar">
-            <div class="tab-group">
-                <button class="tab-btn active" id="tab-movie" onclick="switchTab('movie')">🔥 热门电影</button>
-                <button class="tab-btn" id="tab-tv" onclick="switchTab('tv')">📺 热门电视剧</button>
-                <button class="tab-btn" id="tab-show" onclick="switchTab('show')">🎤 热门综艺</button>
-                <button class="tab-btn" id="tab-anime" onclick="switchTab('anime')">🎨 热门动漫</button>
+            <!-- 2: 顶部加宽操作与分类栏 -->
+            <div class="top-action-bar">
+                <div class="tab-group">
+                    <button class="tab-btn active" id="tab-movie" onclick="switchTab('movie')">🔥 热门电影</button>
+                    <button class="tab-btn" id="tab-tv" onclick="switchTab('tv')">📺 热门电视剧</button>
+                    <button class="tab-btn" id="tab-show" onclick="switchTab('show')">🎤 热门综艺</button>
+                    <button class="tab-btn" id="tab-anime" onclick="switchTab('anime')">🎨 热门动漫</button>
+                </div>
+
+                <div class="right-tools">
+                    <span class="select-count">已选 <b id="selected-count">0</b> 部</span>
+                    <button class="btn-sm" onclick="selectAll()">全选</button>
+                    <button class="btn-sm" onclick="clearSelection()">取消</button>
+                    <button class="btn-transfer-top" onclick="startBatchTransfer()">
+                        🚀 一键批量转存勾选项
+                    </button>
+                </div>
             </div>
 
-            <div class="right-tools">
-                <span class="select-count">已选 <b id="selected-count">0</b> 部</span>
-                <button class="btn-sm" onclick="selectAll()">全选</button>
-                <button class="btn-sm" onclick="clearSelection()">取消</button>
-                <button class="btn-transfer-top" onclick="startBatchTransfer()">
-                    🚀 一键批量转存勾选项
-                </button>
+            <!-- 1: 8列放大海报墙 -->
+            <div class="content-area">
+                <div class="movie-grid" id="movie-grid"></div>
             </div>
         </div>
-    </div>
 
-    <main>
-        <div class="content-area">
-            <!-- 8列展示墙 -->
-            <div class="movie-grid" id="movie-grid"></div>
-        </div>
-
-        <!-- 右侧监控 Sidebar -->
+        <!-- 3: 右侧全高贯穿 Sidebar -->
         <div class="log-sidebar">
+            <div class="sidebar-top-bar">
+                <button class="btn config-btn" onclick="openConfigModal()">⚙️ 配置设置</button>
+            </div>
+
             <div class="status-panel">
                 <div class="status-header">
                     <span class="status-title">⚡ 系统状态监控</span>
-                    <button class="btn-sm" style="font-size:10px; padding:2px 6px;" onclick="refreshStatus()">🔄 刷新</button>
+                    <button class="btn-sm" style="font-size:11px; padding:2px 8px;" onclick="refreshStatus()">🔄 刷新</button>
                 </div>
                 <div class="status-items">
                     <div class="status-item">
                         <span>夸克 Cookie:</span>
                         <span id="quark-status-badge" class="badge badge-warning">检查中...</span>
                     </div>
+                    <!-- 4: TG 检索频道真实检测 -->
                     <div class="status-item">
                         <span>TG 检索频道:</span>
-                        <span id="channel-status-badge" class="badge badge-info">加载中...</span>
+                        <span id="channel-status-badge" class="badge badge-info">探测中...</span>
                     </div>
                 </div>
             </div>
@@ -71,7 +77,7 @@
                 <div class="log-body" id="log-body">系统就绪，等待触发转存任务...</div>
             </div>
         </div>
-    </main>
+    </div>
 
     <!-- 配置 Modal -->
     <div class="modal" id="config-modal">
@@ -79,17 +85,17 @@
             <h3>⚙ 系统与频道配置</h3>
             
             <div class="section-title">☁️ 夸克网盘配置</div>
-            <label style="font-size:12px; color:#94a3b8;">夸克 Cookie:</label>
+            <label style="font-size:13px; color:#94a3b8;">夸克 Cookie:</label>
             <input type="text" id="quark-cookie-input" placeholder="粘贴完整的夸克 Cookie...">
             
-            <label style="font-size:12px; color:#94a3b8;">目标保存目录 FID (默认 0 表示根目录):</label>
+            <label style="font-size:13px; color:#94a3b8;">目标保存目录 FID (默认 0 表示根目录):</label>
             <input type="text" id="folder-id-input" placeholder="默认 0">
 
             <div class="section-title">
                 <span>📺 检索频道配置</span>
                 <div>
-                    <button class="btn-sm" style="font-size:11px; margin-right:4px;" onclick="importChannelsJson()">📥 批量导入 JSON</button>
-                    <button class="btn-sm" style="font-size:11px;" onclick="fetchChannels()">刷新频道</button>
+                    <button class="btn-sm" style="font-size:12px; margin-right:4px;" onclick="importChannelsJson()">📥 批量导入 JSON</button>
+                    <button class="btn-sm" style="font-size:12px;" onclick="fetchChannels()">刷新频道</button>
                 </div>
             </div>
 
