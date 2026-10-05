@@ -39,7 +39,6 @@
                     <div class="action-buttons">
                         <button class="action-btn btn-openlist" onclick="openOpenList()">▶️ OpenList</button>
                         <button class="action-btn btn-quark" onclick="openQuarkApp()">🌐 夸克端</button>
-                        <!-- 🎯 重命名为自动化任务，消除重复 -->
                         <button class="action-btn btn-sub-manage" onclick="openSubModal()">📊 自动化任务</button>
                         <div class="divider"></div>
                         <span class="sel-info">已选 <b id="selected-count">0</b> 部</span>
@@ -50,8 +49,8 @@
                     </div>
                 </div>
 
-                <!-- 筛选过滤条件面板 -->
-                <div class="filter-panel">
+                <!-- 筛选过滤条件面板 (支持滚动自动收起) -->
+                <div id="filter-panel" class="filter-panel">
                     <div class="filter-row">
                         <span class="filter-label">排序:</span>
                         <div class="filter-items">
@@ -104,7 +103,7 @@
                 </div>
 
                 <!-- 影视海报网格展示区 -->
-                <div class="movie-grid-container">
+                <div id="movie-grid-container" class="movie-grid-container">
                     <div id="movie-grid" class="movie-grid">
                         <!-- 动态加载 -->
                     </div>
@@ -246,25 +245,6 @@
 
             <div class="modal-footer" style="margin-top: 15px;">
                 <button class="btn-secondary" onclick="closeSubModal()">关闭</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- 文件手动筛选转存弹窗 -->
-    <div id="select-files-modal" class="modal">
-        <div class="modal-content medium">
-            <h2>📦 分享资源文件筛选转存</h2>
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; font-size:13px; color:#94a3b8;">
-                <span id="selected-parse-count">已选 0 个文件</span>
-                <div>
-                    <button class="btn-sm" onclick="selectAllParseFiles(true)">全选</button>
-                    <button class="btn-sm" onclick="selectAllParseFiles(false)">反选</button>
-                </div>
-            </div>
-            <div id="parse-file-list" class="parse-file-list-box"></div>
-            <div class="modal-footer" style="margin-top: 15px;">
-                <button class="btn-secondary" onclick="closeSelectFilesModal()">取消</button>
-                <button class="btn-primary" onclick="submitSaveSelectedFiles()">确认转存到夸克网盘</button>
             </div>
         </div>
     </div>
