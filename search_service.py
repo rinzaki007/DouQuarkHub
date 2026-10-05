@@ -1,80 +1,63 @@
 import re
 import requests
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from quark_engine import QuarkEngine
 
 class SearchService:
     def __init__(self, cookie):
         self.cookie = cookie
-        self.engine = QuarkEngine(cookie)
-
-    def search_single_tg_channel(self, channel, keyword):
-        ch_name = channel.get('name', '未命名频道')
-        ch_id = channel.get('id', '').strip()
-        if not ch_id:
-            return ch_name, []
-
-        url = f"https://t.me/s/{ch_id}?q={requests.utils.quote(keyword)}"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+        self.headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
         }
-        found_links = []
-        try:
-            resp = requests.get(url, headers=headers, timeout=2.0)
-            if resp.status_code == 200:
-                found = re.findall(r'https://pan\.quark\.cn/s/([a-zA-Z0-9]+)', resp.text)
-                for pwd_id in found:
-                    if pwd_id not in found_links:
-                        found_links.append(pwd_id)
-        except Exception:
-            pass
-        return ch_name, found_links
 
-    def batch_search_and_transfer_stream(self, movies, channels, target_fid='0'):
-        for movie in movies:
-            yield f"\n--- [ {movie} ] ---"
-            yield f"🔍 开始检索资源: {movie}"
-            found_links = []
+    def search_single_movie_pwd_id(self, title, channels):
+        """在已配置的 TG 频道中检索指定剧名，提取第一个有效的夸克链接 pwd_id"""
+        if not title or not channels:
+            return None
 
-            workers = max(1, min(len(channels), 15))
-            with ThreadPoolExecutor(max_workers=workers) as executor:
-                future_to_ch = {
-                    executor.submit(self.search_single_tg_channel, ch, movie): ch 
-                    for ch in channels
-                }
-                for future in as_completed(future_to_ch):
-                    try:
-                        ch_name, p_ids = future.result()
-                        if p_ids:
-                            yield f"  └─ 频道 [{ch_name}] 命中 {len(p_ids)} 个夸克资源"
-                            for p_id in p_ids:
-                                if p_id not in found_links:
-                                    found_links.append(p_id)
-                    except Exception:
-                        pass
+        # 匹配夸克分享链接中的 pwd_id (如 pan.quark.cn/s/ef7951063756)
+        quark_pattern = re.compile(r'(?:pan\.)?quark\.cn/s/([a-zA-Z0-9]+)')
 
-            if not found_links:
-                yield "  ❌ 遍历全部指定频道，未检索到匹配的夸克分享链接"
+        for ch in channels:
+            ch_id = ch.get('id', '').strip()
+            if not ch_id:
                 continue
 
-            transfer_success = False
-            for pwd_id in found_links:
-                yield f"  🚀 解析资源 (ID: {pwd_id})..."
-                
-                files, stoken, err_msg = self.engine.get_share_files(pwd_id)
-                if not files or not stoken:
-                    yield f"     └─ ⚠️ 解析失败: {err_msg or '链接已失效'}"
-                    continue
+            # 请求 Telegram 频道网页预览版的搜索接口
+            search_url = f"https://t.me/s/{ch_id}?q={requests.utils.quote(title)}"
+            try:
+                resp = requests.get(search_url, headers=self.headers, timeout=6)
+                if resp.status_code == 200:
+                    matches = quark_pattern.findall(resp.text)
+                    if matches:
+                        return matches[0]
+            except Exception:
+                continue
 
-                ok, msg = self.engine.save_files(pwd_id, files, stoken, target_fid)
-                if ok:
-                    yield f"     └─ ✅ 转存成功！已保存至目录 (FID: {target_fid})"
-                    transfer_success = True
-                    break
-                else:
-                    yield f"     └─ ❌ 转存失败: {msg}"
+        return None
 
-            if not transfer_success:
-                yield "  ⚠️ 所有命中的资源链接均未转存成功"
+    def batch_search_and_transfer_stream(self, movies, channels, target_fid='0'):
+        """批量检索并转存流式日志输出"""
+        engine = QuarkEngine(self.cookie)
+        for title in movies:
+            yield f"🔍 正在检索: [{title}]..."
+            pwd_id = self.search_single_movie_pwd_id(title, channels)
+            if not pwd_id:
+                yield f"❌ 未在配置频道中找到 [{title}] 的夸克资源"
+                continue
 
-        yield "\n✨ 本轮任务全部执行完成！"
+            yield f"🟢 找到资源链接 ID: {pwd_id}，正在解析内容..."
+            files, stoken, err = engine.get_share_files(pwd_id)
+            if not files:
+                yield f"❌ 解析分享链接失败: {err}"
+                continue
+
+            files_to_save = [{'fid': f.get('fid')} for f in files if f.get('fid')]
+            if not files_to_save:
+                yield f"⚠️ [{title}] 链接内未发现可转存的文件"
+                continue
+
+            ok, msg = engine.save_files(pwd_id, files_to_save, stoken, target_fid)
+            if ok:
+                yield f"✅ [{title}] 成功转存至目标目录 (共 {len(files_to_save)} 个文件)"
+            else:
+                yield f"❌ [{title}] 转存失败: {msg}"
