@@ -1,16 +1,13 @@
 import os
 import requests
 from flask import Flask, render_template, request, jsonify, Response, stream_with_context
+from concurrent.futures import ThreadPoolExecutor
 from quark_engine import QuarkEngine, clean_tv_filename
 from subscription_manager import SubscriptionManager
 from search_service import SearchService
 from utils import load_channels, save_channels, DOUBAN_HEADERS
 
 app = Flask(__name__)
-
-# 全局获取夸克 Cookie 函数1
-def get_global_cookie():
-    return request.headers.get('X-Quark-Cookie', '')
 
 # 初始化追剧轮询调度引擎
 sub_manager = SubscriptionManager(get_cookie_func=lambda: app.config.get('QUARK_COOKIE', ''))
@@ -20,7 +17,132 @@ sub_manager.start_scheduler()
 def index():
     return render_template('index.html')
 
-# 🔍 1. 选集转存接口：解析分享链接中的所有文件并进行洗剧预览
+@app.route('/api/get-movies', methods=['GET'])
+def get_movies():
+    main_tag = request.args.get('tag', '电影')
+    sort_type = request.args.get('sort', 'U')
+    genre = request.args.get('genre', '')
+    country = request.args.get('country', '')
+    year_range = request.args.get('year', '')
+
+    if main_tag == '动漫':
+        main_tag = '动画'
+
+    url = "https://movie.douban.com/j/new_search_subjects"
+    params = {
+        "sort": sort_type,
+        "range": "0,10",
+        "tags": main_tag,
+        "start": 0,
+        "limit": 100
+    }
+    if genre:
+        params["genres"] = genre
+    if country:
+        params["countries"] = country
+    if year_range:
+        params["year_range"] = year_range
+
+    try:
+        resp = requests.get(url, headers=DOUBAN_HEADERS, params=params, timeout=10)
+        
+        # 拦截非 JSON (如 HTML 重定向/风控拦截)
+        content_type = resp.headers.get('Content-Type', '')
+        if 'html' in content_type.lower():
+            return jsonify({'success': False, 'movies': [], 'message': '豆瓣触发风控拦截，请稍后再试'})
+
+        if resp.status_code == 200:
+            data = resp.json()
+            raw_list = data.get('data', [])
+            movies = [{
+                'title': item.get('title'),
+                'cover': item.get('cover'),
+                'rate': item.get('rate') if item.get('rate') else '暂无',
+                'url': item.get('url', f"https://movie.douban.com/subject/{item.get('id')}/")
+            } for item in raw_list]
+            return jsonify({'success': True, 'movies': movies})
+            
+        return jsonify({'success': False, 'movies': [], 'message': f'豆瓣响应异常: HTTP {resp.status_code}'})
+    except Exception as e:
+        return jsonify({'success': False, 'movies': [], 'message': f'服务端请求异常: {str(e)}'})
+
+@app.route('/api/search-douban', methods=['GET'])
+def search_douban():
+    query = request.args.get('q', '').strip()
+    if not query:
+        return jsonify({'success': False, 'movies': []})
+    url = f"https://movie.douban.com/j/subject_suggest?q={requests.utils.quote(query)}"
+    try:
+        resp = requests.get(url, headers=DOUBAN_HEADERS, timeout=10)
+        content_type = resp.headers.get('Content-Type', '')
+        if 'html' in content_type.lower():
+            return jsonify({'success': False, 'movies': [], 'message': '搜索触发风控拦截'})
+
+        if resp.status_code == 200:
+            data = resp.json()
+            movies = [{
+                'title': item.get('title'),
+                'cover': item.get('img'),
+                'rate': item.get('year', '搜索'),
+                'url': f"https://movie.douban.com/subject/{item.get('id')}/"
+            } for item in data]
+            return jsonify({'success': True, 'movies': movies})
+        return jsonify({'success': False, 'movies': []})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e), 'movies': []})
+
+@app.route('/api/check-cookie', methods=['POST'])
+def check_cookie():
+    try:
+        data = request.json or {}
+        cookie = data.get('cookie', '')
+        if not cookie:
+            return jsonify({'valid': False, 'message': '未配置 Cookie'})
+        engine = QuarkEngine(cookie)
+        valid = engine.check_cookie_valid()
+        if valid:
+            app.config['QUARK_COOKIE'] = cookie
+        return jsonify({'valid': valid, 'message': 'Cookie 有效' if valid else 'Cookie 已失效或格式错误'})
+    except Exception as e:
+        return jsonify({'valid': False, 'message': f'校验出错: {str(e)}'})
+
+@app.route('/api/check-channels', methods=['GET'])
+def check_channels_health():
+    channels = load_channels()
+    if not channels:
+        return jsonify({'success': True, 'total': 0, 'valid_count': 0})
+
+    def test_channel(ch):
+        ch_id = ch.get('id', '').strip()
+        if not ch_id:
+            return False
+        url = f"https://t.me/s/{ch_id}"
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+        try:
+            resp = requests.head(url, headers=headers, timeout=2.0)
+            return resp.status_code == 200
+        except Exception:
+            return False
+
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        results = list(executor.map(test_channel, channels))
+
+    valid_count = sum(1 for is_valid in results if is_valid)
+    return jsonify({
+        'success': True,
+        'total': len(channels),
+        'valid_count': valid_count
+    })
+
+@app.route('/api/channels', methods=['GET', 'POST'])
+def handle_channels():
+    if request.method == 'POST':
+        channels = request.json.get('channels', [])
+        save_channels(channels)
+        return jsonify({'success': True})
+    return jsonify({'success': True, 'channels': load_channels()})
+
+# 🔍 解析选集列表与正则洗剧预览
 @app.route('/api/parse-share-detail', methods=['POST'])
 def parse_share_detail():
     data = request.json or {}
@@ -60,7 +182,7 @@ def parse_share_detail():
         'files': parsed_files
     })
 
-# 🚀 2. 选集转存提交接口：仅转存勾选的资源
+# 🚀 保存勾选的选中文件
 @app.route('/api/save-selected-files', methods=['POST'])
 def save_selected_files():
     data = request.json or {}
@@ -71,7 +193,7 @@ def save_selected_files():
     cookie = data.get('cookie', '')
 
     if not selected_fids or not cookie:
-        return jsonify({'success': False, 'message': '未选择任何文件'})
+        return jsonify({'success': False, 'message': '未选择任何文件或缺失 Cookie'})
 
     engine = QuarkEngine(cookie)
     files_to_save = [{'fid': fid} for fid in selected_fids]
@@ -79,7 +201,7 @@ def save_selected_files():
     ok, msg = engine.save_files(pwd_id, files_to_save, stoken, target_fid)
     return jsonify({'success': ok, 'message': msg})
 
-# 📺 3. 追剧订阅 CRUD 接口
+# 📺 追剧订阅 API
 @app.route('/api/subscriptions', methods=['GET', 'POST', 'DELETE'])
 def handle_subscriptions():
     if request.method == 'GET':
@@ -87,8 +209,9 @@ def handle_subscriptions():
 
     if request.method == 'POST':
         data = request.json or {}
-        # 设置全局 Cookie 供轮询引擎使用
-        app.config['QUARK_COOKIE'] = data.get('cookie', '')
+        cookie = data.get('cookie', '')
+        if cookie:
+            app.config['QUARK_COOKIE'] = cookie
         
         new_sub = sub_manager.add_subscription(
             title=data.get('title'),
@@ -103,7 +226,6 @@ def handle_subscriptions():
         sub_manager.delete_subscription(sub_id)
         return jsonify({'success': True})
 
-# 🔄 4. 立即检查追剧更新接口
 @app.route('/api/subscriptions/run-now', methods=['POST'])
 def run_sub_now():
     data = request.json or {}
@@ -115,8 +237,35 @@ def run_sub_now():
     ok, msg = sub_manager.check_subscription_now(sub_id)
     return jsonify({'success': ok, 'message': msg})
 
-# 兼容原项目的豆瓣分类获取、频道列表和流式批量转存等 API...
-# (省略保持不变的部分代码)
+@app.route('/api/transfer', methods=['POST'])
+def transfer():
+    data = request.json or {}
+    movies = data.get('movies', [])
+    cookie = data.get('cookie', '')
+    folder_id = data.get('folderId', '0')
+
+    if not movies or not cookie:
+        return Response("❌ 参数不完整，请检查勾选与 Cookie\n", mimetype='text/plain; charset=utf-8')
+
+    service = SearchService(cookie)
+    channels = load_channels()
+
+    def generate_logs():
+        for line in service.batch_search_and_transfer_stream(movies, channels, target_fid=folder_id):
+            yield line + "\n"
+
+    return Response(stream_with_context(generate_logs()), mimetype='text/plain; charset=utf-8')
+
+@app.route('/api/proxy-img')
+def proxy_img():
+    img_url = request.args.get('url')
+    if not img_url:
+        return Response("Missing url", status=400)
+    try:
+        resp = requests.get(img_url, headers=DOUBAN_HEADERS, timeout=10)
+        return Response(resp.content, mimetype=resp.headers.get('content-type', 'image/jpeg'))
+    except Exception:
+        return Response("", status=404)
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
