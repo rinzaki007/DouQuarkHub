@@ -9,9 +9,8 @@
 <body>
 
     <div class="layout-container">
-        <!-- 3: 左侧主内容区域 -->
+        <!-- 左侧主内容区域 -->
         <div class="left-main">
-            <!-- 2: 顶部加宽 Header 栏 -->
             <header>
                 <div class="logo">🎬 豆瓣全局搜索转存夸克网盘服务</div>
                 <div class="search-box">
@@ -20,13 +19,13 @@
                 </div>
             </header>
 
-            <!-- 2: 顶部加宽操作与分类栏 -->
+            <!-- 顶部分类 Tab（纯分类：电影/电视剧/综艺/动漫） -->
             <div class="top-action-bar">
                 <div class="tab-group">
-                    <button class="tab-btn active" id="tab-movie" onclick="switchTab('movie')">🔥 热门电影</button>
-                    <button class="tab-btn" id="tab-tv" onclick="switchTab('tv')">📺 热门电视剧</button>
-                    <button class="tab-btn" id="tab-show" onclick="switchTab('show')">🎤 热门综艺</button>
-                    <button class="tab-btn" id="tab-anime" onclick="switchTab('anime')">🎨 热门动漫</button>
+                    <button class="tab-btn active" id="tab-电影" onclick="switchCategory('电影')">🎬 电影</button>
+                    <button class="tab-btn" id="tab-电视剧" onclick="switchCategory('电视剧')">📺 电视剧</button>
+                    <button class="tab-btn" id="tab-综艺" onclick="switchCategory('综艺')">🎤 综艺</button>
+                    <button class="tab-btn" id="tab-动漫" onclick="switchCategory('动漫')">🎨 动漫</button>
                 </div>
 
                 <div class="right-tools">
@@ -39,13 +38,68 @@
                 </div>
             </div>
 
-            <!-- 1: 8列放大海报墙 -->
+            <!-- 🌟 多维筛选栏 (排序/类型/地区/年份) -->
+            <div class="filter-panel" id="filter-panel">
+                <div class="filter-row">
+                    <span class="filter-label">排序:</span>
+                    <div class="filter-options" id="filter-sort">
+                        <span class="filter-item active" onclick="setFilter('sort', 'U', this)">热门</span>
+                        <span class="filter-item" onclick="setFilter('sort', 'T', this)">最新</span>
+                        <span class="filter-item" onclick="setFilter('sort', 'S', this)">高分</span>
+                    </div>
+                </div>
+
+                <div class="filter-row">
+                    <span class="filter-label">类型:</span>
+                    <div class="filter-options" id="filter-genre">
+                        <span class="filter-item active" onclick="setFilter('genre', '', this)">全部</span>
+                        <span class="filter-item" onclick="setFilter('genre', '剧情', this)">剧情</span>
+                        <span class="filter-item" onclick="setFilter('genre', '喜剧', this)">喜剧</span>
+                        <span class="filter-item" onclick="setFilter('genre', '动作', this)">动作</span>
+                        <span class="filter-item" onclick="setFilter('genre', '爱情', this)">爱情</span>
+                        <span class="filter-item" onclick="setFilter('genre', '科幻', this)">科幻</span>
+                        <span class="filter-item" onclick="setFilter('genre', '悬疑', this)">悬疑</span>
+                        <span class="filter-item" onclick="setFilter('genre', '犯罪', this)">犯罪</span>
+                        <span class="filter-item" onclick="setFilter('genre', '动画', this)">动画</span>
+                        <span class="filter-item" onclick="setFilter('genre', '惊悚', this)">惊悚</span>
+                    </div>
+                </div>
+
+                <div class="filter-row">
+                    <span class="filter-label">地区:</span>
+                    <div class="filter-options" id="filter-country">
+                        <span class="filter-item active" onclick="setFilter('country', '', this)">全部</span>
+                        <span class="filter-item" onclick="setFilter('country', '中国大陆', this)">中国大陆</span>
+                        <span class="filter-item" onclick="setFilter('country', '美国', this)">美国</span>
+                        <span class="filter-item" onclick="setFilter('country', '中国香港', this)">中国香港</span>
+                        <span class="filter-item" onclick="setFilter('country', '中国台湾', this)">中国台湾</span>
+                        <span class="filter-item" onclick="setFilter('country', '日本', this)">日本</span>
+                        <span class="filter-item" onclick="setFilter('country', '韩国', this)">韩国</span>
+                        <span class="filter-item" onclick="setFilter('country', '英国', this)">英国</span>
+                    </div>
+                </div>
+
+                <div class="filter-row">
+                    <span class="filter-label">年份:</span>
+                    <div class="filter-options" id="filter-year">
+                        <span class="filter-item active" onclick="setFilter('year', '', this)">全部</span>
+                        <span class="filter-item" onclick="setFilter('year', '2026,2026', this)">2026</span>
+                        <span class="filter-item" onclick="setFilter('year', '2025,2025', this)">2025</span>
+                        <span class="filter-item" onclick="setFilter('year', '2024,2024', this)">2024</span>
+                        <span class="filter-item" onclick="setFilter('year', '2023,2023', this)">2023</span>
+                        <span class="filter-item" onclick="setFilter('year', '2020,2029', this)">2020年代</span>
+                        <span class="filter-item" onclick="setFilter('year', '2010,2019', this)">2010年代</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 8列卡片海报墙 -->
             <div class="content-area">
                 <div class="movie-grid" id="movie-grid"></div>
             </div>
         </div>
 
-        <!-- 3: 右侧全高贯穿 Sidebar -->
+        <!-- 右侧全高贯穿 Sidebar -->
         <div class="log-sidebar">
             <div class="sidebar-top-bar">
                 <button class="btn config-btn" onclick="openConfigModal()">⚙️ 配置设置</button>
@@ -61,7 +115,6 @@
                         <span>夸克 Cookie:</span>
                         <span id="quark-status-badge" class="badge badge-warning">检查中...</span>
                     </div>
-                    <!-- 4: TG 检索频道真实检测 -->
                     <div class="status-item">
                         <span>TG 检索频道:</span>
                         <span id="channel-status-badge" class="badge badge-info">探测中...</span>
