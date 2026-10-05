@@ -89,7 +89,6 @@ async function fetchMovies() {
     try {
         const res = await fetch(`/api/get-movies?${params.toString()}`);
         
-        // 关键容错：检查 content-type 避免尝试将 HTML 转换为 JSON
         const contentType = res.headers.get('content-type') || '';
         if (!contentType.includes('application/json')) {
             appendLog(`[系统] ❌ 服务端返回了非 JSON 页面 (HTTP ${res.status})，可能被豆瓣拦截`);
@@ -376,7 +375,11 @@ async function saveConfig() {
     }
 }
 
-function openConfigModal() { document.getElementById('config-modal').style.display = 'flex'; }
+function openConfigModal() { 
+    document.getElementById('config-modal').style.display = 'flex'; 
+    fetchChannels();
+}
+
 function closeConfigModal() { document.getElementById('config-modal').style.display = 'none'; }
 
 function openSubModal() {
@@ -403,7 +406,6 @@ function getTargetFolderId() {
     return defaultFid;
 }
 
-/* 🎬 选集解析与转存 */
 async function parseAndSelectFiles(pwdId, showTitle) {
     const cookie = localStorage.getItem('quark_cookie') || '';
     if (!cookie) {
@@ -498,7 +500,6 @@ async function submitSaveSelectedFiles() {
     }
 }
 
-/* 📺 追剧订阅 API */
 async function fetchSubscriptions() {
     const res = await fetch('/api/subscriptions');
     const data = await res.json();
