@@ -1,6 +1,7 @@
 import os
 import requests
 from flask import Flask, render_template, request, jsonify, Response, stream_with_context
+from concurrent.futures import ThreadPoolExecutor
 from quark_engine import QuarkEngine
 from search_service import SearchService
 from utils import load_channels, save_channels, DOUBAN_HEADERS
@@ -72,6 +73,37 @@ def check_cookie():
     except Exception as e:
         return jsonify({'valid': False, 'message': f'校验出错: {str(e)}'})
 
+# 4: 真实的 TG 频道网络探针检测接口
+@app.route('/api/check-channels', methods=['GET'])
+def check_channels_health():
+    channels = load_channels()
+    if not channels:
+        return jsonify({'success': True, 'total': 0, 'valid_count': 0})
+
+    def test_channel(ch):
+        ch_id = ch.get('id', '').strip()
+        if not ch_id:
+            return False
+        url = f"https://t.me/s/{ch_id}"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+        }
+        try:
+            resp = requests.head(url, headers=headers, timeout=2.0)
+            return resp.status_code == 200
+        except Exception:
+            return False
+
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        results = list(executor.map(test_channel, channels))
+
+    valid_count = sum(1 for is_valid in results if is_valid)
+    return jsonify({
+        'success': True,
+        'total': len(channels),
+        'valid_count': valid_count
+    })
+
 @app.route('/api/channels', methods=['GET', 'POST'])
 def handle_channels():
     if request.method == 'POST':
@@ -80,7 +112,6 @@ def handle_channels():
         return jsonify({'success': True})
     return jsonify({'success': True, 'channels': load_channels()})
 
-# 🚀 核心改动：流式输出日志，建立连接即响应 HTTP 200，彻底防止 502
 @app.route('/api/transfer', methods=['POST'])
 def transfer():
     data = request.json or {}
