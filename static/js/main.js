@@ -27,7 +27,6 @@ function refreshStatus() {
     checkChannelsHealth();
 }
 
-// 切换大类 (电影 / 电视剧 / 综艺 / 动漫)
 function switchCategory(cat) {
     currentCategory = cat;
     ['电影', '电视剧', '综艺', '动漫'].forEach(c => {
@@ -37,11 +36,9 @@ function switchCategory(cat) {
     fetchMovies();
 }
 
-// 设置组合筛选条件
 function setFilter(type, value, el) {
     activeFilters[type] = value;
     
-    // 更新按钮选中状态
     const container = el.parentElement;
     container.querySelectorAll('.filter-item').forEach(item => item.classList.remove('active'));
     el.classList.add('active');
@@ -49,7 +46,6 @@ function setFilter(type, value, el) {
     fetchMovies();
 }
 
-// 根据当前组合条件发起豆瓣数据请求
 async function fetchMovies() {
     appendLog(`[系统] 正在筛选豆瓣【${currentCategory}】...`);
     
