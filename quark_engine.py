@@ -1,5 +1,4 @@
 import requests
-import json
 
 class QuarkEngine:
     def __init__(self, cookie):
@@ -13,15 +12,15 @@ class QuarkEngine:
         }
 
     def check_cookie_valid(self):
-        """校验 Cookie 是否有效"""
+        """通过读取夸克网盘根目录，精准判定 Cookie 有效性"""
         if not self.cookie:
             return False
-        url = "https://drive-pc.quark.cn/1/clouddrive/user/info?pr=ucpro&fr=pc"
+        url = "https://drive-pc.quark.cn/1/clouddrive/file/sort?pr=ucpro&fr=pc&pdir_fid=0&_size=1"
         try:
-            resp = requests.get(url, headers=self.headers, timeout=8)
+            resp = requests.get(url, headers=self.headers, timeout=5)
             if resp.status_code == 200:
                 data = resp.json()
-                return data.get("code") == 0 or "data" in data
+                return data.get("code") == 0
             return False
         except Exception:
             return False
@@ -31,7 +30,7 @@ class QuarkEngine:
         url = "https://drive-pc.quark.cn/1/clouddrive/share/sharepage/detail"
         params = {"pr": "ucpro", "fr": "pc", "pwd_id": pwd_id}
         try:
-            resp = requests.get(url, headers=self.headers, params=params, timeout=10)
+            resp = requests.get(url, headers=self.headers, params=params, timeout=8)
             if resp.status_code == 200:
                 res_json = resp.json()
                 if res_json.get("code") == 0 and "data" in res_json:
@@ -55,12 +54,12 @@ class QuarkEngine:
             "scene": "share"
         }
         try:
-            resp = requests.post(url, headers=self.headers, json=payload, timeout=12)
+            resp = requests.post(url, headers=self.headers, json=payload, timeout=10)
             if resp.status_code == 200:
                 res_json = resp.json()
                 if res_json.get("code") == 0:
                     return True, "转存成功"
-                return False, res_json.get("message", "接口返回转存错误")
+                return False, res_json.get("message", "夸克返回错误")
             return False, f"HTTP 状态码异常: {resp.status_code}"
         except Exception as e:
             return False, f"网络异常: {str(e)}"
