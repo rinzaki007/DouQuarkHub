@@ -21,7 +21,6 @@ function loadConfig() {
     document.getElementById('quark-cookie-input').value = localStorage.getItem('quark_cookie') || '';
     document.getElementById('folder-id-input').value = localStorage.getItem('target_folder_id') || '0';
 
-    // 📁 加载分类独立的 FID 配置
     document.getElementById('folder-movie-input').value = localStorage.getItem('folder_movie') || '';
     document.getElementById('folder-tv-input').value = localStorage.getItem('folder_tv') || '';
     document.getElementById('folder-show-input').value = localStorage.getItem('folder_show') || '';
@@ -187,7 +186,7 @@ function appendLog(text) {
 }
 
 function clearLog() {
-    document.getElementById('log-body').textContent = '系统就绪，等待触发转存任务...';
+    document.getElementById('log-body').textContent = 'DouQuarkHub 就绪，等待触发转存任务...';
 }
 
 async function checkChannelsHealth() {
@@ -338,7 +337,6 @@ async function saveConfig() {
     const cookie = document.getElementById('quark-cookie-input').value.trim();
     const defaultFid = document.getElementById('folder-id-input').value.trim() || '0';
 
-    // 📁 保存分类独立 FID 配置
     const folderMovie = document.getElementById('folder-movie-input').value.trim();
     const folderTv = document.getElementById('folder-tv-input').value.trim();
     const folderShow = document.getElementById('folder-show-input').value.trim();
@@ -375,7 +373,6 @@ async function saveConfig() {
 function openConfigModal() { document.getElementById('config-modal').style.display = 'flex'; }
 function closeConfigModal() { document.getElementById('config-modal').style.display = 'none'; }
 
-// 🚀 智能匹配目标保存目录 FID
 function getTargetFolderId() {
     const defaultFid = localStorage.getItem('target_folder_id') || '0';
     const catFidMap = {
@@ -405,7 +402,6 @@ async function startBatchTransfer() {
         return;
     }
 
-    // 获取智能判断后的目标 FID
     const targetFolderId = getTargetFolderId();
 
     document.getElementById('log-body').textContent = '';
