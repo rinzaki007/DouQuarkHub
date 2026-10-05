@@ -1,4 +1,4 @@
-- main.py # Flask 主程序（原 app.py，仅保留 API 路由与启动）
+- main.py # Flask 主程序（仅保留 API 路由与启动）
 - quark_engine.py # 夸克网盘 API 引擎类（鉴权、创建目录、转存等）
 - search_service.py # 频道检索与转存调度逻辑
 - utils.py # 静态配置、频道读写与辅助工具函数
