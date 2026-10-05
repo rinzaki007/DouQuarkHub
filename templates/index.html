@@ -146,46 +146,48 @@
     <div id="config-modal" class="modal">
         <div class="modal-content large">
             <h2>⚙️ 系统全局配置</h2>
-            <div class="form-group">
-                <label>夸克网盘 Cookie (ck):</label>
-                <textarea id="quark-cookie-input" placeholder="请在此处粘贴你的夸克网盘 Cookie..."></textarea>
-            </div>
-            
-            <div class="form-row">
+            <div class="modal-body">
                 <div class="form-group">
-                    <label>默认全局存储目录 FID:</label>
-                    <input type="text" id="folder-id-input" placeholder="默认为 0 (根目录)">
+                    <label>夸克网盘 Cookie (ck):</label>
+                    <textarea id="quark-cookie-input" placeholder="请在此处粘贴你的夸克网盘 Cookie..."></textarea>
                 </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>默认全局存储目录 FID:</label>
+                        <input type="text" id="folder-id-input" placeholder="默认为 0 (根目录)">
+                    </div>
+                    <div class="form-group">
+                        <label>OpenList 访问地址:</label>
+                        <input type="text" id="openlist-url-input" placeholder="http://192.168.x.x:5244">
+                    </div>
+                </div>
+
+                <h3 style="margin-top:5px; font-size:13px; color:#38bdf8;">📁 各分类专属存储目录 FID (可选)</h3>
+                <div class="form-row">
+                    <div class="form-group"><label>电影目录 FID:</label><input type="text" id="folder-movie-input"></div>
+                    <div class="form-group"><label>电视剧目录 FID:</label><input type="text" id="folder-tv-input"></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label>综艺目录 FID:</label><input type="text" id="folder-show-input"></div>
+                    <div class="form-group"><label>动漫目录 FID:</label><input type="text" id="folder-anime-input"></div>
+                </div>
+
+                <div class="form-group" style="margin-top:5px;">
+                    <label>夸克客户端唤醒链接 / 网页版跳转地址:</label>
+                    <input type="text" id="quark-app-input" value="quark://">
+                </div>
+
                 <div class="form-group">
-                    <label>OpenList 访问地址:</label>
-                    <input type="text" id="openlist-url-input" placeholder="http://192.168.x.x:5244">
-                </div>
-            </div>
-
-            <h3 style="margin-top:15px; font-size:14px; color:#38bdf8;">📁 各分类专属存储目录 FID (可选)</h3>
-            <div class="form-row">
-                <div class="form-group"><label>电影目录 FID:</label><input type="text" id="folder-movie-input"></div>
-                <div class="form-group"><label>电视剧目录 FID:</label><input type="text" id="folder-tv-input"></div>
-            </div>
-            <div class="form-row">
-                <div class="form-group"><label>综艺目录 FID:</label><input type="text" id="folder-show-input"></div>
-                <div class="form-group"><label>动漫目录 FID:</label><input type="text" id="folder-anime-input"></div>
-            </div>
-
-            <div class="form-group" style="margin-top:10px;">
-                <label>夸克客户端唤醒链接 / 网页版跳转地址:</label>
-                <input type="text" id="quark-app-input" value="quark://">
-            </div>
-
-            <div class="form-group">
-                <label>Telegram 检索频道配置管理:</label>
-                <div class="channel-manage-box">
-                    <div id="channel-list-box" class="channel-list-scroll"></div>
-                    <div class="channel-add-row">
-                        <input type="text" id="new-ch-name" placeholder="频道名称 (如: 夸克电影分享)">
-                        <input type="text" id="new-ch-id" placeholder="频道 ID (如: quark_share)">
-                        <button type="button" class="btn-primary" onclick="addChannel()">添加</button>
-                        <button type="button" class="btn-import" onclick="importChannelsJson()">批量导入JSON</button>
+                    <label>Telegram 检索频道配置管理:</label>
+                    <div class="channel-manage-box">
+                        <div id="channel-list-box" class="channel-list-scroll"></div>
+                        <div class="channel-add-row">
+                            <input type="text" id="new-ch-name" placeholder="频道名称 (如: 夸克电影分享)">
+                            <input type="text" id="new-ch-id" placeholder="频道 ID (如: quark_share)">
+                            <button type="button" class="btn-primary" onclick="addChannel()">添加</button>
+                            <button type="button" class="btn-import" onclick="importChannelsJson()">批量导入JSON</button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -201,49 +203,50 @@
     <div id="sub-modal" class="modal">
         <div class="modal-content medium">
             <h2>📊 自动化追剧订阅与任务</h2>
-            
-            <div class="sub-form-box">
-                <div class="form-group">
-                    <label>剧集 / 动漫名称:</label>
-                    <div style="display:flex; gap:8px;">
-                        <input type="text" id="sub-title-input" placeholder="例如: 甄嬛传">
-                        <button type="button" class="btn-primary" onclick="autoSearchSubLink()">🔍 检索链接</button>
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label>夸克链接 ID / 分享短码:</label>
-                    <input type="text" id="sub-pwd-input" placeholder="例如: ef7951063756">
-                </div>
-                <div class="form-row">
+            <div class="modal-body">
+                <div class="sub-form-box">
                     <div class="form-group">
-                        <label>存储目标目录:</label>
-                        <select id="sub-folder-select"></select>
+                        <label>剧集 / 动漫名称:</label>
+                        <div style="display:flex; gap:8px;">
+                            <input type="text" id="sub-title-input" placeholder="例如: 甄嬛传">
+                            <button type="button" class="btn-primary" onclick="autoSearchSubLink()">🔍 检索链接</button>
+                        </div>
                     </div>
                     <div class="form-group">
-                        <label>已看 / 跳过前 X 集 (从 X+1 集起追更):</label>
-                        <input type="number" id="sub-start-ep-input" value="0" min="0">
+                        <label>夸克链接 ID / 分享短码:</label>
+                        <input type="text" id="sub-pwd-input" placeholder="例如: ef7951063756">
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>存储目标目录:</label>
+                            <select id="sub-folder-select"></select>
+                        </div>
+                        <div class="form-group">
+                            <label>已看 / 跳过前 X 集 (从 X+1 集起追更):</label>
+                            <input type="number" id="sub-start-ep-input" value="0" min="0">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>检测频率:</label>
+                            <select id="sub-interval-input">
+                                <option value="3">每 3 小时检测一次</option>
+                                <option value="6" selected>每 6 小时检测一次</option>
+                                <option value="12">每 12 小时检测一次</option>
+                                <option value="24">每 24 小时检测一次</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="display:flex; align-items:flex-end;">
+                            <button type="button" class="btn-success" style="width:100%; height:32px;" onclick="addSubscription()">+ 添加自动追踪订阅</button>
+                        </div>
                     </div>
                 </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>检测频率:</label>
-                        <select id="sub-interval-input">
-                            <option value="3">每 3 小时检测一次</option>
-                            <option value="6" selected>每 6 小时检测一次</option>
-                            <option value="12">每 12 小时检测一次</option>
-                            <option value="24">每 24 小时检测一次</option>
-                        </select>
-                    </div>
-                    <div class="form-group" style="display:flex; align-items:flex-end;">
-                        <button type="button" class="btn-success" style="width:100%; height:38px;" onclick="addSubscription()">+ 添加自动追踪订阅</button>
-                    </div>
-                </div>
+
+                <h3 style="margin: 10px 0 6px 0; font-size: 12px; color: #94a3b8;">已订阅自动化任务列表</h3>
+                <div id="sub-list-box" class="sub-list-scroll"></div>
             </div>
 
-            <h3 style="margin: 15px 0 8px 0; font-size: 13px; color: #94a3b8;">已订阅自动化任务列表</h3>
-            <div id="sub-list-box" class="sub-list-scroll"></div>
-
-            <div class="modal-footer" style="margin-top: 15px;">
+            <div class="modal-footer">
                 <button class="btn-secondary" onclick="closeSubModal()">关闭</button>
             </div>
         </div>
