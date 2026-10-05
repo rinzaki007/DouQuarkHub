@@ -12,6 +12,7 @@ class QuarkEngine:
         }
 
     def check_cookie_valid(self):
+        """通过获取网盘根目录判定 Cookie 是否有效"""
         if not self.cookie:
             return False
         url = "https://drive-pc.quark.cn/1/clouddrive/file/sort?pr=ucpro&fr=pc&pdir_fid=0&_size=1"
@@ -25,22 +26,38 @@ class QuarkEngine:
             return False
 
     def get_share_files(self, pwd_id):
+        """获取分享链接的文件列表与 stoken (补充 pdir_fid=0 与动态 Referer)"""
         url = "https://drive-pc.quark.cn/1/clouddrive/share/sharepage/detail"
-        params = {"pr": "ucpro", "fr": "pc", "pwd_id": pwd_id}
+        params = {
+            "pr": "ucpro",
+            "fr": "pc",
+            "pwd_id": pwd_id,
+            "pdir_fid": "0",
+            "_size": "50"
+        }
+        headers = self.headers.copy()
+        headers["Referer"] = f"https://pan.quark.cn/s/{pwd_id}"
+
         try:
-            resp = requests.get(url, headers=self.headers, params=params, timeout=8)
+            resp = requests.get(url, headers=headers, params=params, timeout=8)
             if resp.status_code == 200:
                 res_json = resp.json()
-                if res_json.get("code") == 0 and "data" in res_json:
+                code = res_json.get("code")
+                if code == 0 and "data" in res_json:
                     data = res_json["data"]
-                    files = data.get("list", [])
+                    files = data.get("list", []) or data.get("file_list", [])
                     stoken = data.get("stoken", "")
-                    return files, stoken
-            return [], ""
-        except Exception:
-            return [], ""
+                    if files and stoken:
+                        return files, stoken, ""
+                    return [], "", "夸克未返回有效文件列表"
+                msg = res_json.get("message") or f"错误码 {code}"
+                return [], "", f"夸克拒绝: {msg}"
+            return [], "", f"HTTP 响应状态 {resp.status_code}"
+        except Exception as e:
+            return [], "", f"网络异常: {str(e)}"
 
     def save_files(self, pwd_id, files, stoken, target_fid='0'):
+        """夸克转存完整接口"""
         url = "https://drive-pc.quark.cn/1/clouddrive/share/sharepage/save?pr=ucpro&fr=pc"
         
         fid_list = [f.get("fid") for f in files if f.get("fid")]
