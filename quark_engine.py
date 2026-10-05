@@ -6,14 +6,11 @@ def sanitize_pwd_id(pwd_id):
     if not pwd_id:
         return ""
     pwd_id = str(pwd_id).strip()
-    # 如果传入的是完整夸克链接，匹配其中的短码
     match = re.search(r'quark\.cn/s/([a-zA-Z0-9]+)', pwd_id)
     if match:
         return match.group(1)
-    # 如果带有 URL 路径斜杠，提取最后一段
     if '/' in pwd_id:
         pwd_id = pwd_id.rstrip('/').split('/')[-1]
-    # 清除问号及参数
     if '?' in pwd_id:
         pwd_id = pwd_id.split('?')[0]
     return pwd_id
@@ -23,7 +20,6 @@ def clean_tv_filename(raw_name, title=""):
     if not raw_name:
         return None, raw_name
     
-    # 匹配常见的集数格式：E01, 第01集, EP13, 13.mp4, [13]
     patterns = [
         r'[E|e][P|p]?\s*(\d{1,4})',
         r'第\s*(\d{1,4})\s*[集|话|期]',
@@ -37,7 +33,6 @@ def clean_tv_filename(raw_name, title=""):
         if m:
             try:
                 ep_num = int(m.group(1))
-                # 过滤年份如 2024, 2025, 1080p, 4k 等误判
                 if ep_num > 1900 and ep_num < 2030:
                     ep_num = None
                     continue
@@ -55,14 +50,18 @@ def clean_tv_filename(raw_name, title=""):
 class QuarkEngine:
     def __init__(self, cookie):
         self.cookie = cookie
+        # 🎯 补全 Referer 与 Origin 请求头，防范夸克 API 校验拦截
         self.headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             'Cookie': cookie,
+            'Referer': 'https://pan.quark.cn/',
+            'Origin': 'https://pan.quark.cn',
             'Content-Type': 'application/json'
         }
 
     def check_cookie_valid(self):
-        url = "https://drive.quark.cn/1/clouddrive/user/info?pr=ucpro&fr=pc"
+        """🎯 使用获取根目录文件列表接口进行校验，精准且不易误判"""
+        url = "https://drive.quark.cn/1/clouddrive/file/sort?pr=ucpro&fr=pc&pdir_fid=0&num=1"
         try:
             resp = requests.get(url, headers=self.headers, timeout=5)
             if resp.status_code == 200:
@@ -73,12 +72,10 @@ class QuarkEngine:
             return False
 
     def get_share_files(self, pwd_id):
-        # 🎯 强力清洗 pwd_id，防范 404
         pwd_id = sanitize_pwd_id(pwd_id)
         if not pwd_id:
             return None, None, "分享链接 ID 无效"
 
-        # 1. 获取 stoken
         token_url = "https://drive.quark.cn/1/clouddrive/share/sharepage/token"
         payload = {"pwd_id": pwd_id, "passcode": ""}
         try:
@@ -94,7 +91,6 @@ class QuarkEngine:
         except Exception as e:
             return None, None, f"请求 Token 异常: {str(e)}"
 
-        # 2. 获取文件列表
         detail_url = f"https://drive.quark.cn/1/clouddrive/share/sharepage/detail?pr=ucpro&fr=pc&pwd_id={pwd_id}&stoken={requests.utils.quote(stoken)}&p=1&num=100"
         try:
             resp = requests.get(detail_url, headers=self.headers, timeout=8)
