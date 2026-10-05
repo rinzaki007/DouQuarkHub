@@ -12,30 +12,43 @@ app = Flask(__name__)
 def index():
     return render_template('index.html')
 
+# 🚀 对接豆瓣多维筛选接口
 @app.route('/api/get-movies', methods=['GET'])
 def get_movies():
-    cat_type = request.args.get('type', 'movie')
-    mapping = {
-        'movie': ('movie', '热门'),
-        'tv': ('tv', '热门'),
-        'show': ('tv', '综艺'),
-        'anime': ('tv', '动漫')
+    main_tag = request.args.get('tag', '电影')   # 大类: 电影, 电视剧, 综艺, 动漫
+    sort_type = request.args.get('sort', 'U')    # U: 热门, T: 最新, S: 高分
+    genre = request.args.get('genre', '')        # 动作, 喜剧...
+    country = request.args.get('country', '')    # 中国大陆, 美国...
+    year_range = request.args.get('year', '')    # 2026,2026 或 2020,2029
+
+    url = "https://movie.douban.com/j/new_search_subjects"
+    params = {
+        "sort": sort_type,
+        "range": "0,10",
+        "tags": main_tag,
+        "start": 0,
+        "limit": 100
     }
-    db_type, db_tag = mapping.get(cat_type, ('movie', '热门'))
-    url = f"https://movie.douban.com/j/search_subjects?type={db_type}&tag={db_tag}&page_limit=100&page_start=0"
-    
+    if genre:
+        params["genres"] = genre
+    if country:
+        params["countries"] = country
+    if year_range:
+        params["year_range"] = year_range
+
     try:
-        resp = requests.get(url, headers=DOUBAN_HEADERS, timeout=10)
+        resp = requests.get(url, headers=DOUBAN_HEADERS, params=params, timeout=10)
         if resp.status_code == 200:
-            subjects = resp.json().get('subjects', [])
+            data = resp.json()
+            raw_list = data.get('data', [])
             movies = [{
                 'title': item.get('title'),
                 'cover': item.get('cover'),
                 'rate': item.get('rate') if item.get('rate') else '暂无',
                 'url': item.get('url', f"https://movie.douban.com/subject/{item.get('id')}/")
-            } for item in subjects]
+            } for item in raw_list]
             return jsonify({'success': True, 'movies': movies})
-        return jsonify({'success': False, 'movies': []})
+        return jsonify({'success': False, 'movies': [], 'message': f'豆瓣返回 {resp.status_code}'})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e), 'movies': []})
 
@@ -73,7 +86,6 @@ def check_cookie():
     except Exception as e:
         return jsonify({'valid': False, 'message': f'校验出错: {str(e)}'})
 
-# 4: 真实的 TG 频道网络探针检测接口
 @app.route('/api/check-channels', methods=['GET'])
 def check_channels_health():
     channels = load_channels()
