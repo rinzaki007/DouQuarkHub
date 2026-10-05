@@ -22,5 +22,5 @@ services:
     ports:
       - 8099:5000
     volumes:
-      - ./data:/app/data
+      - （存储地址）默认 ./data:/app/data
     restart: always
