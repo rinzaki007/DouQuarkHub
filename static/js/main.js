@@ -5,7 +5,7 @@ let channelList = [];
 
 window.onload = () => {
     loadConfig();
-    checkQuarkStatus();
+    refreshStatus();
     fetchMovies('movie');
     fetchChannels();
 };
@@ -15,7 +15,11 @@ function loadConfig() {
     document.getElementById('folder-id-input').value = localStorage.getItem('target_folder_id') || '0';
 }
 
-// 5: 检查夸克 Cookie 状态
+function refreshStatus() {
+    checkQuarkStatus();
+    fetchChannels();
+}
+
 async function checkQuarkStatus() {
     const cookie = localStorage.getItem('quark_cookie') || '';
     const badge = document.getElementById('quark-status-badge');
@@ -44,7 +48,7 @@ async function checkQuarkStatus() {
         }
     } catch (err) {
         badge.className = 'badge badge-danger';
-        badge.textContent = '网络异常';
+        badge.textContent = '接口异常';
     }
 }
 
@@ -56,7 +60,6 @@ async function fetchChannels() {
             channelList = data.channels;
             renderChannels();
             
-            // 5: 更新频道配置监控 Badge
             const chBadge = document.getElementById('channel-status-badge');
             chBadge.className = channelList.length > 0 ? 'badge badge-success' : 'badge badge-warning';
             chBadge.textContent = `${channelList.length} 个频道`;
@@ -148,10 +151,9 @@ async function saveConfig() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ channels: channelList })
         });
-        alert('配置与频道信息已成功保存！');
+        alert('配置已保存！');
         closeConfigModal();
-        checkQuarkStatus();
-        fetchChannels();
+        refreshStatus();
     } catch (err) {
         alert('保存频道配置失败: ' + err.message);
     }
@@ -160,10 +162,9 @@ async function saveConfig() {
 function openConfigModal() { document.getElementById('config-modal').style.display = 'flex'; }
 function closeConfigModal() { document.getElementById('config-modal').style.display = 'none'; }
 
-// 6: 支持 4 个 Tab 切换获取 100 条数据
 async function fetchMovies(type) {
     const names = { movie: '热门电影', tv: '热门电视剧', show: '热门综艺', anime: '热门动漫' };
-    appendLog(`[系统] 正在获取豆瓣【${names[type] || type}】100 部影视列表...`);
+    appendLog(`[系统] 正在获取豆瓣【${names[type] || type}】列表...`);
     try {
         const res = await fetch(`/api/get-movies?type=${type}`);
         const data = await res.json();
@@ -200,7 +201,6 @@ function switchTab(type) {
     fetchMovies(type);
 }
 
-// 3: 渲染 100 个影视，带评分与豆瓣网页链接
 function renderGrid() {
     const grid = document.getElementById('movie-grid');
     grid.innerHTML = '';
@@ -265,7 +265,6 @@ function clearLog() {
     document.getElementById('log-body').textContent = '系统就绪，等待触发转存任务...';
 }
 
-// 4: 触发转存时立即清空上一轮日志，保持固定输出直至下一次提交
 async function startBatchTransfer() {
     if (selectedMovies.size === 0) {
         alert('请先勾选需要转存的影视！');
@@ -276,14 +275,12 @@ async function startBatchTransfer() {
     const folderId = localStorage.getItem('target_folder_id') || '0';
 
     if (!cookie) {
-        alert('请先在右侧或右上角“配置设置”填入夸克 Cookie！');
+        alert('请先填入夸克 Cookie！');
         openConfigModal();
         return;
     }
 
-    // 4: 刷新本轮日志，清空上一轮残留
     document.getElementById('log-body').textContent = '';
-    
     const targets = Array.from(selectedMovies);
     appendLog(`[系统] 🚀 开始处理本轮批量转存，共 ${targets.length} 个目标...`);
 
@@ -297,6 +294,14 @@ async function startBatchTransfer() {
                 folderId: folderId
             })
         });
+
+        // 预防服务器崩溃返回非 JSON 数据
+        const contentType = res.headers.get("content-type");
+        if (!contentType || !contentType.includes("application/json")) {
+            const rawText = await res.text();
+            appendLog(`\n❌ 服务器响应异常: ${rawText.substring(0, 150)}...`);
+            return;
+        }
 
         const data = await res.json();
         if (data.success) {
