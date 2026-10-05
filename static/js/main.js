@@ -17,10 +17,39 @@ function loadConfig() {
 
 function refreshStatus() {
     checkQuarkStatus();
-    fetchChannels();
+    checkChannelsHealth();
 }
 
-// 检查夸克 Cookie 状态
+// 4: 探针检测 TG 频道真实联通性
+async function checkChannelsHealth() {
+    const chBadge = document.getElementById('channel-status-badge');
+    chBadge.className = 'badge badge-warning';
+    chBadge.textContent = '探测中...';
+
+    try {
+        const res = await fetch('/api/check-channels');
+        const data = await res.json();
+        if (data.success) {
+            if (data.total === 0) {
+                chBadge.className = 'badge badge-warning';
+                chBadge.textContent = '未配置频道';
+            } else if (data.valid_count === data.total) {
+                chBadge.className = 'badge badge-success';
+                chBadge.textContent = `🟢 ${data.valid_count}/${data.total} 个联通`;
+            } else if (data.valid_count > 0) {
+                chBadge.className = 'badge badge-warning';
+                chBadge.textContent = `🟡 ${data.valid_count}/${data.total} 个联通`;
+            } else {
+                chBadge.className = 'badge badge-danger';
+                chBadge.textContent = `🔴 0/${data.total} 无法访问`;
+            }
+        }
+    } catch (err) {
+        chBadge.className = 'badge badge-danger';
+        chBadge.textContent = '检测异常';
+    }
+}
+
 async function checkQuarkStatus() {
     const cookie = localStorage.getItem('quark_cookie') || '';
     const badge = document.getElementById('quark-status-badge');
@@ -53,7 +82,6 @@ async function checkQuarkStatus() {
     }
 }
 
-// 加载 TG 检索频道列表
 async function fetchChannels() {
     try {
         const res = await fetch('/api/channels');
@@ -61,10 +89,7 @@ async function fetchChannels() {
         if (data.success) {
             channelList = data.channels;
             renderChannels();
-            
-            const chBadge = document.getElementById('channel-status-badge');
-            chBadge.className = channelList.length > 0 ? 'badge badge-success' : 'badge badge-warning';
-            chBadge.textContent = `${channelList.length} 个频道`;
+            checkChannelsHealth();
         }
     } catch (err) {
         console.error("加载频道失败", err);
@@ -75,7 +100,7 @@ function renderChannels() {
     const container = document.getElementById('channel-list-box');
     container.innerHTML = '';
     if (channelList.length === 0) {
-        container.innerHTML = `<div style="text-align:center; color:#64748b; font-size:12px; padding:8px;">暂无设定频道</div>`;
+        container.innerHTML = `<div style="text-align:center; color:#64748b; font-size:13px; padding:10px;">暂无设定频道</div>`;
         return;
     }
     channelList.forEach((ch, idx) => {
@@ -164,7 +189,6 @@ async function saveConfig() {
 function openConfigModal() { document.getElementById('config-modal').style.display = 'flex'; }
 function closeConfigModal() { document.getElementById('config-modal').style.display = 'none'; }
 
-// 获取 100 条豆瓣影视列表
 async function fetchMovies(type) {
     const names = { movie: '热门电影', tv: '热门电视剧', show: '热门综艺', anime: '热门动漫' };
     appendLog(`[系统] 正在获取豆瓣【${names[type] || type}】列表...\n`);
@@ -204,7 +228,6 @@ function switchTab(type) {
     fetchMovies(type);
 }
 
-// 渲染 8 列网格海报墙
 function renderGrid() {
     const grid = document.getElementById('movie-grid');
     grid.innerHTML = '';
@@ -269,7 +292,6 @@ function clearLog() {
     document.getElementById('log-body').textContent = '系统就绪，等待触发转存任务...';
 }
 
-// 🚀 核心：使用 ReadableStream 实时读取后端流式推送的转存日志
 async function startBatchTransfer() {
     if (selectedMovies.size === 0) {
         alert('请先勾选需要转存的影视！');
@@ -306,7 +328,6 @@ async function startBatchTransfer() {
             return;
         }
 
-        // 建立流式解码器
         const reader = response.body.getReader();
         const decoder = new TextDecoder('utf-8');
 
