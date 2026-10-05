@@ -28,16 +28,18 @@
 在服务器任意目录下创建一个名为 `docker-compose.yml` 的文件，并粘贴以下内容：
 
 ```yaml
-version: "3.8"
-
 services:
-  mycloudcore:
-    image: ghcr.io/rinzaki007/mycloudcore:latest
-    container_name: my-cloud-core
-    restart: always
+  douquarkhub:
+    # 镜像地址。如果国内服务器拉取 ghcr.io 较慢，可自行替换或配置国内镜像加速（例如：ghcr.m.daocloud.io/rinzaki007/mycloudcore:latest）
+    image: ghcr.io/rinzaki007/douquarkhub:latest
+    container_name: DouQuarkHub
+    # 容器重启策略：unless-stopped 表示随系统自动重启，但如果被手动 stop 停止，则不会自动拉起
+    restart: unless-stopped
+    # 左侧的 8099 为宿主机访问端口（若冲突可修改，如 9000:5000）；右侧的 5000 为容器内应用监听端口，请勿修改
     ports:
       - "8099:5000"
     volumes:
+      # 存储地址挂载：请根据你的实际需求修改左侧的宿主机目录路径
       - ./data:/app/data
     environment:
       - TZ=Asia/Shanghai
