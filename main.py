@@ -34,7 +34,7 @@ def get_movies():
                 'url': item.get('url', f"https://movie.douban.com/subject/{item.get('id')}/")
             } for item in subjects]
             return jsonify({'success': True, 'movies': movies})
-        return jsonify({'success': False, 'movies': [], 'message': f'豆瓣响应异常 {resp.status_code}'})
+        return jsonify({'success': False, 'movies': []})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e), 'movies': []})
 
@@ -89,14 +89,19 @@ def transfer():
         folder_id = data.get('folderId', '0')
 
         if not movies or not cookie:
-            return jsonify({'success': False, 'message': '参数不完整，请检查影视勾选与 Cookie'})
+            return jsonify({'success': False, 'message': '参数不完整，请检查勾选与 Cookie'})
 
         service = SearchService(cookie)
         channels = load_channels()
         results = service.batch_search_and_transfer(movies, channels, target_fid=folder_id)
         return jsonify({'success': True, 'results': results})
     except Exception as e:
-        return jsonify({'success': False, 'message': f'服务器内部错误: {str(e)}'})
+        return jsonify({'success': False, 'message': f'后台处理异常: {str(e)}'})
+
+@app.errorhandler(Exception)
+def handle_exception(e):
+    # 强制将所有未捕获异常以 JSON 格式返回，防止返回 HTML 导致 Lucky 触发 502
+    return jsonify({'success': False, 'message': f'系统错误: {str(e)}'}), 200
 
 @app.route('/api/proxy-img')
 def proxy_img():
