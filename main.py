@@ -9,7 +9,6 @@ from utils import load_channels, save_channels, DOUBAN_HEADERS
 
 app = Flask(__name__)
 
-# 初始化追剧订阅管理器
 sub_manager = SubscriptionManager(get_cookie_func=lambda: app.config.get('QUARK_COOKIE', ''))
 sub_manager.start_scheduler()
 
@@ -44,10 +43,10 @@ def get_movies():
         params["year_range"] = year_range
 
     try:
-        resp = requests.get(url, headers=DOUBAN_HEADERS, params=params, timeout=6)
+        resp = requests.get(url, headers=DOUBAN_HEADERS, params=params, timeout=10)
         content_type = resp.headers.get('Content-Type', '')
         if 'html' in content_type.lower():
-            return jsonify({'success': False, 'movies': [], 'message': '豆瓣触发风控拦截，请稍后再试'})
+            return jsonify({'success': False, 'movies': [], 'message': '豆瓣触发风控拦截'})
 
         if resp.status_code == 200:
             data = resp.json()
@@ -71,7 +70,7 @@ def search_douban():
         return jsonify({'success': False, 'movies': []})
     url = f"https://movie.douban.com/j/subject_suggest?q={requests.utils.quote(query)}"
     try:
-        resp = requests.get(url, headers=DOUBAN_HEADERS, timeout=6)
+        resp = requests.get(url, headers=DOUBAN_HEADERS, timeout=8)
         content_type = resp.headers.get('Content-Type', '')
         if 'html' in content_type.lower():
             return jsonify({'success': False, 'movies': [], 'message': '搜索触发风控'})
@@ -100,7 +99,7 @@ def check_cookie():
         valid = engine.check_cookie_valid()
         if valid:
             app.config['QUARK_COOKIE'] = cookie
-        return jsonify({'valid': valid, 'message': 'Cookie 有效' if valid else 'Cookie 已失效或格式错误'})
+        return jsonify({'valid': valid, 'message': 'Cookie 有效' if valid else 'Cookie 已失效'})
     except Exception as e:
         return jsonify({'valid': False, 'message': f'校验出错: {str(e)}'})
 
@@ -118,7 +117,8 @@ def check_channels_health():
             url = f"https://t.me/s/{ch_id}"
             headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
             try:
-                resp = requests.head(url, headers=headers, timeout=1.5)
+                # 🎯 放宽单频道检测超时到 3 秒
+                resp = requests.head(url, headers=headers, timeout=3.0)
                 return resp.status_code == 200
             except Exception:
                 return False
@@ -283,7 +283,7 @@ def proxy_img():
     if not img_url:
         return Response("Missing url", status=400)
     try:
-        resp = requests.get(img_url, headers=DOUBAN_HEADERS, timeout=5)
+        resp = requests.get(img_url, headers=DOUBAN_HEADERS, timeout=8)
         return Response(resp.content, mimetype=resp.headers.get('content-type', 'image/jpeg'))
     except Exception:
         return Response("", status=404)
