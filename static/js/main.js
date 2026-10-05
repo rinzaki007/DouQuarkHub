@@ -1,11 +1,11 @@
 let currentTab = 'movie';
 let movieList = [];
 let selectedMovies = new Set();
-let logAutoClearTimer = null;
 let channelList = [];
 
 window.onload = () => {
     loadConfig();
+    checkQuarkStatus();
     fetchMovies('movie');
     fetchChannels();
 };
@@ -15,6 +15,39 @@ function loadConfig() {
     document.getElementById('folder-id-input').value = localStorage.getItem('target_folder_id') || '0';
 }
 
+// 5: 检查夸克 Cookie 状态
+async function checkQuarkStatus() {
+    const cookie = localStorage.getItem('quark_cookie') || '';
+    const badge = document.getElementById('quark-status-badge');
+    if (!cookie) {
+        badge.className = 'badge badge-danger';
+        badge.textContent = '未配置';
+        return;
+    }
+    
+    badge.className = 'badge badge-warning';
+    badge.textContent = '校验中...';
+
+    try {
+        const res = await fetch('/api/check-cookie', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ cookie: cookie })
+        });
+        const data = await res.json();
+        if (data.valid) {
+            badge.className = 'badge badge-success';
+            badge.textContent = '🟢 有效';
+        } else {
+            badge.className = 'badge badge-danger';
+            badge.textContent = '🔴 已失效';
+        }
+    } catch (err) {
+        badge.className = 'badge badge-danger';
+        badge.textContent = '网络异常';
+    }
+}
+
 async function fetchChannels() {
     try {
         const res = await fetch('/api/channels');
@@ -22,6 +55,11 @@ async function fetchChannels() {
         if (data.success) {
             channelList = data.channels;
             renderChannels();
+            
+            // 5: 更新频道配置监控 Badge
+            const chBadge = document.getElementById('channel-status-badge');
+            chBadge.className = channelList.length > 0 ? 'badge badge-success' : 'badge badge-warning';
+            chBadge.textContent = `${channelList.length} 个频道`;
         }
     } catch (err) {
         console.error("加载频道失败", err);
@@ -67,25 +105,22 @@ function removeChannel(idx) {
     renderChannels();
 }
 
-// 📥 批量导入 JSON 频道核心函数
 function importChannelsJson() {
-    const jsonStr = prompt("请粘贴你的频道 JSON 数据（数组格式）：", '[{"name": "示例频道", "id": "example_channel"}]');
+    const jsonStr = prompt("请粘贴你的频道 JSON 数据（数组格式）：", '[{"name": "示例", "id": "example"}]');
     if (!jsonStr) return;
     
     try {
         const parsed = JSON.parse(jsonStr);
         if (!Array.isArray(parsed)) {
-            alert("导入失败：JSON 格式错误，必须是以方括号包裹的数组 [...]");
+            alert("导入失败：JSON 必须是数组格式 [...]");
             return;
         }
 
         let addedCount = 0;
         parsed.forEach(item => {
-            // 兼容兼容 name/title，id/channel_id 字段
             const name = item.name || item.title || "";
             const id = item.id || item.channel_id || "";
             if (name && id) {
-                // 自动去重
                 if (!channelList.some(c => c.id === id)) {
                     channelList.push({ name, id });
                     addedCount++;
@@ -94,9 +129,9 @@ function importChannelsJson() {
         });
 
         renderChannels();
-        alert(`成功导入 ${addedCount} 个新频道！\n\n请不要忘记点击配置弹窗右下角的“💾 保存配置”按钮！`);
+        alert(`成功导入 ${addedCount} 个新频道！请点击配置弹窗右下角“保存配置”以保存更改。`);
     } catch (err) {
-        alert("解析 JSON 失败，请检查格式是否为标准 JSON！\n错误细节: " + err.message);
+        alert("解析 JSON 失败，请检查格式！\n错误: " + err.message);
     }
 }
 
@@ -113,8 +148,10 @@ async function saveConfig() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ channels: channelList })
         });
-        alert('所有配置与频道已成功保存！');
+        alert('配置与频道信息已成功保存！');
         closeConfigModal();
+        checkQuarkStatus();
+        fetchChannels();
     } catch (err) {
         alert('保存频道配置失败: ' + err.message);
     }
@@ -123,8 +160,10 @@ async function saveConfig() {
 function openConfigModal() { document.getElementById('config-modal').style.display = 'flex'; }
 function closeConfigModal() { document.getElementById('config-modal').style.display = 'none'; }
 
+// 6: 支持 4 个 Tab 切换获取 100 条数据
 async function fetchMovies(type) {
-    appendLog(`[系统] 正在获取豆瓣【${type === 'movie' ? '热门电影' : '热门电视剧'}】列表...`);
+    const names = { movie: '热门电影', tv: '热门电视剧', show: '热门综艺', anime: '热门动漫' };
+    appendLog(`[系统] 正在获取豆瓣【${names[type] || type}】100 部影视列表...`);
     try {
         const res = await fetch(`/api/get-movies?type=${type}`);
         const data = await res.json();
@@ -133,7 +172,7 @@ async function fetchMovies(type) {
             renderGrid();
         }
     } catch (err) {
-        appendLog(`[系统] ❌ 获取影视失败: ${err.message}`);
+        appendLog(`[系统] ❌ 获取列表失败: ${err.message}`);
     }
 }
 
@@ -155,11 +194,13 @@ async function searchMovies() {
 
 function switchTab(type) {
     currentTab = type;
-    document.getElementById('tab-movie').classList.toggle('active', type === 'movie');
-    document.getElementById('tab-tv').classList.toggle('active', type === 'tv');
+    ['movie', 'tv', 'show', 'anime'].forEach(t => {
+        document.getElementById(`tab-${t}`).classList.toggle('active', t === type);
+    });
     fetchMovies(type);
 }
 
+// 3: 渲染 100 个影视，带评分与豆瓣网页链接
 function renderGrid() {
     const grid = document.getElementById('movie-grid');
     grid.innerHTML = '';
@@ -174,10 +215,13 @@ function renderGrid() {
         card.innerHTML = `
             <div class="cover-box">
                 <img src="${coverSrc}" alt="${m.title}" loading="lazy">
-                ${m.rate ? `<div class="rate-tag">${m.rate}</div>` : ''}
+                <div class="rate-tag">${m.rate}</div>
                 <div class="check-box">${isSelected ? '✓' : ''}</div>
             </div>
-            <div class="movie-title">${m.title}</div>
+            <div class="card-info">
+                <div class="movie-title">${m.title}</div>
+                <a href="${m.url}" target="_blank" class="douban-link" onclick="event.stopPropagation()">🔗 豆瓣详情</a>
+            </div>
         `;
         grid.appendChild(card);
     });
@@ -218,13 +262,10 @@ function appendLog(text) {
 }
 
 function clearLog() {
-    document.getElementById('log-body').textContent = '系统就绪，等待任务触发...';
-    if (logAutoClearTimer) {
-        clearTimeout(logAutoClearTimer);
-        logAutoClearTimer = null;
-    }
+    document.getElementById('log-body').textContent = '系统就绪，等待触发转存任务...';
 }
 
+// 4: 触发转存时立即清空上一轮日志，保持固定输出直至下一次提交
 async function startBatchTransfer() {
     if (selectedMovies.size === 0) {
         alert('请先勾选需要转存的影视！');
@@ -235,19 +276,16 @@ async function startBatchTransfer() {
     const folderId = localStorage.getItem('target_folder_id') || '0';
 
     if (!cookie) {
-        alert('请先点击右上角“配置设置”填入夸克 Cookie！');
+        alert('请先在右侧或右上角“配置设置”填入夸克 Cookie！');
         openConfigModal();
         return;
     }
 
-    if (logAutoClearTimer) {
-        clearTimeout(logAutoClearTimer);
-        logAutoClearTimer = null;
-    }
-
-    clearLog();
+    // 4: 刷新本轮日志，清空上一轮残留
+    document.getElementById('log-body').textContent = '';
+    
     const targets = Array.from(selectedMovies);
-    appendLog(`[系统] 🚀 开始处理批量转存，共 ${targets.length} 个目标...`);
+    appendLog(`[系统] 🚀 开始处理本轮批量转存，共 ${targets.length} 个目标...`);
 
     try {
         const res = await fetch('/api/transfer', {
@@ -266,16 +304,11 @@ async function startBatchTransfer() {
                 appendLog(`\n--- [${movieName}] ---`);
                 logs.forEach(l => appendLog(l));
             }
-            appendLog(`\n✨ 批量任务执行完毕！(日志将在 20 秒后自动清空)`);
-
-            logAutoClearTimer = setTimeout(() => {
-                clearLog();
-            }, 20000);
-
+            appendLog(`\n✨ 本轮任务全部执行完成！`);
         } else {
-            appendLog(`\n❌ 转存请求异常: ${data.message}`);
+            appendLog(`\n❌ 转存请求失败: ${data.message}`);
         }
     } catch (err) {
-        appendLog(`\n❌ 网络或者服务对接错误: ${err.message}`);
+        appendLog(`\n❌ 网络请求异常: ${err.message}`);
     }
 }
