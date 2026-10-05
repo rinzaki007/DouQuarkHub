@@ -2,7 +2,7 @@
 
 | 文件 / 路径 | 核心功能与技术说明 |
 | :--- | :--- |
-| **cloudmovie/** | 项目根目录 |
+| **DouQuarkHub/** | 项目根目录 |
 | ├── **.github/workflows/** | GitHub Actions 自动化流水线配置 |
 | │   └── `docker-build.yml` | 自动构建镜像并进行并发控制 |
 | ├── **templates/** | 前端页面模板目录 |
@@ -20,15 +20,24 @@
 
 
 
-docker-compose部署
+## 🚀 快速部署 (Docker Compose)
 
-version: "3"
+推荐使用 Docker Compose 进行部署，只需两步即可完成。
+
+### 1. 编写配置文件
+在服务器任意目录下创建一个名为 `docker-compose.yml` 的文件，并粘贴以下内容：
+
+```yaml
+version: "3.8"
+
 services:
   mycloudcore:
     image: ghcr.io/rinzaki007/mycloudcore:latest
     container_name: my-cloud-core
-    ports:
-      - 8099:5000
-    volumes:
-      - （存储地址）默认 ./data:/app/data
     restart: always
+    ports:
+      - "8099:5000"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - TZ=Asia/Shanghai
