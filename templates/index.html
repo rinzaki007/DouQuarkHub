@@ -3,279 +3,272 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MovieSync - 智能影音转存与云播中心</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <title>MovieSync 云影同步</title>
+    <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
-
-    <div class="layout-container">
-        <!-- 左侧主内容区域 -->
-        <div class="left-main">
-            <header>
-                <div class="logo">🎬 MovieSync 云影同步</div>
-                <div class="search-box">
-                    <input type="text" id="search-input" placeholder="输入你想找的电影、热播剧集、综艺、动漫..." onkeydown="if(event.key==='Enter') searchMovies()">
-                    <button class="btn" onclick="searchMovies()">搜索</button>
-                </div>
-            </header>
-
-            <!-- 顶部分类 Tab 与 工具栏 -->
-            <div class="top-action-bar">
-                <div class="tab-group">
-                    <button class="tab-btn active" id="tab-电影" onclick="switchCategory('电影')">🎬 电影</button>
-                    <button class="tab-btn" id="tab-电视剧" onclick="switchCategory('电视剧')">📺 电视剧</button>
-                    <button class="tab-btn" id="tab-综艺" onclick="switchCategory('综艺')">🎤 综艺</button>
-                    <button class="tab-btn" id="tab-动漫" onclick="switchCategory('动漫')">🎨 动漫</button>
-                </div>
-
-                <div class="right-tools">
-                    <div class="tool-group">
-                        <button class="btn-tool btn-openlist" onclick="openOpenList()" title="点击在新窗口打开 OpenList 播放视频">▶️ OpenList 云播</button>
-                        <button class="btn-tool btn-quark" onclick="openQuarkApp()" title="唤起电脑本地夸克网盘客户端或打开网页版">💻 夸克客户端</button>
-                        <button class="btn-tool btn-sub" onclick="openSubModal()" title="设置追剧/动漫自动定时检测增量转存">📺 追剧订阅</button>
-                    </div>
-
-                    <div class="tool-divider"></div>
-
-                    <div class="action-group">
-                        <span class="select-count">已选 <b id="selected-count">0</b> 部</span>
-                        <button class="btn-sm" onclick="selectAll()">全选</button>
-                        <button class="btn-sm" onclick="clearSelection()">取消</button>
-                        <button class="btn-sm" style="background: #8b5cf6;" onclick="subscribeSelected()" title="将勾选的剧集直接一键带入追剧订阅">📺 一键追剧</button>
-                        <button class="btn-transfer-top" onclick="startBatchTransfer()">
-                            🚀 批量转存
-                        </button>
-                    </div>
-                </div>
+    <div class="app-container">
+        <!-- 顶部导航栏 -->
+        <header class="app-header">
+            <div class="logo-area">
+                <span class="logo-icon">🎬</span>
+                <h1>MovieSync 云影同步</h1>
             </div>
-
-            <!-- 多维筛选栏 -->
-            <div class="filter-panel" id="filter-panel">
-                <div class="filter-row">
-                    <span class="filter-label">排序:</span>
-                    <div class="filter-options" id="filter-sort">
-                        <span class="filter-item active" onclick="setFilter('sort', 'U', this)">热门</span>
-                        <span class="filter-item" onclick="setFilter('sort', 'R', this)">最新</span>
-                        <span class="filter-item" onclick="setFilter('sort', 'S', this)">高分</span>
-                        <span class="filter-item" onclick="setFilter('sort', 'T', this)">最多评价</span>
-                    </div>
-                </div>
-
-                <div class="filter-row">
-                    <span class="filter-label">类型:</span>
-                    <div class="filter-options" id="filter-genre">
-                        <span class="filter-item active" onclick="setFilter('genre', '', this)">全部</span>
-                        <span class="filter-item" onclick="setFilter('genre', '剧情', this)">剧情</span>
-                        <span class="filter-item" onclick="setFilter('genre', '喜剧', this)">喜剧</span>
-                        <span class="filter-item" onclick="setFilter('genre', '动作', this)">动作</span>
-                        <span class="filter-item" onclick="setFilter('genre', '爱情', this)">爱情</span>
-                        <span class="filter-item" onclick="setFilter('genre', '科幻', this)">科幻</span>
-                        <span class="filter-item" onclick="setFilter('genre', '悬疑', this)">悬疑</span>
-                        <span class="filter-item" onclick="setFilter('genre', '犯罪', this)">犯罪</span>
-                        <span class="filter-item" onclick="setFilter('genre', '动画', this)">动画</span>
-                        <span class="filter-item" onclick="setFilter('genre', '惊悚', this)">惊悚</span>
-                    </div>
-                </div>
-
-                <div class="filter-row">
-                    <span class="filter-label">地区:</span>
-                    <div class="filter-options" id="filter-country">
-                        <span class="filter-item active" onclick="setFilter('country', '', this)">全部</span>
-                        <span class="filter-item" onclick="setFilter('country', '中国大陆', this)">中国大陆</span>
-                        <span class="filter-item" onclick="setFilter('country', '美国', this)">美国</span>
-                        <span class="filter-item" onclick="setFilter('country', '中国香港', this)">中国香港</span>
-                        <span class="filter-item" onclick="setFilter('country', '中国台湾', this)">中国台湾</span>
-                        <span class="filter-item" onclick="setFilter('country', '日本', this)">日本</span>
-                        <span class="filter-item" onclick="setFilter('country', '韩国', this)">韩国</span>
-                        <span class="filter-item" onclick="setFilter('country', '英国', this)">英国</span>
-                    </div>
-                </div>
-
-                <div class="filter-row">
-                    <span class="filter-label">年份:</span>
-                    <div class="filter-options" id="filter-year">
-                        <span class="filter-item active" onclick="setFilter('year', '', this)">全部</span>
-                        <span class="filter-item" onclick="setFilter('year', '2026,2026', this)">2026</span>
-                        <span class="filter-item" onclick="setFilter('year', '2025,2025', this)">2025</span>
-                        <span class="filter-item" onclick="setFilter('year', '2024,2024', this)">2024</span>
-                        <span class="filter-item" onclick="setFilter('year', '2023,2023', this)">2023</span>
-                        <span class="filter-item" onclick="setFilter('year', '2020,2029', this)">2020年代</span>
-                        <span class="filter-item" onclick="setFilter('year', '2010,2019', this)">2010年代</span>
-                    </div>
-                </div>
+            <div class="search-bar">
+                <input type="text" id="search-input" placeholder="输入你想找的电影、热播剧集、综艺、动漫..." onkeydown="if(event.key==='Enter') searchMovies()">
+                <button onclick="searchMovies()">搜索</button>
             </div>
+            <div class="header-actions">
+                <button class="btn-config" onclick="openConfigModal()">⚙️ 配置设置</button>
+            </div>
+        </header>
 
-            <!-- 8列海报墙 -->
+        <!-- 主体布局 -->
+        <div class="main-layout">
+            <!-- 左侧内容区 -->
             <div class="content-area">
-                <div class="movie-grid" id="movie-grid"></div>
-            </div>
-        </div>
-
-        <!-- 右侧 Sidebar -->
-        <div class="log-sidebar">
-            <div class="sidebar-top-bar">
-                <button class="btn config-btn" onclick="openConfigModal()">⚙ 配置设置</button>
-            </div>
-
-            <div class="status-panel">
-                <div class="status-header">
-                    <span class="status-title">⚡ 系统状态监控</span>
-                    <button class="btn-sm" style="font-size:11px; padding:2px 8px;" onclick="refreshStatus()">🔄 刷新</button>
-                </div>
-                <div class="status-items">
-                    <div class="status-item">
-                        <span>夸克 Cookie:</span>
-                        <span id="quark-status-badge" class="badge badge-warning">检查中...</span>
+                <!-- 分类 Tab 与功能按钮栏 -->
+                <div class="toolbar">
+                    <div class="category-tabs">
+                        <button class="tab-btn active" id="tab-电影" onclick="switchCategory('电影')">电影</button>
+                        <button class="tab-btn" id="tab-电视剧" onclick="switchCategory('电视剧')">电视剧</button>
+                        <button class="tab-btn" id="tab-综艺" onclick="switchCategory('综艺')">综艺</button>
+                        <button class="tab-btn" id="tab-动漫" onclick="switchCategory('动漫')">动漫</button>
                     </div>
-                    <div class="status-item">
-                        <span>TG 检索频道:</span>
-                        <span id="channel-status-badge" class="badge badge-info">探测中...</span>
+
+                    <div class="action-buttons">
+                        <button class="action-btn btn-openlist" onclick="openOpenList()">▶️ OpenList</button>
+                        <button class="action-btn btn-quark" onclick="openQuarkApp()">🌐 夸克端</button>
+                        <!-- 🎯 重命名为自动化任务，消除重复 -->
+                        <button class="action-btn btn-sub-manage" onclick="openSubModal()">📊 自动化任务</button>
+                        <div class="divider"></div>
+                        <span class="sel-info">已选 <b id="selected-count">0</b> 部</span>
+                        <button class="action-btn" onclick="selectAll()">全选</button>
+                        <button class="action-btn" onclick="clearSelection()">取消</button>
+                        <button class="action-btn btn-primary" onclick="subscribeSelected()">🎯 一键追剧</button>
+                        <button class="action-btn btn-success" onclick="startBatchTransfer()">🚀 批量转存</button>
                     </div>
                 </div>
-            </div>
 
-            <div class="log-container">
-                <div class="log-header">
-                    <span>🟢 实时运行日志</span>
-                    <button class="btn-sm" onclick="clearLog()">清空</button>
-                </div>
-                <div class="log-body" id="log-body">MovieSync 就绪，等待触发转存任务...</div>
-            </div>
-        </div>
-    </div>
-
-    <!-- ⚙️ 1. 系统与服务配置 Modal -->
-    <div class="modal" id="config-modal">
-        <div class="modal-content">
-            <h3>⚙ MovieSync 系统与服务配置</h3>
-            
-            <div class="section-title">☁️ 夸克网盘基础配置</div>
-            <label style="font-size:13px; color:#94a3b8;">夸克 Cookie:</label>
-            <input type="text" id="quark-cookie-input" placeholder="粘贴完整的夸克 Cookie...">
-            
-            <label style="font-size:13px; color:#94a3b8;">默认保存目录 FID (未独立配置时生效，默认 0 为根目录):</label>
-            <input type="text" id="folder-id-input" placeholder="默认 0">
-
-            <div class="section-title">📁 分类独立保存目录 FID (留空则使用默认目录)</div>
-            <div class="folder-grid">
-                <div>
-                    <label style="font-size:12px; color:#94a3b8;">🎬 电影保存 FID:</label>
-                    <input type="text" id="folder-movie-input" placeholder="例: 3ef79d1b...">
-                </div>
-                <div>
-                    <label style="font-size:12px; color:#94a3b8;">📺 电视剧保存 FID:</label>
-                    <input type="text" id="folder-tv-input" placeholder="例: 4ab88f2c...">
-                </div>
-                <div>
-                    <label style="font-size:12px; color:#94a3b8;">🎤 综艺保存 FID:</label>
-                    <input type="text" id="folder-show-input" placeholder="例: 1cd99e3a...">
-                </div>
-                <div>
-                    <label style="font-size:12px; color:#94a3b8;">🎨 动漫保存 FID:</label>
-                    <input type="text" id="folder-anime-input" placeholder="例: 8fe11b4d...">
-                </div>
-            </div>
-
-            <div class="section-title">🔗 外部工具集成</div>
-            <label style="font-size:13px; color:#94a3b8;">OpenList 在线播放地址 (例: http://192.168.1.100:5244):</label>
-            <input type="text" id="openlist-url-input" placeholder="http://192.168.x.x:5244">
-
-            <label style="font-size:13px; color:#94a3b8;">夸克客户端唤起协议 (默认 quark://):</label>
-            <input type="text" id="quark-app-input" placeholder="quark://">
-
-            <div class="section-title">
-                <span>📺 检索频道配置</span>
-                <div>
-                    <button class="btn-sm" style="font-size:12px; margin-right:4px;" onclick="importChannelsJson()">📥 批量导入 JSON</button>
-                    <button class="btn-sm" style="font-size:12px;" onclick="fetchChannels()">刷新频道</button>
-                </div>
-            </div>
-
-            <div class="channel-list-box" id="channel-list-box"></div>
-
-            <div class="add-channel-row">
-                <input type="text" id="new-ch-name" placeholder="频道名称 (例: 夸克影视)" style="flex: 1;">
-                <input type="text" id="new-ch-id" placeholder="Telegram频道ID (例: Quark_Movies)" style="flex: 1;">
-                <button class="btn-sm" style="background: var(--primary);" onclick="addChannel()">添加</button>
-            </div>
-
-            <div style="display:flex; justify-content: space-between; align-items: center; margin-top: 12px;">
-                <button class="btn-sm" style="background:#475569;" onclick="closeConfigModal()">取消</button>
-                <button class="btn" onclick="saveConfig()">💾 保存配置</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- 🎬 2. 选集转存勾选 Modal -->
-    <div class="modal" id="select-files-modal">
-        <div class="modal-content" style="width: 680px;">
-            <h3>🎬 解析选集转存 (自动洗剧清洗)</h3>
-            <p style="font-size:12px; color:#94a3b8;">勾选需要保存的集数（已自动过滤无用广告与预告文件）：</p>
-            
-            <div style="display:flex; justify-content:space-between; margin: 8px 0;">
-                <div>
-                    <button class="btn-sm" onclick="selectAllParseFiles(true)">全选正片</button>
-                    <button class="btn-sm" onclick="selectAllParseFiles(false)">取消全选</button>
-                </div>
-                <span id="selected-parse-count" style="font-size:12px; color:#38bdf8;">已选 0 文件</span>
-            </div>
-
-            <div id="parse-file-list" style="max-height:300px; overflow-y:auto; background:#0f172a; border:1px solid #334155; border-radius:6px; padding:8px;"></div>
-
-            <div style="display:flex; justify-content: space-between; align-items:center; margin-top:12px;">
-                <button class="btn-sm" style="background:#475569;" onclick="closeSelectFilesModal()">取消</button>
-                <button class="btn" onclick="submitSaveSelectedFiles()">🚀 立即转存勾选项</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- 📺 3. 追剧订阅管理 Modal（已增强智能匹配与集数跳过） -->
-    <div class="modal" id="sub-modal">
-        <div class="modal-content" style="width: 650px;">
-            <h3>📺 追剧与动漫自动订阅管理</h3>
-            
-            <div class="section-title">➕ 添加新追剧订阅</div>
-            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px;">
-                <div>
-                    <label style="font-size:11px; color:#94a3b8;">剧集/动漫名称:</label>
-                    <input type="text" id="sub-title-input" placeholder="例如: 兰香如故" style="width:100%;">
-                </div>
-                <div>
-                    <label style="font-size:11px; color:#94a3b8;">夸克链接 ID / 分享码:</label>
-                    <div style="display:flex; gap:4px;">
-                        <input type="text" id="sub-pwd-input" placeholder="例如: ef7951063756" style="flex:1;">
-                        <button class="btn-sm" style="background:#0284c7; font-size:11px;" onclick="autoSearchSubLink()">🔍 检索链接</button>
+                <!-- 筛选过滤条件面板 -->
+                <div class="filter-panel">
+                    <div class="filter-row">
+                        <span class="filter-label">排序:</span>
+                        <div class="filter-items">
+                            <span class="filter-item active" onclick="setFilter('sort', 'U', this)">热门</span>
+                            <span class="filter-item" onclick="setFilter('sort', 'T', this)">最新</span>
+                            <span class="filter-item" onclick="setFilter('sort', 'S', this)">高分</span>
+                            <span class="filter-item" onclick="setFilter('sort', 'R', this)">最多评价</span>
+                        </div>
+                    </div>
+                    <div class="filter-row">
+                        <span class="filter-label">类型:</span>
+                        <div class="filter-items">
+                            <span class="filter-item active" onclick="setFilter('genre', '', this)">全部</span>
+                            <span class="filter-item" onclick="setFilter('genre', '剧情', this)">剧情</span>
+                            <span class="filter-item" onclick="setFilter('genre', '喜剧', this)">喜剧</span>
+                            <span class="filter-item" onclick="setFilter('genre', '动作', this)">动作</span>
+                            <span class="filter-item" onclick="setFilter('genre', '爱情', this)">爱情</span>
+                            <span class="filter-item" onclick="setFilter('genre', '科幻', this)">科幻</span>
+                            <span class="filter-item" onclick="setFilter('genre', '悬疑', this)">悬疑</span>
+                            <span class="filter-item" onclick="setFilter('genre', '犯罪', this)">犯罪</span>
+                            <span class="filter-item" onclick="setFilter('genre', '动画', this)">动画</span>
+                            <span class="filter-item" onclick="setFilter('genre', '惊悚', this)">惊悚</span>
+                        </div>
+                    </div>
+                    <div class="filter-row">
+                        <span class="filter-label">地区:</span>
+                        <div class="filter-items">
+                            <span class="filter-item active" onclick="setFilter('country', '', this)">全部</span>
+                            <span class="filter-item" onclick="setFilter('country', '中国大陆', this)">中国大陆</span>
+                            <span class="filter-item" onclick="setFilter('country', '美国', this)">美国</span>
+                            <span class="filter-item" onclick="setFilter('country', '中国香港', this)">中国香港</span>
+                            <span class="filter-item" onclick="setFilter('country', '中国台湾', this)">中国台湾</span>
+                            <span class="filter-item" onclick="setFilter('country', '日本', this)">日本</span>
+                            <span class="filter-item" onclick="setFilter('country', '韩国', this)">韩国</span>
+                            <span class="filter-item" onclick="setFilter('country', '英国', this)">英国</span>
+                        </div>
+                    </div>
+                    <div class="filter-row">
+                        <span class="filter-label">年份:</span>
+                        <div class="filter-items">
+                            <span class="filter-item active" onclick="setFilter('year', '', this)">全部</span>
+                            <span class="filter-item" onclick="setFilter('year', '2026', this)">2026</span>
+                            <span class="filter-item" onclick="setFilter('year', '2025', this)">2025</span>
+                            <span class="filter-item" onclick="setFilter('year', '2024', this)">2024</span>
+                            <span class="filter-item" onclick="setFilter('year', '2023', this)">2023</span>
+                            <span class="filter-item" onclick="setFilter('year', '2020年代', this)">2020年代</span>
+                            <span class="filter-item" onclick="setFilter('year', '2010年代', this)">2010年代</span>
+                        </div>
                     </div>
                 </div>
-                <div>
-                    <label style="font-size:11px; color:#94a3b8;">保存目标目录 (根据配置智能提供):</label>
-                    <select id="sub-folder-select" style="width:100%; background:#0f172a; color:#fff; border:1px solid #334155; border-radius:4px; padding:8px; font-size:13px;"></select>
-                </div>
-                <div>
-                    <label style="font-size:11px; color:#94a3b8;">已看/跳过前 X 集 (从 X+1 集开始追更):</label>
-                    <input type="number" id="sub-start-ep-input" placeholder="例如: 13 (设为0表示全部)" value="0" min="0" style="width:100%;">
+
+                <!-- 影视海报网格展示区 -->
+                <div class="movie-grid-container">
+                    <div id="movie-grid" class="movie-grid">
+                        <!-- 动态加载 -->
+                    </div>
                 </div>
             </div>
 
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;">
-                <select id="sub-interval-input" style="background:#0f172a; color:#fff; border:1px solid #334155; border-radius:4px; padding:6px; font-size:12px;">
-                    <option value="2">每 2 小时检测一次</option>
-                    <option value="6" selected>每 6 小时检测一次</option>
-                    <option value="12">每 12 小时检测一次</option>
-                    <option value="24">每天检测一次</option>
-                </select>
-                <button class="btn" onclick="addSubscription()">➕ 添加自动追踪订阅</button>
-            </div>
+            <!-- 右侧边栏 (状态监控与实时日志) -->
+            <div class="sidebar">
+                <!-- 状态监控面板 -->
+                <div class="panel status-panel">
+                    <div class="panel-header">
+                        <h3>⚡ 系统状态监控</h3>
+                        <button class="btn-sm" onclick="refreshStatus()">🔄 刷新</button>
+                    </div>
+                    <div class="status-items">
+                        <div class="status-row">
+                            <span>夸克 Cookie:</span>
+                            <span id="quark-status-badge" class="badge badge-warning">检测中...</span>
+                        </div>
+                        <div class="status-row">
+                            <span>TG 检索频道:</span>
+                            <span id="channel-status-badge" class="badge badge-warning">检测中...</span>
+                        </div>
+                    </div>
+                </div>
 
-            <div class="section-title" style="margin-top:14px;">📋 已订阅任务列表</div>
-            <div id="sub-list-box" style="max-height:220px; overflow-y:auto; background:#0f172a; border:1px solid #334155; border-radius:6px; padding:8px;"></div>
-
-            <div style="display:flex; justify-content: flex-end; margin-top:12px;">
-                <button class="btn-sm" style="background:#475569;" onclick="closeSubModal()">关闭</button>
+                <!-- 实时运行日志面板 -->
+                <div class="panel log-panel">
+                    <div class="panel-header">
+                        <h3>🟢 实时运行日志</h3>
+                        <button class="btn-sm" onclick="clearLog()">清空</button>
+                    </div>
+                    <div id="log-body" class="log-body">MovieSync 就绪，等待触发转存任务...</div>
+                </div>
             </div>
         </div>
     </div>
 
-    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <!-- ⚙️ 配置设置弹窗 -->
+    <div id="config-modal" class="modal">
+        <div class="modal-content large">
+            <h2>⚙️ 系统全局配置</h2>
+            <div class="form-group">
+                <label>夸克网盘 Cookie (ck):</label>
+                <textarea id="quark-cookie-input" placeholder="请在此处粘贴你的夸克网盘 Cookie..."></textarea>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label>默认全局存储目录 FID:</label>
+                    <input type="text" id="folder-id-input" placeholder="默认为 0 (根目录)">
+                </div>
+                <div class="form-group">
+                    <label>OpenList 访问地址:</label>
+                    <input type="text" id="openlist-url-input" placeholder="http://192.168.x.x:5244">
+                </div>
+            </div>
+
+            <h3 style="margin-top:15px; font-size:14px; color:#38bdf8;">📁 各分类专属存储目录 FID (可选)</h3>
+            <div class="form-row">
+                <div class="form-group"><label>电影目录 FID:</label><input type="text" id="folder-movie-input"></div>
+                <div class="form-group"><label>电视剧目录 FID:</label><input type="text" id="folder-tv-input"></div>
+            </div>
+            <div class="form-row">
+                <div class="form-group"><label>综艺目录 FID:</label><input type="text" id="folder-show-input"></div>
+                <div class="form-group"><label>动漫目录 FID:</label><input type="text" id="folder-anime-input"></div>
+            </div>
+
+            <div class="form-group" style="margin-top:10px;">
+                <label>夸克客户端唤醒链接 / 网页版跳转地址:</label>
+                <input type="text" id="quark-app-input" value="quark://">
+            </div>
+
+            <div class="form-group">
+                <label>Telegram 检索频道配置管理:</label>
+                <div class="channel-manage-box">
+                    <div id="channel-list-box" class="channel-list-scroll"></div>
+                    <div class="channel-add-row">
+                        <input type="text" id="new-ch-name" placeholder="频道名称 (如: 夸克电影分享)">
+                        <input type="text" id="new-ch-id" placeholder="频道 ID (如: quark_share)">
+                        <button type="button" class="btn-primary" onclick="addChannel()">添加</button>
+                        <button type="button" class="btn-import" onclick="importChannelsJson()">批量导入JSON</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeConfigModal()">取消</button>
+                <button class="btn-primary" onclick="saveConfig()">保存配置</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 📊 自动化追剧订阅弹窗 -->
+    <div id="sub-modal" class="modal">
+        <div class="modal-content medium">
+            <h2>📊 自动化追剧订阅与任务</h2>
+            
+            <div class="sub-form-box">
+                <div class="form-group">
+                    <label>剧集 / 动漫名称:</label>
+                    <div style="display:flex; gap:8px;">
+                        <input type="text" id="sub-title-input" placeholder="例如: 甄嬛传">
+                        <button type="button" class="btn-primary" onclick="autoSearchSubLink()">🔍 检索链接</button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>夸克链接 ID / 分享短码:</label>
+                    <input type="text" id="sub-pwd-input" placeholder="例如: ef7951063756">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>存储目标目录:</label>
+                        <select id="sub-folder-select"></select>
+                    </div>
+                    <div class="form-group">
+                        <label>已看 / 跳过前 X 集 (从 X+1 集起追更):</label>
+                        <input type="number" id="sub-start-ep-input" value="0" min="0">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>检测频率:</label>
+                        <select id="sub-interval-input">
+                            <option value="3">每 3 小时检测一次</option>
+                            <option value="6" selected>每 6 小时检测一次</option>
+                            <option value="12">每 12 小时检测一次</option>
+                            <option value="24">每 24 小时检测一次</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="display:flex; align-items:flex-end;">
+                        <button type="button" class="btn-success" style="width:100%; height:38px;" onclick="addSubscription()">+ 添加自动追踪订阅</button>
+                    </div>
+                </div>
+            </div>
+
+            <h3 style="margin: 15px 0 8px 0; font-size: 13px; color: #94a3b8;">已订阅自动化任务列表</h3>
+            <div id="sub-list-box" class="sub-list-scroll"></div>
+
+            <div class="modal-footer" style="margin-top: 15px;">
+                <button class="btn-secondary" onclick="closeSubModal()">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 文件手动筛选转存弹窗 -->
+    <div id="select-files-modal" class="modal">
+        <div class="modal-content medium">
+            <h2>📦 分享资源文件筛选转存</h2>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; font-size:13px; color:#94a3b8;">
+                <span id="selected-parse-count">已选 0 个文件</span>
+                <div>
+                    <button class="btn-sm" onclick="selectAllParseFiles(true)">全选</button>
+                    <button class="btn-sm" onclick="selectAllParseFiles(false)">反选</button>
+                </div>
+            </div>
+            <div id="parse-file-list" class="parse-file-list-box"></div>
+            <div class="modal-footer" style="margin-top: 15px;">
+                <button class="btn-secondary" onclick="closeSelectFilesModal()">取消</button>
+                <button class="btn-primary" onclick="submitSaveSelectedFiles()">确认转存到夸克网盘</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/main.js"></script>
 </body>
 </html>
