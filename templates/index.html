@@ -19,7 +19,7 @@
                 </div>
             </header>
 
-            <!-- 顶部分类 Tab（纯分类：电影/电视剧/综艺/动漫） -->
+            <!-- 顶部分类 Tab -->
             <div class="top-action-bar">
                 <div class="tab-group">
                     <button class="tab-btn active" id="tab-电影" onclick="switchCategory('电影')">🎬 电影</button>
@@ -38,14 +38,15 @@
                 </div>
             </div>
 
-            <!-- 🌟 多维筛选栏 (排序/类型/地区/年份) -->
+            <!-- 多维筛选栏 (更新 sort: R 为真正的最新) -->
             <div class="filter-panel" id="filter-panel">
                 <div class="filter-row">
                     <span class="filter-label">排序:</span>
                     <div class="filter-options" id="filter-sort">
                         <span class="filter-item active" onclick="setFilter('sort', 'U', this)">热门</span>
-                        <span class="filter-item" onclick="setFilter('sort', 'T', this)">最新</span>
+                        <span class="filter-item" onclick="setFilter('sort', 'R', this)">最新</span>
                         <span class="filter-item" onclick="setFilter('sort', 'S', this)">高分</span>
+                        <span class="filter-item" onclick="setFilter('sort', 'T', this)">最多评价</span>
                     </div>
                 </div>
 
