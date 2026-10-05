@@ -8,45 +8,49 @@
 </head>
 <body>
 
-    <!-- 1 & 2: 顶部固定 Header -->
-    <header>
-        <div class="logo">🎬 豆瓣全局搜索转存夸克网盘服务</div>
-        <div class="search-box">
-            <input type="text" id="search-input" placeholder="输入你想找的电影、热播剧集、综艺、动漫..." onkeydown="if(event.key==='Enter') searchMovies()">
-            <button class="btn" onclick="searchMovies()">搜索</button>
+    <!-- 顶部统一固定卡片，消除缝隙 -->
+    <div class="sticky-top-wrapper">
+        <header>
+            <div class="logo">🎬 豆瓣全局搜索转存夸克网盘服务</div>
+            <div class="search-box">
+                <input type="text" id="search-input" placeholder="输入你想找的电影、热播剧集、综艺、动漫..." onkeydown="if(event.key==='Enter') searchMovies()">
+                <button class="btn" onclick="searchMovies()">搜索</button>
+            </div>
+            <button class="btn config-btn" onclick="openConfigModal()">⚙️ 配置设置</button>
+        </header>
+
+        <div class="top-action-bar">
+            <div class="tab-group">
+                <button class="tab-btn active" id="tab-movie" onclick="switchTab('movie')">🔥 热门电影</button>
+                <button class="tab-btn" id="tab-tv" onclick="switchTab('tv')">📺 热门电视剧</button>
+                <button class="tab-btn" id="tab-show" onclick="switchTab('show')">🎤 热门综艺</button>
+                <button class="tab-btn" id="tab-anime" onclick="switchTab('anime')">🎨 热门动漫</button>
+            </div>
+
+            <div class="right-tools">
+                <span class="select-count">已选 <b id="selected-count">0</b> 部</span>
+                <button class="btn-sm" onclick="selectAll()">全选</button>
+                <button class="btn-sm" onclick="clearSelection()">取消</button>
+                <button class="btn-transfer-top" onclick="startBatchTransfer()">
+                    🚀 一键批量转存勾选项
+                </button>
+            </div>
         </div>
-        <button class="btn config-btn" onclick="openConfigModal()">⚙️ 配置设置</button>
-    </header>
+    </div>
 
     <main>
         <div class="content-area">
-            <!-- 2: 吸顶操作栏 & 6: 四个分类 Tab -->
-            <div class="top-action-bar">
-                <div class="tab-group">
-                    <button class="tab-btn active" id="tab-movie" onclick="switchTab('movie')">🔥 热门电影</button>
-                    <button class="tab-btn" id="tab-tv" onclick="switchTab('tv')">📺 热门电视剧</button>
-                    <button class="tab-btn" id="tab-show" onclick="switchTab('show')">🎤 热门综艺</button>
-                    <button class="tab-btn" id="tab-anime" onclick="switchTab('anime')">🎨 热门动漫</button>
-                </div>
-
-                <div class="right-tools">
-                    <span class="select-count">已选 <b id="selected-count">0</b> 部</span>
-                    <button class="btn-sm" onclick="selectAll()">全选</button>
-                    <button class="btn-sm" onclick="clearSelection()">取消</button>
-                    <button class="btn-transfer-top" onclick="startBatchTransfer()">
-                        🚀 一键批量转存勾选项
-                    </button>
-                </div>
-            </div>
-
-            <!-- 3: 100个影视展示墙 -->
+            <!-- 8列展示墙 -->
             <div class="movie-grid" id="movie-grid"></div>
         </div>
 
-        <!-- 5: 右侧监控与日志 Sidebar -->
+        <!-- 右侧监控 Sidebar -->
         <div class="log-sidebar">
             <div class="status-panel">
-                <div class="status-title">⚡ 系统状态监控</div>
+                <div class="status-header">
+                    <span class="status-title">⚡ 系统状态监控</span>
+                    <button class="btn-sm" style="font-size:10px; padding:2px 6px;" onclick="refreshStatus()">🔄 刷新</button>
+                </div>
                 <div class="status-items">
                     <div class="status-item">
                         <span>夸克 Cookie:</span>
@@ -64,7 +68,6 @@
                     <span>🟢 实时运行日志</span>
                     <button class="btn-sm" onclick="clearLog()">清空</button>
                 </div>
-                <!-- 4: 固定日志，下一轮才刷新的显示区域 -->
                 <div class="log-body" id="log-body">系统就绪，等待触发转存任务...</div>
             </div>
         </div>
