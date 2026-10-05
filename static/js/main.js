@@ -88,7 +88,6 @@ async function fetchMovies() {
 
     try {
         const res = await fetch(`/api/get-movies?${params.toString()}`);
-        
         const contentType = res.headers.get('content-type') || '';
         if (!contentType.includes('application/json')) {
             appendLog(`[系统] ❌ 服务端返回了非 JSON 页面 (HTTP ${res.status})，可能被豆瓣拦截`);
@@ -113,7 +112,6 @@ async function searchMovies() {
     appendLog(`[系统] 🔍 正在豆瓣全站搜索：${query}...`);
     try {
         const res = await fetch(`/api/search-douban?q=${encodeURIComponent(query)}`);
-        
         const contentType = res.headers.get('content-type') || '';
         if (!contentType.includes('application/json')) {
             appendLog(`[系统] ❌ 搜索返回非 JSON 页面`);
@@ -382,11 +380,91 @@ function openConfigModal() {
 
 function closeConfigModal() { document.getElementById('config-modal').style.display = 'none'; }
 
+/* 🎯 渲染用户在配置中保存的 4 大分类目录下拉列表 */
+function populateFolderSelectOptions() {
+    const select = document.getElementById('sub-folder-select');
+    select.innerHTML = '';
+
+    const defaultFid = localStorage.getItem('target_folder_id') || '0';
+    const folderMovie = localStorage.getItem('folder_movie') || '';
+    const folderTv = localStorage.getItem('folder_tv') || '';
+    const folderShow = localStorage.getItem('folder_show') || '';
+    const folderAnime = localStorage.getItem('folder_anime') || '';
+
+    const options = [
+        { label: `📺 电视剧专属目录 (${folderTv || '未配置，使用默认'})`, val: folderTv || defaultFid, cat: '电视剧' },
+        { label: `🎨 动漫专属目录 (${folderAnime || '未配置，使用默认'})`, val: folderAnime || defaultFid, cat: '动漫' },
+        { label: `🎤 综艺专属目录 (${folderShow || '未配置，使用默认'})`, val: folderShow || defaultFid, cat: '综艺' },
+        { label: `🎬 电影专属目录 (${folderMovie || '未配置，使用默认'})`, val: folderMovie || defaultFid, cat: '电影' },
+        { label: `📁 默认全局目录 (${defaultFid})`, val: defaultFid, cat: '全局' }
+    ];
+
+    options.forEach(opt => {
+        const el = document.createElement('option');
+        el.value = opt.val;
+        el.textContent = opt.label;
+        if (opt.cat === currentCategory) {
+            el.selected = true; // 自动根据当前顶栏所在分类做优先选中
+        }
+        select.appendChild(el);
+    });
+}
+
 function openSubModal() {
+    populateFolderSelectOptions();
     document.getElementById('sub-modal').style.display = 'flex';
     fetchSubscriptions();
 }
 function closeSubModal() { document.getElementById('sub-modal').style.display = 'none'; }
+
+/* 🎯 勾选剧集后一键“转存或追剧”带入处理 */
+async function subscribeSelected() {
+    if (selectedMovies.size === 0) {
+        alert('请先在页面上勾选你需要自动追更的剧集或动漫！');
+        return;
+    }
+    
+    const targets = Array.from(selectedMovies);
+    const title = targets[0]; // 默认取第一部勾选剧集
+
+    openSubModal();
+    document.getElementById('sub-title-input').value = title;
+    document.getElementById('sub-pwd-input').value = '检索中...';
+
+    autoSearchSubLink();
+}
+
+/* 🎯 根据剧名在 Telegram 频道中精准检索夸克分享 ID */
+async function autoSearchSubLink() {
+    const title = document.getElementById('sub-title-input').value.trim();
+    if (!title) {
+        alert('请先填写剧集名称！');
+        return;
+    }
+
+    const pwdInput = document.getElementById('sub-pwd-input');
+    pwdInput.value = '🔍 正在 TG 频道检索链接...';
+
+    const cookie = localStorage.getItem('quark_cookie') || '';
+    try {
+        const res = await fetch('/api/search-link-for-sub', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title, cookie })
+        });
+        const data = await res.json();
+        if (data.success && data.pwd_id) {
+            pwdInput.value = data.pwd_id;
+            appendLog(`[追剧订阅] 🟢 成功为你找到剧集 [${title}] 的夸克链接 ID: ${data.pwd_id}`);
+        } else {
+            pwdInput.value = '';
+            alert(data.message || '未查找到有效夸克链接，请手动填入链接 ID！');
+        }
+    } catch (err) {
+        pwdInput.value = '';
+        alert('检索连接超时或异常: ' + err.message);
+    }
+}
 
 function closeSelectFilesModal() { document.getElementById('select-files-modal').style.display = 'none'; }
 
@@ -406,6 +484,7 @@ function getTargetFolderId() {
     return defaultFid;
 }
 
+/* 🎬 选集解析与转存 */
 async function parseAndSelectFiles(pwdId, showTitle) {
     const cookie = localStorage.getItem('quark_cookie') || '';
     if (!cookie) {
@@ -500,6 +579,7 @@ async function submitSaveSelectedFiles() {
     }
 }
 
+/* 📺 追剧订阅 API */
 async function fetchSubscriptions() {
     const res = await fetch('/api/subscriptions');
     const data = await res.json();
@@ -515,7 +595,8 @@ async function fetchSubscriptions() {
             item.style.cssText = 'display:flex; justify-content:space-between; align-items:center; padding:8px; border-bottom:1px solid #1e293b; font-size:12px;';
             item.innerHTML = `
                 <div>
-                    <b style="color:#60a5fa;">${sub.title}</b> <span style="color:#64748b;">(已存集数: ${sub.saved_episodes.length}集)</span>
+                    <b style="color:#60a5fa;">${sub.title}</b> 
+                    <span style="color:#f59e0b; font-size:11px;">(跳过前 ${sub.start_ep || 0} 集 | 已存 ${sub.saved_episodes.length} 集)</span>
                     <div style="font-size:10px; color:#94a3b8;">上次检查: ${sub.last_check} | 间隔: ${sub.interval_hours}小时</div>
                 </div>
                 <div>
@@ -531,8 +612,9 @@ async function fetchSubscriptions() {
 async function addSubscription() {
     const title = document.getElementById('sub-title-input').value.trim();
     const pwdId = document.getElementById('sub-pwd-input').value.trim();
-    const targetFid = document.getElementById('sub-fid-input').value.trim() || '0';
+    const targetFid = document.getElementById('sub-folder-select').value || '0';
     const intervalHours = document.getElementById('sub-interval-input').value;
+    const startEp = document.getElementById('sub-start-ep-input').value || 0;
 
     if (!title || !pwdId) {
         alert('请输入剧集名称和夸克链接 ID！');
@@ -543,7 +625,13 @@ async function addSubscription() {
     await fetch('/api/subscriptions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, pwd_id: pwdId, target_fid: targetFid, interval_hours: intervalHours, cookie })
+        body: JSON.stringify({ 
+            title, 
+            pwd_id: pwdId, 
+            target_fid: targetFid, 
+            interval_hours: intervalHours,
+            start_ep: parseInt(startEp)
+        })
     });
 
     document.getElementById('sub-title-input').value = '';
