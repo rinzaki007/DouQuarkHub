@@ -9,7 +9,7 @@ from utils import load_channels, save_channels, DOUBAN_HEADERS
 
 app = Flask(__name__)
 
-# 初始化追剧轮询调度引擎
+# 初始化追剧订阅管理器
 sub_manager = SubscriptionManager(get_cookie_func=lambda: app.config.get('QUARK_COOKIE', ''))
 sub_manager.start_scheduler()
 
@@ -44,7 +44,7 @@ def get_movies():
         params["year_range"] = year_range
 
     try:
-        resp = requests.get(url, headers=DOUBAN_HEADERS, params=params, timeout=10)
+        resp = requests.get(url, headers=DOUBAN_HEADERS, params=params, timeout=6)
         content_type = resp.headers.get('Content-Type', '')
         if 'html' in content_type.lower():
             return jsonify({'success': False, 'movies': [], 'message': '豆瓣触发风控拦截，请稍后再试'})
@@ -62,7 +62,7 @@ def get_movies():
             
         return jsonify({'success': False, 'movies': [], 'message': f'豆瓣响应异常: HTTP {resp.status_code}'})
     except Exception as e:
-        return jsonify({'success': False, 'movies': [], 'message': f'服务端请求异常: {str(e)}'})
+        return jsonify({'success': False, 'movies': [], 'message': f'请求异常: {str(e)}'})
 
 @app.route('/api/search-douban', methods=['GET'])
 def search_douban():
@@ -71,10 +71,10 @@ def search_douban():
         return jsonify({'success': False, 'movies': []})
     url = f"https://movie.douban.com/j/subject_suggest?q={requests.utils.quote(query)}"
     try:
-        resp = requests.get(url, headers=DOUBAN_HEADERS, timeout=10)
+        resp = requests.get(url, headers=DOUBAN_HEADERS, timeout=6)
         content_type = resp.headers.get('Content-Type', '')
         if 'html' in content_type.lower():
-            return jsonify({'success': False, 'movies': [], 'message': '搜索触发风控拦截'})
+            return jsonify({'success': False, 'movies': [], 'message': '搜索触发风控'})
 
         if resp.status_code == 200:
             data = resp.json()
@@ -106,31 +106,34 @@ def check_cookie():
 
 @app.route('/api/check-channels', methods=['GET'])
 def check_channels_health():
-    channels = load_channels()
-    if not channels:
-        return jsonify({'success': True, 'total': 0, 'valid_count': 0})
+    try:
+        channels = load_channels()
+        if not channels:
+            return jsonify({'success': True, 'total': 0, 'valid_count': 0})
 
-    def test_channel(ch):
-        ch_id = ch.get('id', '').strip()
-        if not ch_id:
-            return False
-        url = f"https://t.me/s/{ch_id}"
-        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
-        try:
-            resp = requests.head(url, headers=headers, timeout=2.0)
-            return resp.status_code == 200
-        except Exception:
-            return False
+        def test_channel(ch):
+            ch_id = ch.get('id', '').strip()
+            if not ch_id:
+                return False
+            url = f"https://t.me/s/{ch_id}"
+            headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+            try:
+                resp = requests.head(url, headers=headers, timeout=1.5)
+                return resp.status_code == 200
+            except Exception:
+                return False
 
-    with ThreadPoolExecutor(max_workers=10) as executor:
-        results = list(executor.map(test_channel, channels))
+        with ThreadPoolExecutor(max_workers=5) as executor:
+            results = list(executor.map(test_channel, channels))
 
-    valid_count = sum(1 for is_valid in results if is_valid)
-    return jsonify({
-        'success': True,
-        'total': len(channels),
-        'valid_count': valid_count
-    })
+        valid_count = sum(1 for is_valid in results if is_valid)
+        return jsonify({
+            'success': True,
+            'total': len(channels),
+            'valid_count': valid_count
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'total': 0, 'valid_count': 0, 'error': str(e)})
 
 @app.route('/api/channels', methods=['GET', 'POST'])
 def handle_channels():
@@ -189,7 +192,7 @@ def save_selected_files():
     cookie = data.get('cookie', '')
 
     if not selected_fids or not cookie:
-        return jsonify({'success': False, 'message': '未选择任何文件或缺失 Cookie'})
+        return jsonify({'success': False, 'message': '未选择文件或缺失 Cookie'})
 
     engine = QuarkEngine(cookie)
     files_to_save = [{'fid': fid} for fid in selected_fids]
@@ -197,7 +200,6 @@ def save_selected_files():
     ok, msg = engine.save_files(pwd_id, files_to_save, stoken, target_fid)
     return jsonify({'success': ok, 'message': msg})
 
-# 🎯 自动检索单个剧集在 TG 频道中的夸克链接 ID（增强容错与异常捕获）
 @app.route('/api/search-link-for-sub', methods=['POST'])
 def search_link_for_sub():
     try:
@@ -209,7 +211,7 @@ def search_link_for_sub():
 
         channels = load_channels()
         if not channels:
-            return jsonify({'success': False, 'message': '未配置任何 TG 检索频道，请先在系统设置中添加频道！'})
+            return jsonify({'success': False, 'message': '未配置 TG 检索频道'})
 
         service = SearchService(cookie)
         pwd_id = service.search_single_movie_pwd_id(title, channels)
@@ -220,7 +222,6 @@ def search_link_for_sub():
     except Exception as e:
         return jsonify({'success': False, 'message': f'后台检索异常: {str(e)}'})
 
-# 📺 追剧订阅 API
 @app.route('/api/subscriptions', methods=['GET', 'POST', 'DELETE'])
 def handle_subscriptions():
     if request.method == 'GET':
@@ -265,7 +266,7 @@ def transfer():
     folder_id = data.get('folderId', '0')
 
     if not movies or not cookie:
-        return Response("❌ 参数不完整，请检查勾选与 Cookie\n", mimetype='text/plain; charset=utf-8')
+        return Response("❌ 参数不完整\n", mimetype='text/plain; charset=utf-8')
 
     service = SearchService(cookie)
     channels = load_channels()
@@ -282,7 +283,7 @@ def proxy_img():
     if not img_url:
         return Response("Missing url", status=400)
     try:
-        resp = requests.get(img_url, headers=DOUBAN_HEADERS, timeout=10)
+        resp = requests.get(img_url, headers=DOUBAN_HEADERS, timeout=5)
         return Response(resp.content, mimetype=resp.headers.get('content-type', 'image/jpeg'))
     except Exception:
         return Response("", status=404)
