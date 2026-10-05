@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DouQuark Hub</title>
+    <title>DouQuarkHub</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
@@ -12,14 +12,14 @@
         <!-- 左侧主内容区域 -->
         <div class="left-main">
             <header>
-                <div class="logo">🎬DouQuark Hub</div>
+                <div class="logo">🎬 DouQuarkHub</div>
                 <div class="search-box">
                     <input type="text" id="search-input" placeholder="输入你想找的电影、热播剧集、综艺、动漫..." onkeydown="if(event.key==='Enter') searchMovies()">
                     <button class="btn" onclick="searchMovies()">搜索</button>
                 </div>
             </header>
 
-            <!-- 顶部分类 Tab 与 重构后的优化工具栏 -->
+            <!-- 顶部分类 Tab 与 工具栏 -->
             <div class="top-action-bar">
                 <div class="tab-group">
                     <button class="tab-btn active" id="tab-电影" onclick="switchCategory('电影')">🎬 电影</button>
@@ -29,7 +29,6 @@
                 </div>
 
                 <div class="right-tools">
-                    <!-- 外部播放/客户端工具 -->
                     <div class="tool-group">
                         <button class="btn-tool btn-openlist" onclick="openOpenList()" title="点击在新窗口打开 OpenList 播放视频">▶️ OpenList 云播</button>
                         <button class="btn-tool btn-quark" onclick="openQuarkApp()" title="唤起电脑本地夸克网盘客户端或打开网页版">💻 夸克客户端</button>
@@ -37,7 +36,6 @@
 
                     <div class="tool-divider"></div>
 
-                    <!-- 选择与转存核心区 -->
                     <div class="action-group">
                         <span class="select-count">已选 <b id="selected-count">0</b> 部</span>
                         <button class="btn-sm" onclick="selectAll()">全选</button>
@@ -105,16 +103,16 @@
                 </div>
             </div>
 
-            <!-- 8列卡片海报墙 -->
+            <!-- 8列海报墙 -->
             <div class="content-area">
                 <div class="movie-grid" id="movie-grid"></div>
             </div>
         </div>
 
-        <!-- 右侧全高贯穿 Sidebar -->
+        <!-- 右侧 Sidebar -->
         <div class="log-sidebar">
             <div class="sidebar-top-bar">
-                <button class="btn config-btn" onclick="openConfigModal()">⚙️ 配置设置</button>
+                <button class="btn config-btn" onclick="openConfigModal()">⚙️️ 配置设置</button>
             </div>
 
             <div class="status-panel">
@@ -139,7 +137,7 @@
                     <span>🟢 实时运行日志</span>
                     <button class="btn-sm" onclick="clearLog()">清空</button>
                 </div>
-                <div class="log-body" id="log-body">系统就绪，等待触发转存任务...</div>
+                <div class="log-body" id="log-body">DouQuarkHub 就绪，等待触发转存任务...</div>
             </div>
         </div>
     </div>
@@ -147,7 +145,7 @@
     <!-- ⚙️ 配置 Settings Modal -->
     <div class="modal" id="config-modal">
         <div class="modal-content">
-            <h3>⚙ 系统与服务集成配置</h3>
+            <h3>⚙ DouQuarkHub 系统与服务配置</h3>
             
             <div class="section-title">☁️ 夸克网盘基础配置</div>
             <label style="font-size:13px; color:#94a3b8;">夸克 Cookie:</label>
@@ -156,7 +154,6 @@
             <label style="font-size:13px; color:#94a3b8;">默认保存目录 FID (未独立配置时生效，默认 0 为根目录):</label>
             <input type="text" id="folder-id-input" placeholder="默认 0">
 
-            <!-- 📁 新增：分类独立保存目录 (2x2 网格) -->
             <div class="section-title">📁 分类独立保存目录 FID (留空则使用默认目录)</div>
             <div class="folder-grid">
                 <div>
@@ -177,7 +174,6 @@
                 </div>
             </div>
 
-            <!-- 🔗 外部集成配置 -->
             <div class="section-title">🔗 外部工具集成</div>
             <label style="font-size:13px; color:#94a3b8;">OpenList 在线播放地址 (例: http://192.168.1.100:5244):</label>
             <input type="text" id="openlist-url-input" placeholder="http://192.168.x.x:5244">
