@@ -13,7 +13,6 @@ let currentParseData = null;
 
 window.onload = () => {
     loadConfig();
-    // 异步不阻塞加载，防卡死
     refreshStatus();
     fetchMovies();
     fetchChannels();
@@ -88,12 +87,7 @@ async function fetchMovies() {
     });
 
     try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 8000);
-
-        const res = await fetch(`/api/get-movies?${params.toString()}`, { signal: controller.signal });
-        clearTimeout(timeoutId);
-
+        const res = await fetch(`/api/get-movies?${params.toString()}`);
         const contentType = res.headers.get('content-type') || '';
         if (!contentType.includes('application/json')) {
             appendLog(`[系统] ❌ 服务端响应页面异常`);
@@ -108,7 +102,7 @@ async function fetchMovies() {
             appendLog(`[系统] ⚠️ ${data.message || '获取列表失败'}`);
         }
     } catch (err) {
-        appendLog(`[系统] ❌ 加载超时或网络失败: ${err.message}`);
+        appendLog(`[系统] ❌ 加载网络失败: ${err.message}`);
     }
 }
 
@@ -202,12 +196,7 @@ async function checkChannelsHealth() {
     chBadge.textContent = '探测中...';
 
     try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 4000);
-
-        const res = await fetch('/api/check-channels', { signal: controller.signal });
-        clearTimeout(timeoutId);
-
+        const res = await fetch('/api/check-channels');
         const data = await res.json();
         if (data.success) {
             if (data.total === 0) {
@@ -242,17 +231,11 @@ async function checkQuarkStatus() {
     badge.textContent = '校验中...';
 
     try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 4000);
-
         const res = await fetch('/api/check-cookie', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ cookie: cookie }),
-            signal: controller.signal
+            body: JSON.stringify({ cookie: cookie })
         });
-        clearTimeout(timeoutId);
-
         const data = await res.json();
         if (data.valid) {
             badge.className = 'badge badge-success';
@@ -263,7 +246,7 @@ async function checkQuarkStatus() {
         }
     } catch (err) {
         badge.className = 'badge badge-danger';
-        badge.textContent = '接口超时';
+        badge.textContent = '接口异常';
     }
 }
 
@@ -358,6 +341,7 @@ function closeConfigModal() { document.getElementById('config-modal').style.disp
 
 function populateFolderSelectOptions() {
     const select = document.getElementById('sub-folder-select');
+    if (!select) return;
     select.innerHTML = '';
 
     const defaultFid = localStorage.getItem('target_folder_id') || '0';
@@ -382,6 +366,21 @@ function openSubModal() {
     fetchSubscriptions();
 }
 function closeSubModal() { document.getElementById('sub-modal').style.display = 'none'; }
+
+// 🎯 修复：一键追剧按钮触发函数
+function subscribeSelected() {
+    if (selectedMovies.size === 0) {
+        alert('请先在页面上勾选你需要自动追更的剧集或动漫！');
+        return;
+    }
+    const targets = Array.from(selectedMovies);
+    const title = targets[0];
+
+    openSubModal();
+    document.getElementById('sub-title-input').value = title;
+    document.getElementById('sub-pwd-input').value = '';
+    autoSearchSubLink();
+}
 
 async function autoSearchSubLink() {
     const title = document.getElementById('sub-title-input').value.trim();
@@ -412,32 +411,37 @@ async function autoSearchSubLink() {
 }
 
 async function fetchSubscriptions() {
-    const res = await fetch('/api/subscriptions');
-    const data = await res.json();
-    if (data.success) {
-        const box = document.getElementById('sub-list-box');
-        box.innerHTML = '';
-        if (data.subscriptions.length === 0) {
-            box.innerHTML = `<div style="text-align:center; color:#64748b; font-size:12px; padding:10px;">暂无自动追剧订阅</div>`;
-            return;
+    try {
+        const res = await fetch('/api/subscriptions');
+        const data = await res.json();
+        if (data.success) {
+            const box = document.getElementById('sub-list-box');
+            if (!box) return;
+            box.innerHTML = '';
+            if (data.subscriptions.length === 0) {
+                box.innerHTML = `<div style="text-align:center; color:#64748b; font-size:12px; padding:10px;">暂无自动追剧订阅</div>`;
+                return;
+            }
+            data.subscriptions.forEach(sub => {
+                const item = document.createElement('div');
+                item.style.cssText = 'display:flex; justify-content:space-between; align-items:center; padding:8px; border-bottom:1px solid #1e293b; font-size:12px;';
+                item.innerHTML = `
+                    <div>
+                        <b style="color:#60a5fa;">${sub.title}</b> 
+                        <span style="color:#38bdf8; font-size:11px;">[ID: ${sub.pwd_id || '未知'}]</span>
+                        <span style="color:#f59e0b; font-size:11px;">(跳过前 ${sub.start_ep || 0} 集 | 已存 ${sub.saved_episodes.length} 集)</span>
+                        <div style="font-size:10px; color:#94a3b8;">上次检查: ${sub.last_check} | 间隔: ${sub.interval_hours}小时</div>
+                    </div>
+                    <div>
+                        <button class="btn-sm" style="background:#0284c7; margin-right:4px;" onclick="runSubNow('${sub.id}')">🔄 立即检测</button>
+                        <button class="btn-del" onclick="deleteSub('${sub.id}')">✕</button>
+                    </div>
+                `;
+                box.appendChild(item);
+            });
         }
-        data.subscriptions.forEach(sub => {
-            const item = document.createElement('div');
-            item.style.cssText = 'display:flex; justify-content:space-between; align-items:center; padding:8px; border-bottom:1px solid #1e293b; font-size:12px;';
-            item.innerHTML = `
-                <div>
-                    <b style="color:#60a5fa;">${sub.title}</b> 
-                    <span style="color:#38bdf8; font-size:11px;">[ID: ${sub.pwd_id || '未知'}]</span>
-                    <span style="color:#f59e0b; font-size:11px;">(跳过前 ${sub.start_ep || 0} 集 | 已存 ${sub.saved_episodes.length} 集)</span>
-                    <div style="font-size:10px; color:#94a3b8;">上次检查: ${sub.last_check} | 间隔: ${sub.interval_hours}小时</div>
-                </div>
-                <div>
-                    <button class="btn-sm" style="background:#0284c7; margin-right:4px;" onclick="runSubNow('${sub.id}')">🔄 立即检测</button>
-                    <button class="btn-del" onclick="deleteSub('${sub.id}')">✕</button>
-                </div>
-            `;
-            box.appendChild(item);
-        });
+    } catch (err) {
+        console.error("加载订阅失败", err);
     }
 }
 
@@ -486,4 +490,71 @@ async function runSubNow(subId) {
     const data = await res.json();
     alert(data.message);
     fetchSubscriptions();
+}
+
+function getTargetFolderId() {
+    const defaultFid = localStorage.getItem('target_folder_id') || '0';
+    const catFidMap = {
+        '电影': localStorage.getItem('folder_movie'),
+        '电视剧': localStorage.getItem('folder_tv'),
+        '综艺': localStorage.getItem('folder_show'),
+        '动漫': localStorage.getItem('folder_anime')
+    };
+    const specificFid = catFidMap[currentCategory];
+    if (specificFid && specificFid.trim() !== '') {
+        return specificFid.trim();
+    }
+    return defaultFid;
+}
+
+// 🎯 修复：一键批量转存按钮触发函数
+async function startBatchTransfer() {
+    if (selectedMovies.size === 0) {
+        alert('请先勾选需要转存的影视！');
+        return;
+    }
+
+    const cookie = localStorage.getItem('quark_cookie') || '';
+    if (!cookie) {
+        alert('请先填入夸克 Cookie！');
+        openConfigModal();
+        return;
+    }
+
+    const targetFolderId = getTargetFolderId();
+
+    document.getElementById('log-body').textContent = '';
+    const targets = Array.from(selectedMovies);
+    appendLog(`[系统] 🚀 开始处理批量转存 [分类: ${currentCategory}]，共 ${targets.length} 个目标...`);
+    appendLog(`[系统] 📁 存储目标目录 FID: ${targetFolderId}`);
+
+    try {
+        const response = await fetch('/api/transfer', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                movies: targets,
+                cookie: cookie,
+                folderId: targetFolderId
+            })
+        });
+
+        if (!response.ok) {
+            const text = await response.text();
+            appendLog(`\n❌ 服务异常 (${response.status}): ${text.substring(0, 100)}`);
+            return;
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder('utf-8');
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            const chunk = decoder.decode(value, { stream: true });
+            appendLog(chunk);
+        }
+    } catch (err) {
+        appendLog(`\n❌ 转存网络请求异常: ${err.message}`);
+    }
 }
