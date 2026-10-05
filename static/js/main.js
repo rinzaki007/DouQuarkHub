@@ -20,6 +20,7 @@ function refreshStatus() {
     fetchChannels();
 }
 
+// 检查夸克 Cookie 状态
 async function checkQuarkStatus() {
     const cookie = localStorage.getItem('quark_cookie') || '';
     const badge = document.getElementById('quark-status-badge');
@@ -52,6 +53,7 @@ async function checkQuarkStatus() {
     }
 }
 
+// 加载 TG 检索频道列表
 async function fetchChannels() {
     try {
         const res = await fetch('/api/channels');
@@ -162,9 +164,10 @@ async function saveConfig() {
 function openConfigModal() { document.getElementById('config-modal').style.display = 'flex'; }
 function closeConfigModal() { document.getElementById('config-modal').style.display = 'none'; }
 
+// 获取 100 条豆瓣影视列表
 async function fetchMovies(type) {
     const names = { movie: '热门电影', tv: '热门电视剧', show: '热门综艺', anime: '热门动漫' };
-    appendLog(`[系统] 正在获取豆瓣【${names[type] || type}】列表...`);
+    appendLog(`[系统] 正在获取豆瓣【${names[type] || type}】列表...\n`);
     try {
         const res = await fetch(`/api/get-movies?type=${type}`);
         const data = await res.json();
@@ -173,14 +176,14 @@ async function fetchMovies(type) {
             renderGrid();
         }
     } catch (err) {
-        appendLog(`[系统] ❌ 获取列表失败: ${err.message}`);
+        appendLog(`[系统] ❌ 获取列表失败: ${err.message}\n`);
     }
 }
 
 async function searchMovies() {
     const query = document.getElementById('search-input').value.trim();
     if (!query) return;
-    appendLog(`[系统] 🔍 正在豆瓣搜索：${query}...`);
+    appendLog(`[系统] 🔍 正在豆瓣搜索：${query}...\n`);
     try {
         const res = await fetch(`/api/search-douban?q=${encodeURIComponent(query)}`);
         const data = await res.json();
@@ -189,7 +192,7 @@ async function searchMovies() {
             renderGrid();
         }
     } catch (err) {
-        appendLog(`[系统] ❌ 搜索失败: ${err.message}`);
+        appendLog(`[系统] ❌ 搜索失败: ${err.message}\n`);
     }
 }
 
@@ -201,6 +204,7 @@ function switchTab(type) {
     fetchMovies(type);
 }
 
+// 渲染 8 列网格海报墙
 function renderGrid() {
     const grid = document.getElementById('movie-grid');
     grid.innerHTML = '';
@@ -257,7 +261,7 @@ function updateCount() {
 
 function appendLog(text) {
     const logBody = document.getElementById('log-body');
-    logBody.textContent += (logBody.textContent ? '\n' : '') + text;
+    logBody.textContent += text;
     logBody.scrollTop = logBody.scrollHeight;
 }
 
@@ -265,6 +269,7 @@ function clearLog() {
     document.getElementById('log-body').textContent = '系统就绪，等待触发转存任务...';
 }
 
+// 🚀 核心：使用 ReadableStream 实时读取后端流式推送的转存日志
 async function startBatchTransfer() {
     if (selectedMovies.size === 0) {
         alert('请先勾选需要转存的影视！');
@@ -282,10 +287,10 @@ async function startBatchTransfer() {
 
     document.getElementById('log-body').textContent = '';
     const targets = Array.from(selectedMovies);
-    appendLog(`[系统] 🚀 开始处理本轮批量转存，共 ${targets.length} 个目标...`);
+    appendLog(`[系统] 🚀 开始处理本轮批量转存，共 ${targets.length} 个目标...\n`);
 
     try {
-        const res = await fetch('/api/transfer', {
+        const response = await fetch('/api/transfer', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -295,25 +300,23 @@ async function startBatchTransfer() {
             })
         });
 
-        // 预防服务器崩溃返回非 JSON 数据
-        const contentType = res.headers.get("content-type");
-        if (!contentType || !contentType.includes("application/json")) {
-            const rawText = await res.text();
-            appendLog(`\n❌ 服务器响应异常: ${rawText.substring(0, 150)}...`);
+        if (!response.ok) {
+            const text = await response.text();
+            appendLog(`\n❌ 网关/服务器异常 (${response.status}): ${text.substring(0, 100)}\n`);
             return;
         }
 
-        const data = await res.json();
-        if (data.success) {
-            for (const [movieName, logs] of Object.entries(data.results)) {
-                appendLog(`\n--- [${movieName}] ---`);
-                logs.forEach(l => appendLog(l));
-            }
-            appendLog(`\n✨ 本轮任务全部执行完成！`);
-        } else {
-            appendLog(`\n❌ 转存请求失败: ${data.message}`);
+        // 建立流式解码器
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder('utf-8');
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            const chunk = decoder.decode(value, { stream: true });
+            appendLog(chunk);
         }
     } catch (err) {
-        appendLog(`\n❌ 网络请求异常: ${err.message}`);
+        appendLog(`\n❌ 网络请求异常: ${err.message}\n`);
     }
 }
