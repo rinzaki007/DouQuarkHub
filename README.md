@@ -11,3 +11,16 @@
     - main.js # 前端交互与 API 逻辑脚本
 - templates/
   - index.html # 纯 HTML 页面结构
+
+docker-compose部署
+
+version: "3"
+services:
+  mycloudcore:
+    image: ghcr.io/rinzaki007/mycloudcore:latest
+    container_name: my-cloud-core
+    ports:
+      - 8099:5000
+    volumes:
+      - ./data:/app/data
+    restart: always
