@@ -1,6 +1,6 @@
 import os
 import requests
-from flask import Flask, render_template, request, jsonify, Response
+from flask import Flask, render_template, request, jsonify, Response, stream_with_context
 from quark_engine import QuarkEngine
 from search_service import SearchService
 from utils import load_channels, save_channels, DOUBAN_HEADERS
@@ -80,28 +80,25 @@ def handle_channels():
         return jsonify({'success': True})
     return jsonify({'success': True, 'channels': load_channels()})
 
+# 🚀 核心改动：流式输出日志，建立连接即响应 HTTP 200，彻底防止 502
 @app.route('/api/transfer', methods=['POST'])
 def transfer():
-    try:
-        data = request.json or {}
-        movies = data.get('movies', [])
-        cookie = data.get('cookie', '')
-        folder_id = data.get('folderId', '0')
+    data = request.json or {}
+    movies = data.get('movies', [])
+    cookie = data.get('cookie', '')
+    folder_id = data.get('folderId', '0')
 
-        if not movies or not cookie:
-            return jsonify({'success': False, 'message': '参数不完整，请检查勾选与 Cookie'})
+    if not movies or not cookie:
+        return Response("❌ 参数不完整，请检查勾选与 Cookie\n", mimetype='text/plain; charset=utf-8')
 
-        service = SearchService(cookie)
-        channels = load_channels()
-        results = service.batch_search_and_transfer(movies, channels, target_fid=folder_id)
-        return jsonify({'success': True, 'results': results})
-    except Exception as e:
-        return jsonify({'success': False, 'message': f'后台处理异常: {str(e)}'})
+    service = SearchService(cookie)
+    channels = load_channels()
 
-@app.errorhandler(Exception)
-def handle_exception(e):
-    # 强制将所有未捕获异常以 JSON 格式返回，防止返回 HTML 导致 Lucky 触发 502
-    return jsonify({'success': False, 'message': f'系统错误: {str(e)}'}), 200
+    def generate_logs():
+        for line in service.batch_search_and_transfer_stream(movies, channels, target_fid=folder_id):
+            yield line + "\n"
+
+    return Response(stream_with_context(generate_logs()), mimetype='text/plain; charset=utf-8')
 
 @app.route('/api/proxy-img')
 def proxy_img():
