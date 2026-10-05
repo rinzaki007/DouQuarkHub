@@ -176,7 +176,7 @@ body {
     color: #94a3b8;
 }
 
-/* 🎯 筛选面板：支持平滑收起展开动画 */
+/* 筛选面板：支持平滑收起展开动画 */
 .filter-panel {
     background: #111827;
     padding: 10px 14px;
@@ -192,7 +192,6 @@ body {
     transition: max-height 0.3s ease, opacity 0.3s ease, padding 0.3s ease;
 }
 
-/* 🎯 滚动时自动触发的收起状态类 */
 .filter-panel.collapsed {
     max-height: 0;
     opacity: 0;
@@ -241,7 +240,7 @@ body {
     font-weight: 600;
 }
 
-/* 🎯 影视海报网格优化：将最小宽度缩至 135px，确保一屏完美展现完整多行海报 */
+/* 影视海报网格 */
 .movie-grid-container {
     flex: 1;
     overflow-y: auto;
@@ -456,7 +455,7 @@ body {
 }
 .btn-del:hover { background: rgba(239, 68, 68, 0.1); border-radius: 4px; }
 
-/* 模态框弹窗 */
+/* 模态框弹窗优化 */
 .modal {
     display: none;
     position: fixed;
@@ -475,7 +474,7 @@ body {
     padding: 20px;
     display: flex;
     flex-direction: column;
-    gap: 14px;
+    gap: 12px;
     box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
 }
 
@@ -486,6 +485,17 @@ body {
     font-size: 15px;
     font-weight: 700;
     color: #f8fafc;
+    flex-shrink: 0;
+}
+
+/* 🎯 弹窗内部滚动容器，防止表单过长挤压底部按钮 */
+.modal-body {
+    overflow-y: auto;
+    max-height: calc(85vh - 100px);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding-right: 4px;
 }
 
 .form-group {
@@ -510,7 +520,7 @@ body {
     outline: none;
 }
 
-.form-group textarea { height: 65px; resize: none; }
+.form-group textarea { height: 60px; resize: none; }
 
 .form-row {
     display: flex;
@@ -522,6 +532,9 @@ body {
     display: flex;
     justify-content: flex-end;
     gap: 8px;
+    flex-shrink: 0;
+    padding-top: 4px;
+    border-top: 1px solid #1f2937;
 }
 
 .btn-secondary {
@@ -572,7 +585,7 @@ body {
 .channel-add-row input { flex: 1; padding: 4px 8px; font-size: 11px; }
 
 .sub-list-scroll, .parse-file-list-box {
-    max-height: 200px;
+    max-height: 180px;
     overflow-y: auto;
     background: #0f172a;
     border: 1px solid #1f2937;
