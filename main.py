@@ -45,8 +45,6 @@ def get_movies():
 
     try:
         resp = requests.get(url, headers=DOUBAN_HEADERS, params=params, timeout=10)
-        
-        # 拦截非 JSON (如 HTML 重定向/风控拦截)
         content_type = resp.headers.get('Content-Type', '')
         if 'html' in content_type.lower():
             return jsonify({'success': False, 'movies': [], 'message': '豆瓣触发风控拦截，请稍后再试'})
@@ -142,7 +140,6 @@ def handle_channels():
         return jsonify({'success': True})
     return jsonify({'success': True, 'channels': load_channels()})
 
-# 🔍 解析选集列表与正则洗剧预览
 @app.route('/api/parse-share-detail', methods=['POST'])
 def parse_share_detail():
     data = request.json or {}
@@ -182,7 +179,6 @@ def parse_share_detail():
         'files': parsed_files
     })
 
-# 🚀 保存勾选的选中文件
 @app.route('/api/save-selected-files', methods=['POST'])
 def save_selected_files():
     data = request.json or {}
@@ -201,7 +197,24 @@ def save_selected_files():
     ok, msg = engine.save_files(pwd_id, files_to_save, stoken, target_fid)
     return jsonify({'success': ok, 'message': msg})
 
-# 📺 追剧订阅 API
+# 🎯 自动检索单个剧集在 TG 频道中的夸克链接 ID
+@app.route('/api/search-link-for-sub', methods=['POST'])
+def search_link_for_sub():
+    data = request.json or {}
+    title = data.get('title', '').strip()
+    cookie = data.get('cookie', '')
+    if not title:
+        return jsonify({'success': False, 'message': '未传入剧名'})
+
+    service = SearchService(cookie)
+    channels = load_channels()
+    
+    pwd_id = service.search_single_movie_pwd_id(title, channels)
+    if pwd_id:
+        return jsonify({'success': True, 'pwd_id': pwd_id})
+    return jsonify({'success': False, 'message': f'未在所设频道中找到 [{title}] 的有效夸克链接'})
+
+# 📺 追剧订阅 API（接收 start_ep 起始集数）
 @app.route('/api/subscriptions', methods=['GET', 'POST', 'DELETE'])
 def handle_subscriptions():
     if request.method == 'GET':
@@ -217,7 +230,8 @@ def handle_subscriptions():
             title=data.get('title'),
             pwd_id=data.get('pwd_id'),
             target_fid=data.get('target_fid', '0'),
-            interval_hours=data.get('interval_hours', 6)
+            interval_hours=data.get('interval_hours', 6),
+            start_ep=data.get('start_ep', 0)
         )
         return jsonify({'success': True, 'subscription': new_sub})
 
