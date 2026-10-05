@@ -8,7 +8,7 @@ from utils import load_channels, save_channels, DOUBAN_HEADERS
 
 app = Flask(__name__)
 
-# 全局获取夸克 Cookie 函数
+# 全局获取夸克 Cookie 函数1
 def get_global_cookie():
     return request.headers.get('X-Quark-Cookie', '')
 
