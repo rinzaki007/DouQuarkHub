@@ -62,7 +62,10 @@
 
             <div class="section-title">
                 <span>📺 检索频道配置</span>
-                <button class="btn-sm" style="font-size:11px;" onclick="fetchChannels()">刷新频道</button>
+                <div>
+                    <button class="btn-sm" style="font-size:11px; margin-right:4px;" onclick="importChannelsJson()">📥 批量导入 JSON</button>
+                    <button class="btn-sm" style="font-size:11px;" onclick="fetchChannels()">刷新频道</button>
+                </div>
             </div>
 
             <div class="channel-list-box" id="channel-list-box"></div>
