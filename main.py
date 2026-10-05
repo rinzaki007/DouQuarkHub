@@ -197,24 +197,30 @@ def save_selected_files():
     ok, msg = engine.save_files(pwd_id, files_to_save, stoken, target_fid)
     return jsonify({'success': ok, 'message': msg})
 
-# 🎯 自动检索单个剧集在 TG 频道中的夸克链接 ID
+# 🎯 自动检索单个剧集在 TG 频道中的夸克链接 ID（增强容错与异常捕获）
 @app.route('/api/search-link-for-sub', methods=['POST'])
 def search_link_for_sub():
-    data = request.json or {}
-    title = data.get('title', '').strip()
-    cookie = data.get('cookie', '')
-    if not title:
-        return jsonify({'success': False, 'message': '未传入剧名'})
+    try:
+        data = request.json or {}
+        title = data.get('title', '').strip()
+        cookie = data.get('cookie', '')
+        if not title:
+            return jsonify({'success': False, 'message': '未传入剧集名称'})
 
-    service = SearchService(cookie)
-    channels = load_channels()
-    
-    pwd_id = service.search_single_movie_pwd_id(title, channels)
-    if pwd_id:
-        return jsonify({'success': True, 'pwd_id': pwd_id})
-    return jsonify({'success': False, 'message': f'未在所设频道中找到 [{title}] 的有效夸克链接'})
+        channels = load_channels()
+        if not channels:
+            return jsonify({'success': False, 'message': '未配置任何 TG 检索频道，请先在系统设置中添加频道！'})
 
-# 📺 追剧订阅 API（接收 start_ep 起始集数）
+        service = SearchService(cookie)
+        pwd_id = service.search_single_movie_pwd_id(title, channels)
+        
+        if pwd_id:
+            return jsonify({'success': True, 'pwd_id': pwd_id})
+        return jsonify({'success': False, 'message': f'未在所设频道中找到 [{title}] 的有效夸克链接'})
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'后台检索异常: {str(e)}'})
+
+# 📺 追剧订阅 API
 @app.route('/api/subscriptions', methods=['GET', 'POST', 'DELETE'])
 def handle_subscriptions():
     if request.method == 'GET':
@@ -282,4 +288,4 @@ def proxy_img():
         return Response("", status=404)
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    app.run(host='0.0.0.0', port=5000)v
