@@ -20,11 +20,45 @@ window.onload = () => {
 function loadConfig() {
     document.getElementById('quark-cookie-input').value = localStorage.getItem('quark_cookie') || '';
     document.getElementById('folder-id-input').value = localStorage.getItem('target_folder_id') || '0';
+    document.getElementById('openlist-url-input').value = localStorage.getItem('openlist_url') || '';
+    document.getElementById('quark-app-input').value = localStorage.getItem('quark_app_url') || 'quark://';
 }
 
 function refreshStatus() {
     checkQuarkStatus();
     checkChannelsHealth();
+}
+
+// 🌟 打开 OpenList 在线播放
+function openOpenList() {
+    const url = localStorage.getItem('openlist_url');
+    if (!url) {
+        alert('请先在右侧【⚙️ 配置设置】中填入你 NAS 部署的 OpenList 访问地址！');
+        openConfigModal();
+        return;
+    }
+    window.open(url, '_blank');
+}
+
+// 🌟 唤起电脑本地夸克网盘客户端或网页版
+function openQuarkApp() {
+    const appUrl = localStorage.getItem('quark_app_url') || 'quark://';
+    
+    // 如果配置的是 HTTP/HTTPS 网址（如夸克网页版），直接在新页面打开
+    if (appUrl.startsWith('http://') || appUrl.startsWith('https://')) {
+        window.open(appUrl, '_blank');
+        return;
+    }
+
+    // 通过隐藏的 iframe 尝试唤起本地客户端 (quark://)
+    const iframe = document.createElement('iframe');
+    iframe.style.display = 'none';
+    iframe.src = appUrl;
+    document.body.appendChild(iframe);
+    
+    setTimeout(() => {
+        document.body.removeChild(iframe);
+    }, 2000);
 }
 
 function switchCategory(cat) {
@@ -38,11 +72,9 @@ function switchCategory(cat) {
 
 function setFilter(type, value, el) {
     activeFilters[type] = value;
-    
     const container = el.parentElement;
     container.querySelectorAll('.filter-item').forEach(item => item.classList.remove('active'));
     el.classList.add('active');
-
     fetchMovies();
 }
 
@@ -302,9 +334,13 @@ function importChannelsJson() {
 async function saveConfig() {
     const cookie = document.getElementById('quark-cookie-input').value.trim();
     const fid = document.getElementById('folder-id-input').value.trim() || '0';
+    const openlistUrl = document.getElementById('openlist-url-input').value.trim();
+    const quarkAppUrl = document.getElementById('quark-app-input').value.trim() || 'quark://';
     
     localStorage.setItem('quark_cookie', cookie);
     localStorage.setItem('target_folder_id', fid);
+    localStorage.setItem('openlist_url', openlistUrl);
+    localStorage.setItem('quark_app_url', quarkAppUrl);
 
     try {
         await fetch('/api/channels', {
@@ -367,6 +403,11 @@ async function startBatchTransfer() {
             if (done) break;
             const chunk = decoder.decode(value, { stream: true });
             appendLog(chunk);
+        }
+
+        const openlistUrl = localStorage.getItem('openlist_url');
+        if (openlistUrl) {
+            appendLog(`\n👉 提示：你可以点击顶部【📺 在线观看】直接打开 OpenList 播放影视！`);
         }
     } catch (err) {
         appendLog(`\n❌ 网络请求异常: ${err.message}`);
