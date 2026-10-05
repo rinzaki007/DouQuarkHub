@@ -1,140 +1,132 @@
 import re
 import requests
 
-def clean_tv_filename(raw_filename, show_title):
-    """
-    自动洗剧正则匹配：过滤黑名单杂质，提取集数并组装为 Emby/Plex 标准格式
-    例: "01~4K.mp4" -> (1, "兰香如故.E01.mp4")
-    """
-    # 1. 过滤黑名单
-    black_words = ["纯享", "加更", "超前企划", "训练室", "预告", "花絮", "特辑", "广告"]
-    if any(bw in raw_filename for bw in black_words):
-        return None, None
+def sanitize_pwd_id(pwd_id):
+    """自动清洗 pwd_id，无论是完整 URL 还是带斜杠的路径，都只提取纯短码 ID"""
+    if not pwd_id:
+        return ""
+    pwd_id = str(pwd_id).strip()
+    # 如果传入的是完整夸克链接，匹配其中的短码
+    match = re.search(r'quark\.cn/s/([a-zA-Z0-9]+)', pwd_id)
+    if match:
+        return match.group(1)
+    # 如果带有 URL 路径斜杠，提取最后一段
+    if '/' in pwd_id:
+        pwd_id = pwd_id.rstrip('/').split('/')[-1]
+    # 清除问号及参数
+    if '?' in pwd_id:
+        pwd_id = pwd_id.split('?')[0]
+    return pwd_id
 
-    # 2. 匹配常见视频后缀
-    ext_match = re.search(r'\.(mp4|mkv|mov|avi|flv)$', raw_filename, re.I)
-    if not ext_match:
-        return None, None
-    ext = ext_match.group(1).lower()
-
-    # 3. 集数正则表达式模式链
+def clean_tv_filename(raw_name, title=""):
+    """智能从文件名中提取集数数字并清洗文件名"""
+    if not raw_name:
+        return None, raw_name
+    
+    # 匹配常见的集数格式：E01, 第01集, EP13, 13.mp4, [13]
     patterns = [
-        r'[S|s]\d+[E|e](\d{1,3})',          # S01E02
-        r'[E|e](\d{1,3})',                   # E01
-        r'第\s*(\d{1,3})\s*[集|话]',         # 第01集 / 第1话
-        r'(?:^|[^\d])(\d{1,2})(?:~|-|\.|\b|[K|k|p|P])' # 01~4K / 01.mp4
+        r'[E|e][P|p]?\s*(\d{1,4})',
+        r'第\s*(\d{1,4})\s*[集|话|期]',
+        r'\[(\d{1,4})\]',
+        r'(?<!\d)(\d{1,4})(?!\d)'
     ]
-
+    
     ep_num = None
     for pattern in patterns:
-        match = re.search(pattern, raw_filename)
-        if match:
-            ep_num = int(match.group(1))
-            break
+        m = re.search(pattern, raw_name)
+        if m:
+            try:
+                ep_num = int(m.group(1))
+                # 过滤年份如 2024, 2025, 1080p, 4k 等误判
+                if ep_num > 1900 and ep_num < 2030:
+                    ep_num = None
+                    continue
+                if ep_num in [720, 1080, 2160, 4]:
+                    ep_num = None
+                    continue
+                break
+            except ValueError:
+                continue
 
-    if ep_num is not None:
-        cleaned_name = f"{show_title}.E{ep_num:02d}.{ext}"
-        return ep_num, cleaned_name
-
-    return None, raw_filename
+    cleaned_name = raw_name
+    return ep_num, cleaned_name
 
 
 class QuarkEngine:
     def __init__(self, cookie):
-        self.cookie = cookie.strip() if cookie else ""
+        self.cookie = cookie
         self.headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-            "Referer": "https://pan.quark.cn/",
-            "Origin": "https://pan.quark.cn",
-            "Cookie": self.cookie,
-            "Content-Type": "application/json;charset=UTF-8",
-            "Accept": "application/json, text/plain, */*"
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Cookie': cookie,
+            'Content-Type': 'application/json'
         }
 
     def check_cookie_valid(self):
-        if not self.cookie:
-            return False
-        url = "https://drive-pc.quark.cn/1/clouddrive/file/sort?pr=ucpro&fr=pc&pdir_fid=0&_size=1"
+        url = "https://drive.quark.cn/1/clouddrive/user/info?pr=ucpro&fr=pc"
         try:
             resp = requests.get(url, headers=self.headers, timeout=5)
             if resp.status_code == 200:
-                return resp.json().get("code") == 0
+                data = resp.json()
+                return data.get('code') == 0
             return False
         except Exception:
             return False
 
-    def get_stoken(self, pwd_id, passcode=""):
-        url = "https://drive-pc.quark.cn/1/clouddrive/share/sharepage/token?pr=ucpro&fr=pc"
-        payload = {"pwd_id": pwd_id, "passcode": passcode}
-        headers = self.headers.copy()
-        headers["Referer"] = f"https://pan.quark.cn/s/{pwd_id}"
-        
+    def get_share_files(self, pwd_id):
+        # 🎯 强力清洗 pwd_id，防范 404
+        pwd_id = sanitize_pwd_id(pwd_id)
+        if not pwd_id:
+            return None, None, "分享链接 ID 无效"
+
+        # 1. 获取 stoken
+        token_url = "https://drive.quark.cn/1/clouddrive/share/sharepage/token"
+        payload = {"pwd_id": pwd_id, "passcode": ""}
         try:
-            resp = requests.post(url, headers=headers, json=payload, timeout=6)
-            if resp.status_code == 200:
-                res = resp.json()
-                if res.get("code") == 0 and "data" in res:
-                    return res["data"].get("stoken", ""), ""
-                return "", res.get('message', '未知错误')
-            return "", f"HTTP {resp.status_code}"
+            resp = requests.post(token_url, json=payload, headers=self.headers, timeout=8)
+            if resp.status_code == 404:
+                return None, None, "HTTP 404 (该链接已失效或已被原作者删除)"
+            
+            data = resp.json()
+            if data.get('code') != 0:
+                return None, None, f"获取 Token 失败: {data.get('message', '未知错误')}"
+            
+            stoken = data.get('data', {}).get('stoken')
         except Exception as e:
-            return "", str(e)
+            return None, None, f"请求 Token 异常: {str(e)}"
 
-    def get_share_files(self, pwd_id, pdir_fid="0", passcode=""):
-        """获取分享链接的文件列表"""
-        stoken, err = self.get_stoken(pwd_id, passcode)
-        if not stoken:
-            return [], "", err
-
-        url = "https://drive-pc.quark.cn/1/clouddrive/share/sharepage/detail"
-        params = {
-            "pr": "ucpro", "fr": "pc",
-            "pwd_id": pwd_id, "stoken": stoken,
-            "pdir_fid": str(pdir_fid),
-            "_page": "1", "_size": "100"
-        }
-        headers = self.headers.copy()
-        headers["Referer"] = f"https://pan.quark.cn/s/{pwd_id}"
-
+        # 2. 获取文件列表
+        detail_url = f"https://drive.quark.cn/1/clouddrive/share/sharepage/detail?pr=ucpro&fr=pc&pwd_id={pwd_id}&stoken={requests.utils.quote(stoken)}&p=1&num=100"
         try:
-            resp = requests.get(url, headers=headers, params=params, timeout=8)
-            if resp.status_code == 200:
-                res = resp.json()
-                if res.get("code") == 0 and "data" in res:
-                    files = res["data"].get("list", []) or res["data"].get("file_list", [])
-                    return files, stoken, ""
-            return [], "", f"HTTP {resp.status_code}"
+            resp = requests.get(detail_url, headers=self.headers, timeout=8)
+            if resp.status_code == 404:
+                return None, None, "HTTP 404 (获取文件列表失败)"
+            
+            data = resp.json()
+            if data.get('code') != 0:
+                return None, None, f"获取列表失败: {data.get('message', '未知错误')}"
+
+            files = data.get('data', {}).get('list', [])
+            return files, stoken, None
         except Exception as e:
-            return [], "", str(e)
+            return None, None, f"请求文件列表异常: {str(e)}"
 
-    def save_files(self, pwd_id, files, stoken, target_fid='0'):
-        """转存指定的包含 fid 列表的文件集合"""
-        url = "https://drive-pc.quark.cn/1/clouddrive/share/sharepage/save?pr=ucpro&fr=pc"
+    def save_files(self, pwd_id, files_to_save, stoken, target_fid='0'):
+        pwd_id = sanitize_pwd_id(pwd_id)
+        url = "https://drive.quark.cn/1/clouddrive/share/sharepage/save?pr=ucpro&fr=pc"
+        fid_list = [f['fid'] for f in files_to_save if 'fid' in f]
         
-        fid_list = [f.get("fid") for f in files if f.get("fid")]
-        fid_token_list = [f.get("share_fid_token") or f.get("fid_token") or "" for f in files]
-
-        if not fid_list:
-            return False, "未找到有效的文件 FID"
-
         payload = {
-            "fid_list": fid_list,
-            "fid_token_list": fid_token_list,
-            "to_pdir_fid": str(target_fid),
             "pwd_id": pwd_id,
             "stoken": stoken,
-            "scene": "share"
+            "fid_list": fid_list,
+            "to_pdir_fid": str(target_fid)
         }
-        headers = self.headers.copy()
-        headers["Referer"] = f"https://pan.quark.cn/s/{pwd_id}"
-
+        
         try:
-            resp = requests.post(url, headers=headers, json=payload, timeout=10)
-            if resp.status_code == 200:
-                res = resp.json()
-                if res.get("code") == 0:
-                    return True, "转存成功"
-                return False, res.get("message", "夸克拒绝转存")
-            return False, f"HTTP {resp.status_code}"
+            resp = requests.post(url, json=payload, headers=self.headers, timeout=10)
+            data = resp.json()
+            if data.get('code') == 0:
+                return True, "转存成功"
+            return False, data.get('message', '转存失败')
         except Exception as e:
             return False, str(e)
