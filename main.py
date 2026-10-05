@@ -12,14 +12,17 @@ app = Flask(__name__)
 def index():
     return render_template('index.html')
 
-# 🚀 对接豆瓣多维筛选接口
 @app.route('/api/get-movies', methods=['GET'])
 def get_movies():
-    main_tag = request.args.get('tag', '电影')   # 大类: 电影, 电视剧, 综艺, 动漫
-    sort_type = request.args.get('sort', 'U')    # U: 热门, T: 最新, S: 高分
+    main_tag = request.args.get('tag', '电影')   # 电影, 电视剧, 综艺, 动漫
+    sort_type = request.args.get('sort', 'U')    # U: 热门, R: 最新上映, S: 高分, T: 最多评价
     genre = request.args.get('genre', '')        # 动作, 喜剧...
     country = request.args.get('country', '')    # 中国大陆, 美国...
     year_range = request.args.get('year', '')    # 2026,2026 或 2020,2029
+
+    # 豆瓣 API 中动漫对应的标准 tag 为 '动画'
+    if main_tag == '动漫':
+        main_tag = '动画'
 
     url = "https://movie.douban.com/j/new_search_subjects"
     params = {
