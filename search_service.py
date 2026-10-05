@@ -31,13 +31,11 @@ class SearchService:
         return ch_name, found_links
 
     def batch_search_and_transfer_stream(self, movies, channels, target_fid='0'):
-        """流式生成日志：查到一个频道/转存一个文件就实时推送到前端"""
         for movie in movies:
             yield f"\n--- [ {movie} ] ---"
             yield f"🔍 开始检索资源: {movie}"
             found_links = []
 
-            # 开 15 个并发线程同时检索全部频道，极速完成
             workers = max(1, min(len(channels), 15))
             with ThreadPoolExecutor(max_workers=workers) as executor:
                 future_to_ch = {
@@ -63,9 +61,9 @@ class SearchService:
             for pwd_id in found_links:
                 yield f"  🚀 解析资源 (ID: {pwd_id})..."
                 
-                files, stoken = self.engine.get_share_files(pwd_id)
+                files, stoken, err_msg = self.engine.get_share_files(pwd_id)
                 if not files or not stoken:
-                    yield "     └─ ⚠️ 资源解析失败或链接已失效"
+                    yield f"     └─ ⚠️ 解析失败: {err_msg or '链接已失效'}"
                     continue
 
                 ok, msg = self.engine.save_files(pwd_id, files, stoken, target_fid)
