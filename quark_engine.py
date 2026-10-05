@@ -50,7 +50,6 @@ def clean_tv_filename(raw_name, title=""):
 class QuarkEngine:
     def __init__(self, cookie):
         self.cookie = cookie
-        # 🎯 补全 Referer 与 Origin 请求头，防范夸克 API 校验拦截
         self.headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             'Cookie': cookie,
@@ -60,7 +59,7 @@ class QuarkEngine:
         }
 
     def check_cookie_valid(self):
-        """🎯 使用获取根目录文件列表接口进行校验，精准且不易误判"""
+        """使用获取根目录文件列表接口进行校验"""
         url = "https://drive.quark.cn/1/clouddrive/file/sort?pr=ucpro&fr=pc&pdir_fid=0&num=1"
         try:
             resp = requests.get(url, headers=self.headers, timeout=5)
@@ -71,7 +70,8 @@ class QuarkEngine:
         except Exception:
             return False
 
-    def get_share_files(self, pwd_id):
+    def get_share_files(self, pwd_id, max_depth=3):
+        """🎯 自动递归穿透文件夹，获取分享内所有层级中的具体文件"""
         pwd_id = sanitize_pwd_id(pwd_id)
         if not pwd_id:
             return None, None, "分享链接 ID 无效"
@@ -91,20 +91,30 @@ class QuarkEngine:
         except Exception as e:
             return None, None, f"请求 Token 异常: {str(e)}"
 
-        detail_url = f"https://drive.quark.cn/1/clouddrive/share/sharepage/detail?pr=ucpro&fr=pc&pwd_id={pwd_id}&stoken={requests.utils.quote(stoken)}&p=1&num=100"
-        try:
-            resp = requests.get(detail_url, headers=self.headers, timeout=8)
-            if resp.status_code == 404:
-                return None, None, "HTTP 404 (获取文件列表失败)"
-            
-            data = resp.json()
-            if data.get('code') != 0:
-                return None, None, f"获取列表失败: {data.get('message', '未知错误')}"
+        all_files = []
 
-            files = data.get('data', {}).get('list', [])
-            return files, stoken, None
-        except Exception as e:
-            return None, None, f"请求文件列表异常: {str(e)}"
+        # 🎯 递归函数：深层遍历文件夹
+        def fetch_folder_files(pdir_fid, current_depth):
+            if current_depth > max_depth:
+                return
+            detail_url = f"https://drive.quark.cn/1/clouddrive/share/sharepage/detail?pr=ucpro&fr=pc&pwd_id={pwd_id}&stoken={requests.utils.quote(stoken)}&pdir_fid={pdir_fid}&p=1&num=200"
+            try:
+                r = requests.get(detail_url, headers=self.headers, timeout=8)
+                if r.status_code == 200:
+                    d = r.json()
+                    if d.get('code') == 0:
+                        items = d.get('data', {}).get('list', [])
+                        for item in items:
+                            # 判断如果是文件夹，深入下一层递归读取
+                            if item.get('dir_file') is True or item.get('file_type') == 0:
+                                fetch_folder_files(item.get('fid'), current_depth + 1)
+                            else:
+                                all_files.append(item)
+            except Exception:
+                pass
+
+        fetch_folder_files('0', 0)
+        return all_files, stoken, None
 
     def save_files(self, pwd_id, files_to_save, stoken, target_fid='0'):
         pwd_id = sanitize_pwd_id(pwd_id)
