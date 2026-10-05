@@ -59,10 +59,10 @@ class QuarkEngine:
         }
 
     def check_cookie_valid(self):
-        """使用获取根目录文件列表接口进行校验"""
+        """使用根目录查询验证 Cookie 有效性"""
         url = "https://drive.quark.cn/1/clouddrive/file/sort?pr=ucpro&fr=pc&pdir_fid=0&num=1"
         try:
-            resp = requests.get(url, headers=self.headers, timeout=5)
+            resp = requests.get(url, headers=self.headers, timeout=4)
             if resp.status_code == 200:
                 data = resp.json()
                 return data.get('code') == 0
@@ -71,7 +71,7 @@ class QuarkEngine:
             return False
 
     def get_share_files(self, pwd_id, max_depth=3):
-        """🎯 自动递归穿透文件夹，获取分享内所有层级中的具体文件"""
+        """递归穿透文件夹获取底层视频文件"""
         pwd_id = sanitize_pwd_id(pwd_id)
         if not pwd_id:
             return None, None, "分享链接 ID 无效"
@@ -79,7 +79,7 @@ class QuarkEngine:
         token_url = "https://drive.quark.cn/1/clouddrive/share/sharepage/token"
         payload = {"pwd_id": pwd_id, "passcode": ""}
         try:
-            resp = requests.post(token_url, json=payload, headers=self.headers, timeout=8)
+            resp = requests.post(token_url, json=payload, headers=self.headers, timeout=6)
             if resp.status_code == 404:
                 return None, None, "HTTP 404 (该链接已失效或已被原作者删除)"
             
@@ -93,19 +93,17 @@ class QuarkEngine:
 
         all_files = []
 
-        # 🎯 递归函数：深层遍历文件夹
         def fetch_folder_files(pdir_fid, current_depth):
             if current_depth > max_depth:
                 return
             detail_url = f"https://drive.quark.cn/1/clouddrive/share/sharepage/detail?pr=ucpro&fr=pc&pwd_id={pwd_id}&stoken={requests.utils.quote(stoken)}&pdir_fid={pdir_fid}&p=1&num=200"
             try:
-                r = requests.get(detail_url, headers=self.headers, timeout=8)
+                r = requests.get(detail_url, headers=self.headers, timeout=6)
                 if r.status_code == 200:
                     d = r.json()
                     if d.get('code') == 0:
                         items = d.get('data', {}).get('list', [])
                         for item in items:
-                            # 判断如果是文件夹，深入下一层递归读取
                             if item.get('dir_file') is True or item.get('file_type') == 0:
                                 fetch_folder_files(item.get('fid'), current_depth + 1)
                             else:
@@ -129,7 +127,7 @@ class QuarkEngine:
         }
         
         try:
-            resp = requests.post(url, json=payload, headers=self.headers, timeout=10)
+            resp = requests.post(url, json=payload, headers=self.headers, timeout=8)
             data = resp.json()
             if data.get('code') == 0:
                 return True, "转存成功"
