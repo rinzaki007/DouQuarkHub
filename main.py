@@ -115,21 +115,142 @@ def index():
 def admin():
     return render_template('admin.html')
 
-# ==================== 🎯 核心影视查询 API (修正检索分类与排序) ====================
+# ==================== 🎯 抓包 API 数据解析与逻辑封装 ====================
+
+REXXAR_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Referer": "https://movie.douban.com/",
+    "Accept": "application/json, text/plain, */*"
+}
+
+def parse_rexxar_items(items):
+    """通用提取 Rexxar 返回的影视条目"""
+    movies = []
+    for item in items:
+        title = item.get('title', '')
+        if not title:
+            continue
+        
+        # 封面获取
+        cover = ''
+        if isinstance(item.get('pic'), dict):
+            cover = item['pic'].get('normal') or item['pic'].get('large') or ''
+        elif item.get('cover'):
+            cover = item.get('cover')
+        elif item.get('cover_url'):
+            cover = item.get('cover_url')
+
+        # 评分获取
+        rate = '暂无'
+        if isinstance(item.get('rating'), dict):
+            val = item['rating'].get('value')
+            if val and float(val) > 0:
+                rate = str(val)
+        elif item.get('rate'):
+            rate = str(item.get('rate'))
+
+        # ID及详情页URL
+        target_id = item.get('id')
+        if not target_id and isinstance(item.get('target'), dict):
+            target_id = item['target'].get('id')
+        if not target_id and 'uri' in item:
+            m_id = re.search(r'/(\d+)', str(item.get('uri')))
+            if m_id:
+                target_id = m_id.group(1)
+
+        url = f"https://movie.douban.com/subject/{target_id}/" if target_id else '#'
+        
+        movies.append({
+            'title': title,
+            'cover': cover,
+            'rate': rate,
+            'url': url
+        })
+    return movies
+
+def fetch_movie_recent_hot(category='热门'):
+    """针对【电影】的抓包 API: subject/recent_hot/movie"""
+    url = "https://m.douban.com/rexxar/api/v2/subject/recent_hot/movie"
+    params = {
+        "start": "0",
+        "limit": "100",
+        "category": category, # '热门' 或 '最新'
+        "type": "全部"
+    }
+    try:
+        resp = requests.get(url, headers=REXXAR_HEADERS, params=params, timeout=10)
+        if resp.status_code == 200:
+            data = resp.json()
+            items = data.get('subjects', []) or data.get('items', [])
+            return parse_rexxar_items(items)
+    except Exception as e:
+        print(f"请求电影 Rexxar 接口异常: {e}")
+    return None
+
+def fetch_tv_recommend(main_tag, sort_type='U', genre=''):
+    """针对【电视剧/综艺/动画】的抓包 API: tv/recommend"""
+    url = "https://m.douban.com/rexxar/api/v2/tv/recommend"
+    
+    if main_tag in ['动漫', '动画']:
+        sel_cat = {"类型": "动画", "形式": "电视剧"}
+        tag_str = genre if genre else "动画"
+    elif main_tag == '综艺':
+        sel_cat = {"类型": "", "形式": "综艺"}
+        tag_str = genre if genre else "综艺"
+    else: # 电视剧
+        sel_cat = {"类型": "", "形式": "电视剧"}
+        tag_str = genre if genre else "电视剧"
+
+    # 🎯 核心映射：抓包证实 sort=R 为最新，sort=U 为热门，sort=S 为高分
+    real_sort = 'U'
+    if sort_type in ['T', 'R']:
+        real_sort = 'R'
+    elif sort_type == 'S':
+        real_sort = 'S'
+
+    params = {
+        "refresh": "0",
+        "start": "0",
+        "count": "100",
+        "selected_categories": json.dumps(sel_cat, ensure_ascii=False),
+        "uncollect": "false",
+        "score_range": "0,10",
+        "tags": tag_str,
+        "sort": real_sort
+    }
+    try:
+        resp = requests.get(url, headers=REXXAR_HEADERS, params=params, timeout=10)
+        if resp.status_code == 200:
+            data = resp.json()
+            items = data.get('items', []) or data.get('subjects', [])
+            return parse_rexxar_items(items)
+    except Exception as e:
+        print(f"请求 TV Rexxar 接口异常: {e}")
+    return None
 
 @app.route('/api/get-movies', methods=['GET'])
 def get_movies():
     main_tag = request.args.get('tag', '电影')
-    sort_type = request.args.get('sort', 'U')  # U: 热门, T: 最新, S: 高分, R: 最多评价
+    sort_type = request.args.get('sort', 'U')  # U: 热门, T/R: 最新, S: 高分
     genre = request.args.get('genre', '')
     country = request.args.get('country', '')
     year_range = request.args.get('year', '')
 
-    # 规范化豆瓣分类标签名称
-    search_tag = main_tag
-    if main_tag in ['动漫', '动画']:
-        search_tag = '动画'
+    # 1. 如果是大分类“电影”
+    if main_tag == '电影':
+        category = '最新' if sort_type in ['T', 'R'] else '热门'
+        movies = fetch_movie_recent_hot(category=category)
+        if movies:
+            return jsonify({'success': True, 'movies': movies})
 
+    # 2. 如果是大分类“电视剧”、“综艺”、“动漫/动画”
+    if main_tag in ['电视剧', '综艺', '动漫', '动画']:
+        movies = fetch_tv_recommend(main_tag, sort_type=sort_type, genre=genre)
+        if movies:
+            return jsonify({'success': True, 'movies': movies})
+
+    # 3. 降级备用（常规 Web API）
+    search_tag = '动画' if main_tag in ['动漫', '动画'] else main_tag
     url = "https://movie.douban.com/j/new_search_subjects"
     params = {
         "sort": sort_type,
@@ -147,10 +268,6 @@ def get_movies():
 
     try:
         resp = requests.get(url, headers=DOUBAN_HEADERS, params=params, timeout=10)
-        content_type = resp.headers.get('Content-Type', '')
-        if 'html' in content_type.lower():
-            return jsonify({'success': False, 'movies': [], 'message': '豆瓣触发风控拦截'})
-
         if resp.status_code == 200:
             data = resp.json()
             raw_list = data.get('data', [])
@@ -161,7 +278,6 @@ def get_movies():
                 'url': item.get('url', f"https://movie.douban.com/subject/{item.get('id')}/")
             } for item in raw_list]
             return jsonify({'success': True, 'movies': movies})
-            
         return jsonify({'success': False, 'movies': [], 'message': f'豆瓣响应异常: HTTP {resp.status_code}'})
     except Exception as e:
         return jsonify({'success': False, 'movies': [], 'message': f'请求异常: {str(e)}'})
@@ -390,7 +506,7 @@ def proxy_img():
     if not img_url:
         return Response("Missing url", status=400)
     try:
-        resp = requests.get(img_url, headers=DOUBAN_HEADERS, timeout=8)
+        resp = requests.get(img_url, headers=REXXAR_HEADERS, timeout=8)
         return Response(resp.content, mimetype=resp.headers.get('content-type', 'image/jpeg'))
     except Exception:
         return Response("", status=404)
