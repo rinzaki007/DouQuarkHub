@@ -3,111 +3,68 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ '首次初始化设置' if is_setup else '登录' }} - MovieSync 云影同步</title>
-    <link rel="stylesheet" href="/static/css/style.css">
+    <title>{{ '系统初始化' if is_setup else '系统登录' }} - MovieSync</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        .login-wrapper {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            background: #0b0f19;
-        }
-        .login-card {
-            background: #111827;
-            border: 1px solid #1f2937;
-            border-radius: 12px;
-            padding: 32px;
-            width: 380px;
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
-        }
-        .title-header {
-            text-align: center;
-            margin-bottom: 24px;
-        }
-        .title-header h2 {
-            color: #38bdf8;
-            font-size: 20px;
-            margin-bottom: 6px;
-        }
-        .title-header p {
-            color: #94a3b8;
-            font-size: 12px;
+        body {
+            background-color: #0f172a;
+            color: #f8fafc;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         }
     </style>
 </head>
-<body>
-<div class="login-wrapper">
-    <div class="login-card">
-        <div class="title-header">
-            <h2>🎬 MovieSync</h2>
-            <p>{{ '首次部署请设置你的专属管理员账号' if is_setup else '请登录以继续使用服务' }}</p>
+<body class="min-h-screen flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-xl w-full max-w-md p-8 shadow-2xl space-y-6">
+        <div class="text-center space-y-2">
+            <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-blue-600/20 text-blue-500 text-xl mb-1">
+                <i class="fa-solid fa-film"></i>
+            </div>
+            <h1 class="text-xl font-bold text-white tracking-wide">MovieSync</h1>
+            <p class="text-xs text-slate-400">{{ '请创建管理员账号以初始化系统' if is_setup else '请登录以继续使用服务' }}</p>
         </div>
 
-        {% if is_setup %}
-        <!-- 首次初始化表单 -->
-        <form onsubmit="handleSetup(event)">
-            <div class="form-group" style="margin-bottom: 14px;">
-                <label>自定义管理员账号</label>
-                <input type="text" id="setup-username" placeholder="请输入你的用户名" required>
+        <form id="auth-form" onsubmit="handleAuth(event)" class="space-y-4">
+            <div class="space-y-1">
+                <label class="text-xs font-medium text-slate-300">账号</label>
+                <input type="text" id="username" required placeholder="请输入管理员账号" 
+                       class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3.5 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-blue-500 transition">
             </div>
-            <div class="form-group" style="margin-bottom: 18px;">
-                <label>设置密码</label>
-                <input type="password" id="setup-password" placeholder="请输入安全密码" required>
+            <div class="space-y-1">
+                <label class="text-xs font-medium text-slate-300">密码</label>
+                <input type="password" id="password" required placeholder="请输入密码" 
+                       class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3.5 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-blue-500 transition">
             </div>
-            <button type="submit" class="btn-primary" style="width: 100%; height: 38px;">创建账号并登录</button>
+            <button type="submit" class="w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition shadow-lg shadow-blue-600/20">
+                {{ '立即初始化并登录' if is_setup else '登 录' }}
+            </button>
         </form>
-        {% else %}
-        <!-- 正常登录表单 -->
-        <form onsubmit="handleLogin(event)">
-            <div class="form-group" style="margin-bottom: 14px;">
-                <label>账号</label>
-                <input type="text" id="login-username" required>
-            </div>
-            <div class="form-group" style="margin-bottom: 18px;">
-                <label>密码</label>
-                <input type="password" id="login-password" required>
-            </div>
-            <button type="submit" class="btn-primary" style="width: 100%; height: 38px;">登 录</button>
-        </form>
-        {% endif %}
     </div>
-</div>
 
-<script>
-async function handleSetup(e) {
-    e.preventDefault();
-    const username = document.getElementById('setup-username').value;
-    const password = document.getElementById('setup-password').value;
-    const res = await fetch('/api/setup', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({username, password})
-    });
-    const data = await res.json();
-    if(data.success) {
-        window.location.href = '/';
-    } else {
-        alert(data.message);
-    }
-}
+    <script>
+        const isSetup = {{ 'true' if is_setup else 'false' }};
+        async function handleAuth(e) {
+            e.preventDefault();
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value.trim();
+            const endpoint = isSetup ? '/api/setup' : '/api/login';
 
-async function handleLogin(e) {
-    e.preventDefault();
-    const username = document.getElementById('login-username').value;
-    const password = document.getElementById('login-password').value;
-    const res = await fetch('/api/login', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({username, password})
-    });
-    const data = await res.json();
-    if(data.success) {
-        window.location.href = '/';
-    } else {
-        alert(data.message);
-    }
-}
-</script>
+            try {
+                const resp = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                const res = await resp.json();
+                if (res.success) {
+                    window.location.href = '/';
+                } else {
+                    alert(res.message || '操作失败');
+                }
+            } catch (err) {
+                alert('请求发生异常');
+            }
+        }
+    </script>
 </body>
 </html>
