@@ -23,11 +23,14 @@ class QuarkEngine:
         self.headers = {
             "Cookie": self.cookie,
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Referer": "https://pan.quark.cn/",
+            "Origin": "https://pan.quark.cn",
             "Content-Type": "application/json"
         }
 
     def check_cookie_valid(self):
-        url = "https://drive-pc.quark.cn/1/clouddrive/user/info"
+        """校验夸克 Cookie 是否生效"""
+        url = "https://drive-pc.quark.cn/1/clouddrive/user/info?pr=uc_drive&fr=pc"
         try:
             resp = requests.get(url, headers=self.headers, timeout=5)
             if resp.status_code == 200:
@@ -38,22 +41,14 @@ class QuarkEngine:
         return False
 
     def get_or_create_subfolder(self, folder_name, parent_fid='0'):
-        """
-        在 parent_fid 目录下检索或新建名为 folder_name 的专属文件夹，返回该文件夹的 fid
-        """
+        """在 parent_fid 目录下检索或新建名为 folder_name 的专属文件夹"""
         if not parent_fid:
             parent_fid = '0'
 
-        headers = {
-            "Cookie": self.cookie,
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-            "Content-Type": "application/json"
-        }
-
-        # 1. 先检查父目录下是否已存在同名文件夹
+        # 1. 查找现有同名文件夹
         try:
-            list_url = f"https://drive-pc.quark.cn/1/clouddrive/file/sort?pdir_fid={parent_fid}&file_type=0&_size=100"
-            res = requests.get(list_url, headers=headers, timeout=5).json()
+            list_url = f"https://drive-pc.quark.cn/1/clouddrive/file/sort?pdir_fid={parent_fid}&file_type=0&_size=100&pr=uc_drive&fr=pc"
+            res = requests.get(list_url, headers=self.headers, timeout=5).json()
             file_list = res.get("data", {}).get("list", []) or res.get("list", [])
             for item in file_list:
                 if item.get("file_name") == folder_name:
@@ -61,8 +56,8 @@ class QuarkEngine:
         except Exception as e:
             print(f"查找文件夹异常: {e}")
 
-        # 2. 调用 Quark mkdir 接口新建文件夹
-        mkdir_url = "https://drive-pc.quark.cn/1/clouddrive/file/mkdir"
+        # 2. 新建文件夹
+        mkdir_url = "https://drive-pc.quark.cn/1/clouddrive/file/mkdir?pr=uc_drive&fr=pc"
         payload = {
             "pdir_fid": parent_fid,
             "file_name": folder_name,
@@ -70,16 +65,16 @@ class QuarkEngine:
         }
 
         try:
-            res = requests.post(mkdir_url, json=payload, headers=headers, timeout=5).json()
+            res = requests.post(mkdir_url, json=payload, headers=self.headers, timeout=5).json()
             if res.get("status") == 200 or res.get("code") == 0:
                 new_fid = res.get("data", {}).get("fid")
                 if new_fid:
                     return new_fid
             
-            # 如果文件夹已存在 (错误码 41013)
+            # 兼容文件夹已存在 (code 41013)
             if res.get("code") == 41013 or res.get("status") == 41013:
-                list_url = f"https://drive-pc.quark.cn/1/clouddrive/file/sort?pdir_fid={parent_fid}&file_type=0&_size=100"
-                res_list = requests.get(list_url, headers=headers, timeout=5).json()
+                list_url = f"https://drive-pc.quark.cn/1/clouddrive/file/sort?pdir_fid={parent_fid}&file_type=0&_size=100&pr=uc_drive&fr=pc"
+                res_list = requests.get(list_url, headers=self.headers, timeout=5).json()
                 for item in res_list.get("data", {}).get("list", []):
                     if item.get("file_name") == folder_name:
                         return item.get("fid")
@@ -88,29 +83,61 @@ class QuarkEngine:
 
         return parent_fid
 
-    def get_share_files(self, pwd_id, only_video=True):
-        """解析分享链接内部文件"""
+    def get_share_files(self, pwd_id, pdir_fid="0", only_video=True):
+        """
+        穿透解析夸克分享链接
+        🎯 核心修复：完善参数，并自动递归解析子目录下的视频文件
+        """
         url = "https://drive-pc.quark.cn/1/clouddrive/share/sharepage/detail"
-        params = {"pwd_id": pwd_id, "_size": 100}
+        params = {
+            "pwd_id": pwd_id,
+            "pdir_fid": pdir_fid,
+            "_size": 100,
+            "pr": "uc_drive",
+            "fr": "pc"
+        }
+        
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Referer": f"https://pan.quark.cn/s/{pwd_id}",
+            "Cookie": self.cookie
+        }
+
         try:
-            resp = requests.get(url, headers=self.headers, params=params, timeout=8)
+            resp = requests.get(url, headers=headers, params=params, timeout=8)
             if resp.status_code == 200:
                 data = resp.json()
                 if data.get("status") == 200 or data.get("code") == 0:
                     stoken = data.get("data", {}).get("stoken", "")
-                    raw_files = data.get("data", {}).get("list", [])
-                    if only_video:
-                        video_files = [f for f in raw_files if not f.get("dir") and any(f.get("file_name", "").lower().endswith(ext) for ext in ['.mp4', '.mkv', '.avi', '.mov', '.flv'])]
-                        return video_files, stoken, None
-                    return raw_files, stoken, None
-                return None, None, data.get("message", "解析接口返回错误")
+                    raw_files = data.get("data", {}).get("list", []) or []
+                    
+                    video_extensions = ('.mp4', '.mkv', '.avi', '.mov', '.flv', '.wmv', '.m4v')
+                    result_files = []
+
+                    for f in raw_files:
+                        # 如果是文件夹，递归穿透一层
+                        if f.get("dir"):
+                            sub_files, _, _ = self.get_share_files(pwd_id, pdir_fid=f.get("fid"), only_video=only_video)
+                            if sub_files:
+                                result_files.extend(sub_files)
+                        else:
+                            if only_video:
+                                if any(f.get("file_name", "").lower().endswith(ext) for ext in video_extensions):
+                                    result_files.append(f)
+                            else:
+                                result_files.append(f)
+
+                    return result_files, stoken, None
+                
+                msg = data.get("message") or data.get("msg") or "夸克未返回有效内容"
+                return None, None, msg
+            return None, None, f"HTTP {resp.status_code}"
         except Exception as e:
             return None, None, str(e)
-        return None, None, "无法解析该分享链接"
 
     def save_files(self, pwd_id, files, stoken, target_fid='0'):
-        """转存文件至指定目录 FID"""
-        url = "https://drive-pc.quark.cn/1/clouddrive/share/sharepage/save"
+        """转存文件至目标 FID"""
+        url = "https://drive-pc.quark.cn/1/clouddrive/share/sharepage/save?pr=uc_drive&fr=pc"
         payload = {
             "pwd_id": pwd_id,
             "stoken": stoken,
