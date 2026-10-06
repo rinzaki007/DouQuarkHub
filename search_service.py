@@ -9,10 +9,7 @@ class SearchService:
         self.engine = QuarkEngine(cookie)
 
     def search_single_movie(self, title, channels):
-        """
-        在指定的 TG 频道列表中精准检索资源
-        使用 Telegram Web 搜索接口 ?q=电影名 穿透历史消息
-        """
+        """在指定的 TG 频道列表中精准检索资源"""
         cleaned_title = title.strip()
         simplified_title = re.sub(r'[^\w\u4e00-\u9fa5]', '', cleaned_title)
 
@@ -31,7 +28,7 @@ class SearchService:
             if not ch_id:
                 continue
 
-            # 🎯 核心修复：追加 ?q=标题 开启 Telegram 频道历史全量搜索，避免只搜到最新的20条
+            # 开启频道历史搜索
             urls_to_try = [
                 f"https://t.me/s/{ch_id}?q={quote(cleaned_title)}",
                 f"https://t.me/s/{ch_id}"
@@ -45,19 +42,16 @@ class SearchService:
 
                     html = resp.text
                     
-                    # 抓取频道名称
                     title_match = re.search(r'<div class="tgme_channel_info_title"><span dir="auto">(.*?)</span></div>', html)
                     if title_match:
                         ch_name = title_match.group(1).strip()
 
-                    # 提取 Telegram 消息文本块
                     messages = re.findall(r'<div class="tgme_widget_message_text js-message_text".*?>([\s\S]*?)</div>', html)
                     
                     for msg in reversed(messages):
                         clean_text = re.sub(r'<[^>]+>', '', msg)
                         clean_text_simple = re.sub(r'[^\w\u4e00-\u9fa5]', '', clean_text)
 
-                        # 匹配：包含原标题，或消除标点后的简化标题匹配
                         if cleaned_title in clean_text or (simplified_title and simplified_title in clean_text_simple):
                             pwd_match = re.search(r'pan\.quark\.cn/s/([a-zA-Z0-9]+)', msg)
                             if pwd_match:
@@ -70,9 +64,6 @@ class SearchService:
         return None, None
 
     def batch_search_and_transfer_stream(self, movies, channels, target_fid='0', category_fids=None):
-        """
-        批量检索与转存流式日志输出
-        """
         category_fids = category_fids or {}
         yield f"[系统] 🚀 开始处理批量转存，共 {len(movies)} 个目标...\n"
 
@@ -89,7 +80,7 @@ class SearchService:
             pwd_id, ch_name = self.search_single_movie(title, channels)
 
             if not pwd_id:
-                yield f"[系统] ❌ 未能在已配置的频道中找到《{title}》的有效夸克资源\n"
+                yield f"[系统] ❌ 未能在已配置频道中找到《{title}》的有效夸克资源\n"
                 continue
 
             yield f"[系统] 📢 [来源频道: {ch_name}] 精确命中《{title}》 | 夸克代码: {pwd_id}\n"
@@ -100,7 +91,7 @@ class SearchService:
                 yield f"[系统] ⚠️ 资源解析失败或未包含有效视频: {err}\n"
                 continue
 
-            yield f"[系统] 📁 正在定位/创建专属文件夹：《{title}》...\n"
+            yield f"[系统] 📁 正在专属存储目录下新建/定位文件夹：《{title}》...\n"
             movie_folder_fid = self.engine.get_or_create_subfolder(title, parent_fid)
 
             files_to_save = [{'fid': f['fid']} for f in files]
