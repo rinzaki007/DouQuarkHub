@@ -1,460 +1,675 @@
-let currentCategory = '电影';
-let activeFilters = { sort: 'U', genre: '', country: '', year: '' };
-let movieList = [];
-let selectedMovies = new Set();
+let currentTag = '电影';
+let currentSort = 'U';
 
-window.onload = () => {
+let moviesData = [];
+let selectedIndices = new Set();
+let currentChaseSelectedCandidate = null;
+
+let logTimerInterval = null;
+let logTimerSeconds = 0;
+
+document.addEventListener("DOMContentLoaded", () => {
     fetchMovies();
-    refreshHomeStatus();
-    initScrollCollapseFilter();
-};
+    checkSystemHealth();
+    loadCategoryOptions();
+});
 
-async function refreshHomeStatus() {
-    const cookie = localStorage.getItem('quark_cookie') || '';
-    const badge = document.getElementById('quark-status-badge');
-    if (badge) {
-        if (cookie) {
-            try {
-                const res = await fetch('/api/check-cookie', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({cookie})
-                });
-                const data = await res.json();
-                badge.className = data.valid ? 'badge badge-success' : 'badge badge-danger';
-                badge.textContent = data.valid ? '🟢 有效' : '🔴 失效';
-            } catch (e) {
-                badge.className = 'badge badge-danger';
-                badge.textContent = '异常';
-            }
+async function loadCategoryOptions() {
+    try {
+        const resp = await fetch('/api/config');
+        const res = await resp.json();
+        if (res.success && res.config) {
+            const cfg = res.config;
+            const selects = document.querySelectorAll('.global-category-select');
+            
+            selects.forEach(selectEl => {
+                selectEl.innerHTML = '';
+
+                const defaultFid = cfg.default_fid || '0';
+                const optDefault = document.createElement('option');
+                optDefault.value = defaultFid;
+                optDefault.textContent = `默认全局目录 (FID: ${defaultFid})`;
+                selectEl.appendChild(optDefault);
+
+                const catFids = cfg.category_fids || {};
+                for (const [catName, fid] of Object.entries(catFids)) {
+                    if (fid) {
+                        const opt = document.createElement('option');
+                        opt.value = fid;
+                        opt.textContent = `${catName}专属目录 (FID: ${fid})`;
+                        selectEl.appendChild(opt);
+                    }
+                }
+
+                if (selectEl.id === 'batch-target-fid') {
+                    let matched = false;
+                    for (let opt of selectEl.options) {
+                        if (opt.textContent.includes(currentTag + '专属')) {
+                            opt.selected = true;
+                            matched = true;
+                            break;
+                        }
+                    }
+                    if (!matched && selectEl.options.length > 0) {
+                        selectEl.selectedIndex = 0;
+                    }
+                } else if (selectEl.id === 'chase-target-fid') {
+                    for (let opt of selectEl.options) {
+                        if (opt.textContent.includes('电视剧专属')) {
+                            opt.selected = true;
+                            break;
+                        }
+                    }
+                }
+            });
+        }
+    } catch (err) {
+        console.error("加载后台目录配置失败:", err);
+    }
+}
+
+async function checkSystemHealth() {
+    try {
+        const localCookie = localStorage.getItem('quark_cookie') || '';
+        const resp = await fetch('/api/check-cookie', { 
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ cookie: localCookie })
+        });
+        const res = await resp.json();
+        const badge = document.getElementById('cookie-status-badge');
+        if (res.valid) {
+            badge.className = "px-2 py-1 text-xs rounded bg-emerald-950/80 text-emerald-400 border border-emerald-800 flex items-center gap-1";
+            badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-500"></span><span>Cookie 有效</span>`;
         } else {
-            badge.className = 'badge badge-danger';
-            badge.textContent = '未配置';
+            badge.className = "px-2 py-1 text-xs rounded bg-rose-950/80 text-rose-400 border border-rose-800 flex items-center gap-1";
+            badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-rose-500"></span><span>Cookie 失效</span>`;
         }
+    } catch (err) {
+        console.error("初始化检测异常", err);
     }
 
-    const chBadge = document.getElementById('channel-status-badge');
-    if (chBadge) {
-        try {
-            const chRes = await fetch('/api/check-channels');
-            const chData = await chRes.json();
-            if (chData.success) {
-                chBadge.className = 'badge badge-success';
-                chBadge.textContent = `🟢 ${chData.valid_count}/${chData.total} 联通`;
-            }
-        } catch (e) {
-            chBadge.className = 'badge badge-danger';
-            chBadge.textContent = '超时';
+    try {
+        const resp = await fetch('/api/check-channels');
+        const res = await resp.json();
+        if (res.success) {
+            document.getElementById('channel-count-text').innerText = `频道 ${res.valid_count}/${res.total}`;
         }
+    } catch (err) {
+        console.error("频道检测异常", err);
     }
 }
 
-function initScrollCollapseFilter() {
-    const gridContainer = document.getElementById('movie-grid-container');
-    const filterPanel = document.getElementById('filter-panel');
-    if (!gridContainer || !filterPanel) return;
-
-    let lastScrollTop = 0;
-    gridContainer.addEventListener('scroll', () => {
-        const currentScroll = gridContainer.scrollTop;
-        if (currentScroll > 20 && currentScroll > lastScrollTop) {
-            filterPanel.classList.add('collapsed');
-        } else if (currentScroll < 10) {
-            filterPanel.classList.remove('collapsed');
-        }
-        lastScrollTop = currentScroll;
+function changeTag(tag) {
+    currentTag = tag;
+    document.querySelectorAll('.nav-tag').forEach(btn => {
+        btn.className = btn.dataset.tag === tag 
+            ? 'nav-tag px-3.5 py-1.5 rounded text-sm font-medium transition bg-blue-600 text-white'
+            : 'nav-tag px-3.5 py-1.5 rounded text-sm font-medium transition bg-slate-800 text-slate-300 hover:bg-slate-700';
     });
-}
-
-function toggleLogDrawer() {
-    const drawer = document.getElementById('log-drawer');
-    if (drawer) drawer.classList.toggle('open');
-}
-
-function clearHomeLog() {
-    const logBody = document.getElementById('log-body');
-    if (logBody) logBody.textContent = '日志已清空...';
-}
-
-function appendLog(text) {
-    const logBody = document.getElementById('log-body');
-    if (logBody) {
-        logBody.textContent += (logBody.textContent ? '\n' : '') + text;
-        logBody.scrollTop = logBody.scrollHeight;
-    }
-}
-
-function switchCategory(cat) {
-    currentCategory = cat;
-    ['电影', '电视剧', '综艺', '动漫'].forEach(c => {
-        const btn = document.getElementById(`tab-${c}`);
-        if (btn) btn.classList.toggle('active', c === cat);
-    });
+    loadCategoryOptions();
     fetchMovies();
 }
 
-function setFilter(type, value, el) {
-    activeFilters[type] = value;
-    el.parentElement.querySelectorAll('.filter-item').forEach(i => i.classList.remove('active'));
-    el.classList.add('active');
+function changeSort(sort) {
+    currentSort = sort;
+    document.querySelectorAll('.sort-tag').forEach(btn => {
+        if (btn.dataset.sort === sort) {
+            btn.className = "sort-tag px-3 py-1 rounded-md font-medium transition bg-blue-600 text-white shadow";
+        } else {
+            btn.className = "sort-tag px-3 py-1 rounded-md font-medium transition text-slate-400 hover:text-white";
+        }
+    });
     fetchMovies();
 }
 
 async function fetchMovies() {
-    const params = new URLSearchParams({ tag: currentCategory, ...activeFilters });
+    const loading = document.getElementById('loading');
+    const grid = document.getElementById('movie-grid');
+    loading.classList.remove('hidden');
+    grid.classList.add('hidden');
+    selectedIndices.clear();
+    updateSelectedCount();
+
     try {
-        const res = await fetch(`/api/get-movies?${params.toString()}`);
-        const data = await res.json();
-        if (data.success) {
-            movieList = data.movies;
+        const url = `/api/get-movies?tag=${encodeURIComponent(currentTag)}&sort=${currentSort}`;
+        const resp = await fetch(url);
+        const res = await resp.json();
+        if (res.success) {
+            moviesData = res.movies || [];
             renderGrid();
         }
-    } catch (err) { console.error(err); }
+    } catch (err) {
+        console.error(err);
+    } finally {
+        loading.classList.add('hidden');
+        grid.classList.remove('hidden');
+    }
 }
 
-async function searchMovies() {
-    const q = document.getElementById('search-input').value.trim();
-    if (!q) return;
+async function doSearch() {
+    const query = document.getElementById('search-input').value.trim();
+    if (!query) return;
+
+    const loading = document.getElementById('loading');
+    const grid = document.getElementById('movie-grid');
+    loading.classList.remove('hidden');
+    grid.classList.add('hidden');
+    selectedIndices.clear();
+    updateSelectedCount();
+
     try {
-        const res = await fetch(`/api/search-douban?q=${encodeURIComponent(q)}`);
-        const data = await res.json();
-        if (data.success) {
-            movieList = data.movies;
+        const resp = await fetch(`/api/search-douban?q=${encodeURIComponent(query)}`);
+        const res = await resp.json();
+        if (res.success) {
+            moviesData = res.movies || [];
             renderGrid();
         }
-    } catch (err) { console.error(err); }
+    } catch (err) {
+        console.error(err);
+    } finally {
+        loading.classList.add('hidden');
+        grid.classList.remove('hidden');
+    }
 }
 
 function renderGrid() {
     const grid = document.getElementById('movie-grid');
-    if (!grid) return;
     grid.innerHTML = '';
 
-    if (movieList.length === 0) {
-        grid.innerHTML = `<div style="grid-column: 1 / -1; text-align:center; color:#64748b; padding:40px;">暂无满足条件的影视资源</div>`;
-        return;
-    }
+    moviesData.forEach((movie, idx) => {
+        const coverUrl = movie.cover ? `/api/proxy-img?url=${encodeURIComponent(movie.cover)}` : 'https://via.placeholder.com/150x220?text=No+Cover';
+        const isSelected = selectedIndices.has(idx);
 
-    movieList.forEach(m => {
-        const isSelected = selectedMovies.has(m.title);
         const card = document.createElement('div');
-        card.className = `movie-card ${isSelected ? 'selected' : ''}`;
-        card.onclick = () => toggleSelect(m.title, card);
-
-        const coverSrc = m.cover ? `/api/proxy-img?url=${encodeURIComponent(m.cover)}` : '';
-        const detailUrl = m.url || '#';
+        card.className = `relative group bg-slate-900 border ${isSelected ? 'border-blue-500' : 'border-slate-800'} rounded-lg overflow-hidden card-shadow cursor-pointer transition`;
+        card.onclick = (e) => {
+            if (e.target.tagName !== 'A') {
+                toggleSelect(idx);
+            }
+        };
 
         card.innerHTML = `
-            <div class="cover-box">
-                <img src="${coverSrc}" alt="${m.title}" loading="lazy">
-                <div class="rate-tag">${m.rate}</div>
-                <div class="check-box">${isSelected ? '✓' : ''}</div>
+            <div class="aspect-[2/3] w-full bg-slate-950 relative overflow-hidden">
+                <img src="${coverUrl}" alt="${movie.title}" class="w-full h-full object-cover group-hover:scale-105 transition duration-300" loading="lazy">
+                <div class="absolute top-2 left-2 z-10">
+                    <input type="checkbox" ${isSelected ? 'checked' : ''} class="w-4 h-4 rounded border-slate-600 bg-slate-900/80 text-blue-600 focus:ring-0">
+                </div>
+                <div class="absolute top-2 right-2 bg-slate-900/90 backdrop-blur text-amber-400 text-[11px] font-bold px-1.5 py-0.5 rounded border border-slate-700/50">
+                    ${movie.rate || '暂无'}
+                </div>
             </div>
-            <div class="card-info">
-                <div class="movie-title" title="${m.title}">${m.title}</div>
-                <a href="${detailUrl}" target="_blank" class="douban-link" onclick="event.stopPropagation()">🔗 详情</a>
+            <div class="p-2.5">
+                <div class="font-medium text-xs text-slate-200 line-clamp-1 group-hover:text-blue-400 transition" title="${movie.title}">${movie.title}</div>
+                <div class="mt-1 flex items-center justify-between text-[11px]">
+                    <a href="${movie.url}" target="_blank" class="text-blue-400 hover:underline">详情</a>
+                </div>
             </div>
         `;
         grid.appendChild(card);
     });
-    const countEl = document.getElementById('selected-count');
-    if (countEl) countEl.textContent = selectedMovies.size;
 }
 
-function toggleSelect(title, card) {
-    if (selectedMovies.has(title)) {
-        selectedMovies.delete(title);
-        card.classList.remove('selected');
-        card.querySelector('.check-box').textContent = '';
-    } else {
-        selectedMovies.add(title);
-        card.classList.add('selected');
-        card.querySelector('.check-box').textContent = '✓';
+function toggleSelect(idx) {
+    if (selectedIndices.has(idx)) selectedIndices.delete(idx);
+    else selectedIndices.add(idx);
+    updateSelectedCount();
+    renderGrid();
+}
+
+function selectAll(select) {
+    if (select) moviesData.forEach((_, idx) => selectedIndices.add(idx));
+    else selectedIndices.clear();
+    updateSelectedCount();
+    renderGrid();
+}
+
+function updateSelectedCount() {
+    document.getElementById('selected-count').innerText = selectedIndices.size;
+}
+
+function toggleLogBox(show = true) {
+    const panel = document.getElementById('log-panel');
+    if (show) panel.classList.remove('hidden');
+    else panel.classList.toggle('hidden');
+}
+
+function clearLog() {
+    document.getElementById('log-box').innerHTML = '';
+}
+
+function startLogTimer() {
+    logTimerSeconds = 0;
+    const badge = document.getElementById('log-timer-badge');
+    badge.classList.remove('hidden');
+    badge.innerText = `耗时: 0 秒`;
+    if (logTimerInterval) clearInterval(logTimerInterval);
+    logTimerInterval = setInterval(() => {
+        logTimerSeconds++;
+        badge.innerText = `耗时: ${logTimerSeconds} 秒`;
+    }, 1000);
+}
+
+function stopLogTimer() {
+    if (logTimerInterval) {
+        clearInterval(logTimerInterval);
+        logTimerInterval = null;
     }
-    const countEl = document.getElementById('selected-count');
-    if (countEl) countEl.textContent = selectedMovies.size;
 }
 
-function selectAll() { movieList.forEach(m => selectedMovies.add(m.title)); renderGrid(); }
-function clearSelection() { selectedMovies.clear(); renderGrid(); }
+function appendLogLine(text, type = 'info') {
+    const logBox = document.getElementById('log-box');
+    if (!text) return;
+    const lines = text.split('\n');
+    lines.forEach(line => {
+        if (line.trim().length > 0) {
+            const div = document.createElement('div');
+            let colorClass = 'text-sky-400';
+            if (type === 'success') colorClass = 'text-emerald-400 font-semibold';
+            else if (type === 'warn') colorClass = 'text-amber-400';
+            else if (type === 'error') colorClass = 'text-rose-400 font-bold';
 
-function openOpenList() {
-    const url = localStorage.getItem('openlist_url');
-    if (!url) { alert('请先前往【后台管理】设置 OpenList 页面地址！'); return; }
-    window.open(url, '_blank');
-}
-
-function openQuarkApp() {
-    window.open(localStorage.getItem('quark_app_url') || 'quark://', '_blank');
-}
-
-function populateFolderSelectOptions() {
-    const select = document.getElementById('sub-folder-select');
-    if (!select) return;
-    select.innerHTML = '';
-
-    const defaultFid = localStorage.getItem('target_folder_id') || '0';
-    const folderMovie = localStorage.getItem('folder_movie') || '';
-    const folderTv = localStorage.getItem('folder_tv') || '';
-    const folderShow = localStorage.getItem('folder_show') || '';
-    const folderAnime = localStorage.getItem('folder_anime') || '';
-
-    const options = [
-        { label: `📁 默认全局目录 (${defaultFid})`, val: defaultFid }
-    ];
-
-    if (folderTv) options.unshift({ label: `📺 电视剧专属目录 (${folderTv})`, val: folderTv });
-    if (folderAnime) options.unshift({ label: `🎨 动漫专属目录 (${folderAnime})`, val: folderAnime });
-    if (folderShow) options.unshift({ label: `🎤 综艺专属目录 (${folderShow})`, val: folderShow });
-    if (folderMovie) options.unshift({ label: `🎬 电影专属目录 (${folderMovie})`, val: folderMovie });
-
-    options.forEach(opt => {
-        const el = document.createElement('option');
-        el.value = opt.val;
-        el.textContent = opt.label;
-        select.appendChild(el);
+            div.className = `py-0.5 font-mono leading-relaxed ${colorClass} border-b border-slate-900/40`;
+            div.textContent = line;
+            logBox.appendChild(div);
+        }
     });
+    logBox.scrollTop = logBox.scrollHeight;
 }
 
-function subscribeSelected() {
-    if (selectedMovies.size === 0) { alert('请先勾选影视！'); return; }
-    const title = Array.from(selectedMovies)[0];
-    
-    populateFolderSelectOptions();
-    
-    const modal = document.getElementById('sub-modal');
-    if (modal) modal.style.display = 'flex';
-    const input = document.getElementById('sub-title-input');
-    if (input) input.value = title;
-    
-    autoSearchSubLink();
+function openChaseModal() { 
+    document.getElementById('chase-modal').classList.remove('hidden');
+    switchChaseTab('add');
+    loadModalSubscriptions();
+    loadCategoryOptions();
 }
 
-function closeSubModal() {
-    const modal = document.getElementById('sub-modal');
-    if (modal) modal.style.display = 'none';
+function closeChaseModal() { 
+    document.getElementById('chase-modal').classList.add('hidden'); 
 }
 
-async function autoSearchSubLink() {
-    const input = document.getElementById('sub-title-input');
-    if (!input) return;
-    const title = input.value.trim();
-    const cookie = localStorage.getItem('quark_cookie') || '';
-    const pwdInput = document.getElementById('sub-pwd-input');
-    if (pwdInput) pwdInput.value = '🔍 检索中...';
-    
+function switchChaseTab(tabName) {
+    const tabAdd = document.getElementById('chase-tab-add');
+    const tabList = document.getElementById('chase-tab-list');
+    const panelAdd = document.getElementById('chase-panel-add');
+    const panelList = document.getElementById('chase-panel-list');
+    const submitBtn = document.getElementById('btn-submit-chase');
+
+    if (tabName === 'add') {
+        tabAdd.className = "px-3.5 py-1.5 rounded bg-purple-600 text-white font-medium transition";
+        tabList.className = "px-3.5 py-1.5 rounded text-slate-400 hover:text-white transition";
+        panelAdd.classList.remove('hidden');
+        panelList.classList.add('hidden');
+        if(currentChaseSelectedCandidate) submitBtn.classList.remove('hidden');
+    } else {
+        tabList.className = "px-3.5 py-1.5 rounded bg-purple-600 text-white font-medium transition";
+        tabAdd.className = "px-3.5 py-1.5 rounded text-slate-400 hover:text-white transition";
+        panelList.classList.remove('hidden');
+        panelAdd.classList.add('hidden');
+        submitBtn.classList.add('hidden');
+        loadModalSubscriptions();
+    }
+}
+
+async function loadModalSubscriptions() {
+    const tbody = document.getElementById('modal-sub-table-body');
+    tbody.innerHTML = '<tr><td colspan="5" class="px-3.5 py-6 text-center text-slate-500"><i class="fa-solid fa-spinner fa-spin"></i> 正在加载...</td></tr>';
     try {
-        const res = await fetch('/api/search-link-for-sub', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({title, cookie})
-        });
-        const data = await res.json();
-        if (data.success && data.pwd_id) {
-            if (pwdInput) pwdInput.value = data.pwd_id;
-        } else {
-            if (pwdInput) pwdInput.value = '';
+        const resp = await fetch('/api/subscriptions');
+        const res = await resp.json();
+        if (res.success && res.subscriptions) {
+            document.getElementById('sub-count-badge').innerText = res.subscriptions.length;
+            if (res.subscriptions.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="px-3.5 py-8 text-center text-slate-500">暂无自动化追剧任务，请先去【添加新追剧】创建。</td></tr>';
+                return;
+            }
+            tbody.innerHTML = '';
+            res.subscriptions.forEach(sub => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-900/60";
+                tr.innerHTML = `
+                    <td class="px-3.5 py-3 font-medium text-slate-200">${sub.title}</td>
+                    <td class="px-3.5 py-3 text-emerald-400">${sub.channel || '默认频道'}</td>
+                    <td class="px-3.5 py-3 text-slate-400">${sub.interval_hours} 小时</td>
+                    <td class="px-3.5 py-3 text-slate-400">${sub.last_check || '等待触发'}</td>
+                    <td class="px-3.5 py-3 text-right space-x-2">
+                        <button onclick="runSubNow('${sub.id}')" class="bg-purple-600 hover:bg-purple-500 text-white px-2.5 py-1 rounded text-[11px]">立即运行</button>
+                        <button onclick="deleteSub('${sub.id}')" class="bg-rose-900/60 hover:bg-rose-800 text-rose-200 px-2.5 py-1 rounded text-[11px]">删除</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
         }
     } catch (err) {
-        if (pwdInput) pwdInput.value = '';
+        tbody.innerHTML = '<tr><td colspan="5" class="px-3.5 py-4 text-center text-rose-400">加载失败</td></tr>';
     }
 }
 
-async function addSubscriptionFromModal() {
-    const title = document.getElementById('sub-title-input').value.trim();
-    const pwdId = document.getElementById('sub-pwd-input').value.trim();
-    const targetFid = document.getElementById('sub-folder-select').value || '0';
-    const startEp = document.getElementById('sub-start-ep-input').value || 0;
-    const cookie = localStorage.getItem('quark_cookie') || '';
-
-    if (!title || !pwdId) { alert('请补充名称和夸克短码'); return; }
-
+async function runSubNow(subId) {
     try {
-        const res = await fetch('/api/subscriptions', {
+        const resp = await fetch('/api/subscriptions/run-now', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ id: subId })
+        });
+        const res = await resp.json();
+        alert(res.message || '已执行检视');
+        loadModalSubscriptions();
+    } catch (err) {
+        alert('手动执行失败');
+    }
+}
+
+async function deleteSub(subId) {
+    if (!confirm('确定要删除该追剧任务吗？')) return;
+    try {
+        await fetch(`/api/subscriptions?id=${subId}`, { method: 'DELETE' });
+        loadModalSubscriptions();
+    } catch (err) {
+        alert('删除失败');
+    }
+}
+
+async function searchChaseCandidates() {
+    const title = document.getElementById('chase-title-input').value.trim();
+    if (!title) return alert('请输入要追剧的名称');
+
+    const cookie = localStorage.getItem('quark_cookie') || '';
+    const listContainer = document.getElementById('chase-candidates-list');
+    listContainer.innerHTML = `<div class="text-xs text-slate-400 py-6 text-center"><i class="fa-solid fa-spinner fa-spin"></i> 正在全网并发检索频道...</div>`;
+    document.getElementById('chase-candidates-container').classList.remove('hidden');
+
+    try {
+        const resp = await fetch('/api/search-candidates', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                title, 
-                pwd_id: pwdId, 
-                target_fid: targetFid,
-                start_ep: parseInt(startEp),
-                cookie
+                movies: [{ title: title, tag: '电视剧' }],
+                cookie: cookie
             })
         });
-        const data = await res.json();
-        if (data.success) {
-            alert('追剧任务订阅成功！');
-            closeSubModal();
-        } else {
-            alert('订阅失败: ' + (data.message || '未知错误'));
+        const res = await resp.json();
+        if (!res.success) {
+            listContainer.innerHTML = `<div class="text-xs text-rose-400 py-2">检索失败: ${res.message}</div>`;
+            return;
         }
+
+        const candidatesMap = res.candidates_map || {};
+        const candidates = candidatesMap[title] || [];
+
+        if (candidates.length === 0) {
+            listContainer.innerHTML = `<div class="text-xs text-amber-400 py-4 text-center">未在任何配置频道中找到匹配资源，请检查片名是否正确。</div>`;
+            return;
+        }
+
+        listContainer.innerHTML = '';
+        candidates.forEach((cand) => {
+            const fileNames = cand.files.map((f) => `
+                <label class="flex items-center gap-2 py-1 text-xs text-slate-300 hover:text-white cursor-pointer">
+                    <input type="checkbox" name="chase-file-item" value="${f.fid}" class="chase-file-cb rounded bg-slate-900 border-slate-700 text-purple-600 focus:ring-0">
+                    <span class="font-mono">${f.file_name}</span>
+                </label>
+            `).join('');
+
+            const itemDiv = document.createElement('div');
+            itemDiv.className = 'bg-slate-950 border border-slate-800 rounded-lg p-4 space-y-3';
+            itemDiv.innerHTML = `
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-bold text-emerald-400"><i class="fa-brands fa-telegram"></i> 频道: ${cand.channel}</span>
+                    <button onclick='selectThisChaseCandidate(${JSON.stringify(cand)}, this)' class="px-3.5 py-1.5 bg-purple-600 hover:bg-purple-500 text-white rounded text-xs font-medium transition">
+                        👈 锁定此源并追剧
+                    </button>
+                </div>
+                <div class="text-xs text-slate-400">夸克短码: <span class="font-mono text-slate-200">${cand.pwd_id}</span> | 包含视频数: ${cand.files.length}</div>
+                <div class="bg-slate-900 p-3 rounded-md max-h-48 overflow-y-auto space-y-1 border border-slate-800">
+                    <div class="text-[11px] text-slate-400 mb-2 font-medium">勾选您需要监控/下载的具体集数或版本：</div>
+                    ${fileNames}
+                </div>
+            `;
+            listContainer.appendChild(itemDiv);
+        });
+
     } catch (err) {
-        alert('请求异常: ' + err.message);
+        listContainer.innerHTML = `<div class="text-xs text-rose-400 py-2">请求发生异常: ${err.message}</div>`;
     }
 }
 
-function getTargetFolderId() {
-    const defaultFid = localStorage.getItem('target_folder_id') || '0';
-    const catFidMap = {
-        '电影': localStorage.getItem('folder_movie'),
-        '电视剧': localStorage.getItem('folder_tv'),
-        '综艺': localStorage.getItem('folder_show'),
-        '动漫': localStorage.getItem('folder_anime')
+function selectThisChaseCandidate(candidate, btnElement) {
+    currentChaseSelectedCandidate = candidate;
+    document.querySelectorAll('#chase-candidates-list button').forEach(btn => {
+        btn.className = "px-3.5 py-1.5 bg-purple-600 hover:bg-purple-500 text-white rounded text-xs font-medium transition";
+        btn.innerText = "👈 锁定此源并追剧";
+    });
+    btnElement.className = "px-3.5 py-1.5 bg-emerald-600 text-white rounded text-xs font-medium";
+    btnElement.innerText = "✅ 已锁定此源";
+    
+    document.getElementById('btn-submit-chase').classList.remove('hidden');
+    alert(`已成功锁定频道 [${candidate.channel}] 的分享源！请在下方设置存储目录和频率并点击保存。`);
+}
+
+async function submitSmartChase() {
+    const title = document.getElementById('chase-title-input').value.trim();
+    const intervalHours = parseInt(document.getElementById('chase-interval-select').value) || 6;
+    const targetFid = document.getElementById('chase-target-fid').value;
+
+    if (!title || !currentChaseSelectedCandidate) {
+        return alert('请先输入名称并锁定一个有效的频道分享源！');
+    }
+
+    const checkboxes = document.querySelectorAll('input[name="chase-file-item"]:checked');
+    const selectedFids = Array.from(checkboxes).map(cb => cb.value);
+
+    if (selectedFids.length === 0) {
+        return alert('请至少勾选一个需要监控的文件/集数！');
+    }
+
+    const filteredFiles = currentChaseSelectedCandidate.files.filter(f => selectedFids.includes(f.fid));
+    const payload = {
+        title: title,
+        channel: currentChaseSelectedCandidate.channel,
+        pwd_id: currentChaseSelectedCandidate.pwd_id,
+        stoken: currentChaseSelectedCandidate.stoken,
+        files: filteredFiles,
+        interval_hours: intervalHours,
+        target_fid: targetFid
     };
-    const specificFid = catFidMap[currentCategory];
-    if (specificFid && specificFid.trim() !== '') {
-        return specificFid.trim();
+
+    try {
+        const resp = await fetch('/api/subscriptions', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload)
+        });
+        const res = await resp.json();
+        alert(res.message || '自动化追剧规则保存成功！');
+        switchChaseTab('list');
+    } catch (err) {
+        alert('保存追剧任务失败');
     }
-    return defaultFid;
 }
 
-// ==========================================
-// 🎬 核心重构：第一阶段（搜刮候选并弹出交互窗口）
-// ==========================================
-async function startBatchTransfer() {
-    if (selectedMovies.size === 0) { alert('请先勾选需要转存的影视！'); return; }
+async function batchTransfer() {
+    if (selectedIndices.size === 0) return alert('请先选择至少一部影片');
+
     const cookie = localStorage.getItem('quark_cookie') || '';
-    if (!cookie) { alert('请先在后台填入夸克 Cookie！'); return; }
-
-    const drawer = document.getElementById('log-drawer');
-    if (drawer) drawer.classList.add('open');
+    const selectedMovies = Array.from(selectedIndices).map(idx => {
+        const item = moviesData[idx];
+        return {
+            title: item.title,
+            tag: currentTag || '电影',
+            cover: item.cover,
+            url: item.url
+        };
+    });
     
-    const logBody = document.getElementById('log-body');
-    if (logBody) logBody.textContent = '';
+    toggleLogBox(true);
+    clearLog();
+    startLogTimer();
 
-    const targets = Array.from(selectedMovies);
-    const selectedObjs = targets.map(title => movieList.find(m => m.title === title)).filter(Boolean).map(m => ({
-        title: m.title,
-        tag: currentCategory || '电影',
-        cover: m.cover,
-        url: m.url
-    }));
+    appendLogLine(`[任务发起] 🚀 准备开始并发多线程搜刮，共选中 ${selectedMovies.length} 部目标影片...`, 'info');
+    selectedMovies.forEach(m => appendLogLine(`  -> 目标解析: 《${m.title}》 (${m.tag})`, 'info'));
+    appendLogLine(`[网络交互] ⏳ 正在向后端发送检索请求，请耐心等待所有TG频道响应...`, 'warn');
     
-    appendLog(`[系统] 🔍 正在各大 TG 频道中深度搜刮候选资源，请稍候...`);
-
+    const startTime = Date.now();
     try {
         const response = await fetch('/api/search-candidates', {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                movies: selectedObjs,
+                movies: selectedMovies,
                 cookie: cookie
             })
         });
 
         const res = await response.json();
+        const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+        stopLogTimer();
+
         if (!res.success) {
-            appendLog(`[系统] ❌ 搜刮失败: ${res.message || '未知错误'}`);
+            appendLogLine(`[系统错误] ❌ 搜刮失败 (耗时 ${elapsed}秒): ${res.message || '未知错误'}`, 'error');
             return;
         }
 
-        appendLog(`[系统] ✅ 搜刮完成，正在弹出候选资源选择窗口...`);
-        showCandidateSelectionModal(selectedObjs, res.candidates_map || {});
+        appendLogLine(`[并发搜刮] ✅ 后端多线程检索顺利完成！总耗时: ${elapsed} 秒`, 'success');
+
+        const candidatesMap = res.candidates_map || {};
+        let totalFound = 0;
+
+        for (const movie of selectedMovies) {
+            const title = movie.title;
+            const candidates = candidatesMap[title] || [];
+            totalFound += candidates.length;
+
+            if (candidates.length === 0) {
+                appendLogLine(`[结果统计] ⚠️ 《${title}》：未能在任何配置的 TG 频道中检索到有效候选资源。`, 'warn');
+            } else {
+                appendLogLine(`[结果统计] 🎯 《${title}》：成功匹配到 ${candidates.length} 个可用版本。`, 'success');
+                candidates.forEach((cand, idx) => {
+                    appendLogLine(`    [源 ${idx + 1}] 频道名称: "${cand.channel}" | 夸克短码: ${cand.pwd_id} | 包含视频文件: ${cand.files.length} 个`, 'info');
+                });
+            }
+        }
+
+        appendLogLine(`[系统完成] 📦 全网检索汇总完毕：共找到 ${totalFound} 个候选资源，正在为您弹出交互选择窗口...`, 'success');
+        openCandidateModal(selectedMovies, candidatesMap);
     } catch (err) {
-        appendLog(`[系统] ❌ 请求异常: ${err.message}`);
+        stopLogTimer();
+        appendLogLine(`[异常捕获] ❌ 请求过程发生异常: ${err.message}`, 'error');
     }
 }
 
-// 📌 渲染候选资源交互选择弹窗
-function showCandidateSelectionModal(movies, candidatesMap) {
-    let existing = document.getElementById('custom-candidate-modal');
-    if (existing) existing.remove();
+function openCandidateModal(movies, candidatesMap) {
+    toggleLogBox(false);
+    loadCategoryOptions();
 
-    const modal = document.createElement('div');
-    modal.id = 'custom-candidate-modal';
-    modal.style.cssText = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:9999; display:flex; justify-content:center; align-items:center;";
-
-    let htmlContent = `
-        <div style="background:#1e293b; color:#f8fafc; width:700px; max-height:85vh; border-radius:8px; padding:20px; overflow-y:auto; box-shadow:0 10px 25px rgba(0,0,0,0.5); border:1px solid #334155;">
-            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #334155; padding-bottom:10px; margin-bottom:15px;">
-                <h3 style="margin:0; font-size:18px; color:#38bdf8;"><i class="fa-solid fa-list-check"></i> 选择要转存的资源版本</h3>
-                <button onclick="document.getElementById('custom-candidate-modal').remove()" style="background:none; border:none; color:#94a3b8; font-size:20px; cursor:pointer;">&times;</button>
-            </div>
-            <div>
-    `;
-
-    movies.forEach(movie => {
+    const container = document.getElementById('candidate-content');
+    container.innerHTML = '';
+    
+    movies.forEach((movie, mIdx) => {
         const title = movie.title;
         const candidates = candidatesMap[title] || [];
 
-        htmlContent += `<div style="margin-bottom:15px; background:#0f172a; padding:12px; border-radius:6px; border:1px solid #1e293b;">`;
-        htmlContent += `<div style="font-weight:bold; color:#60a5fa; margin-bottom:8px;">🎬 《${title}》 (找到 ${candidates.length} 个候选源)</div>`;
+        const movieSection = document.createElement('div');
+        movieSection.className = 'bg-slate-950 border border-slate-800 rounded-lg p-4 space-y-3';
+        
+        let html = `<div class="font-bold text-sm text-blue-400 flex items-center justify-between border-b border-slate-800 pb-2">
+            <span>🎬 《${title}》</span>
+            <span class="text-xs text-slate-400 font-normal">找到 ${candidates.length} 个候选源版本</span>
+        </div>`;
 
         if (candidates.length === 0) {
-            htmlContent += `<div style="color:#f43f5e; font-size:13px;">未能在配置的频道中找到匹配资源</div>`;
+            html += `<div class="text-xs text-rose-400 py-2">未能在配置的频道中找到匹配资源</div>`;
         } else {
-            candidates.forEach((cand) => {
-                const fileNames = cand.files.map(f => f.file_name).join('<br>');
-                const movieStr = encodeURIComponent(JSON.stringify(movie));
-                const candStr = encodeURIComponent(JSON.stringify(cand));
+            html += `<div class="space-y-3 mt-2">`;
+            candidates.forEach((cand, cIdx) => {
+                const fileCheckboxes = cand.files.map((f) => `
+                    <label class="flex items-center gap-2 py-1 text-xs text-slate-300 hover:text-white cursor-pointer">
+                        <input type="checkbox" name="batch-file-${mIdx}-${cIdx}" value="${f.fid}" class="rounded bg-slate-900 border-slate-700 text-blue-600 focus:ring-0">
+                        <span class="font-mono">${f.file_name}</span>
+                    </label>
+                `).join('');
 
-                htmlContent += `
-                    <div style="background:#1e293b; border:1px solid #334155; border-radius:6px; padding:10px; margin-top:8px; font-size:13px;">
-                        <div style="display:flex; justify-content:space-between; margin-bottom:6px; color:#34d399;">
-                            <span>🌐 频道: ${cand.channel}</span>
-                            <span style="color:#94a3b8;">包含 ${cand.files.length} 个视频文件</span>
+                html += `
+                    <div class="bg-slate-900 border border-slate-800/80 rounded-lg p-3 text-xs space-y-2">
+                        <div class="flex items-center justify-between text-slate-300">
+                            <span class="font-semibold text-emerald-400"><i class="fa-brands fa-telegram"></i> 频道: ${cand.channel}</span>
+                            <span class="text-slate-400 font-mono text-[11px]">短码: ${cand.pwd_id} | 包含 ${cand.files.length} 个文件</span>
                         </div>
-                        <div style="background:#020617; padding:8px; border-radius:4px; max-height:90px; overflow-y:auto; font-family:monospace; font-size:12px; color:#cbd5e1; margin-bottom:8px;">
-                            ${fileNames}
+                        <div class="bg-slate-950 p-2.5 rounded-md max-h-40 overflow-y-auto space-y-1 border border-slate-800">
+                            <div class="text-[11px] text-slate-400 mb-1 font-medium">勾选您需要转存的具体文件：</div>
+                            ${fileCheckboxes}
                         </div>
-                        <div style="text-align:right;">
-                            <button onclick='executeConfirmedTransfer("${movieStr}", "${candStr}")' style="background:#059669; color:white; border:none; padding:6px 12px; border-radius:4px; cursor:pointer; font-weight:500;">
-                                🚀 确认转存此版本
+                        <div class="text-right pt-1">
+                            <button onclick='confirmBatchTransferForCandidate(${mIdx}, ${cIdx}, ${JSON.stringify(movie)}, ${JSON.stringify(cand)})' class="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-xs font-medium transition shadow flex items-center gap-1 ml-auto">
+                                <i class="fa-solid fa-cloud-arrow-down"></i> 确认转存勾选项
                             </button>
                         </div>
                     </div>
                 `;
             });
+            html += `</div>`;
         }
-        htmlContent += `</div>`;
+        movieSection.innerHTML = html;
+        container.appendChild(movieSection);
     });
 
-    htmlContent += `
-            </div>
-            <div style="text-align:right; margin-top:15px; border-top:1px solid #334155; padding-top:10px;">
-                <button onclick="document.getElementById('custom-candidate-modal').remove()" style="background:#475569; color:white; border:none; padding:6px 14px; border-radius:4px; cursor:pointer;">关闭</button>
-            </div>
-        </div>
-    `;
-
-    modal.innerHTML = htmlContent;
-    document.body.appendChild(modal);
+    document.getElementById('candidate-modal').classList.remove('hidden');
 }
 
-// ==========================================
-// 🎯 核心重构：第二阶段（用户确认后执行指定转存）
-// ==========================================
-async function executeConfirmedTransfer(movieEncoded, candEncoded) {
-    const modal = document.getElementById('custom-candidate-modal');
-    if (modal) modal.remove();
+function closeCandidateModal() {
+    document.getElementById('candidate-modal').classList.add('hidden');
+}
 
-    const movie = JSON.parse(decodeURIComponent(movieEncoded));
-    const candidate = JSON.parse(decodeURIComponent(candEncoded));
+function confirmBatchTransferForCandidate(mIdx, cIdx, movie, candidate) {
+    const checkboxes = document.querySelectorAll(`input[name="batch-file-${mIdx}-${cIdx}"]:checked`);
+    const selectedFids = Array.from(checkboxes).map(cb => cb.value);
+
+    if (selectedFids.length === 0) {
+        return alert('请至少勾选一个要转存的文件！');
+    }
+
+    const filteredFiles = candidate.files.filter(f => selectedFids.includes(f.fid));
+    const customCandidate = { ...candidate, files: filteredFiles };
+    const targetFid = document.getElementById('batch-target-fid').value;
+    confirmTransferAndSave(movie, customCandidate, targetFid);
+}
+
+async function confirmTransferAndSave(movie, candidate, targetFid = '0') {
+    closeCandidateModal();
     const cookie = localStorage.getItem('quark_cookie') || '';
-
-    const drawer = document.getElementById('log-drawer');
-    if (drawer) drawer.classList.add('open');
     
-    appendLog(`[系统] 📥 正在为《${movie.title}》创建专属文件夹并转存选中版本...`);
+    toggleLogBox(true);
+    clearLog();
+    startLogTimer();
 
+    appendLogLine(`[转存启动] 📥 正在为《${movie.title}》创建专属云端文件夹并转存选中版本...`, 'info');
+    appendLogLine(`  -> 目标频道: ${candidate.channel}`, 'info');
+    appendLogLine(`  -> 提取短码: ${candidate.pwd_id}`, 'info');
+
+    const startTime = Date.now();
     try {
         const response = await fetch('/api/transfer-selected', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({
                 movie: movie,
                 candidate: candidate,
-                cookie: cookie
+                cookie: cookie,
+                target_fid: targetFid
             })
         });
 
         const res = await response.json();
+        const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+        stopLogTimer();
+
         if (res.success) {
-            appendLog(`[完成] 🎉 ${res.message}`);
+            appendLogLine(`[转存成功] 🎉 ${res.message} (耗时 ${elapsed}秒)`, 'success');
         } else {
-            appendLog(`[完成] ❌ 转存失败: ${res.message}`);
+            appendLogLine(`[转存失败] ❌ ${res.message} (耗时 ${elapsed}秒)`, 'error');
         }
     } catch (err) {
-        appendLog(`[系统] ❌ 转存请求异常: ${err.message}`);
+        stopLogTimer();
+        appendLogLine(`[异常捕获] ❌ 转存请求发生异常: ${err.message}`, 'error');
     }
 }
