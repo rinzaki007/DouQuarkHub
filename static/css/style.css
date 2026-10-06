@@ -18,7 +18,6 @@ body {
     height: 100vh;
 }
 
-/* 🎯 解决白色按钮的全局核心 CSS 重置 */
 button, input, select, textarea {
     outline: none;
     background-color: #1f2937;
@@ -59,16 +58,50 @@ button:hover { background-color: #1d4ed8; }
 .logo-area { display: flex; align-items: center; gap: 8px; }
 .logo-area h1 { font-size: 16px; font-weight: 700; color: #38bdf8; }
 
+/* 🎯 居中大搜索框样式优化 */
 .search-bar {
     display: flex;
-    width: 380px;
+    width: 580px;
     background: #1f2937;
-    border-radius: 6px;
+    border-radius: 8px;
     overflow: hidden;
     border: 1px solid #374151;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
 }
 
-.search-bar input { flex: 1; border: none; background: transparent; padding: 6px 12px; color: #fff; }
+.search-bar input {
+    flex: 1;
+    border: none;
+    background: transparent;
+    padding: 8px 14px;
+    color: #fff;
+    font-size: 13px;
+}
+
+.search-bar button {
+    border-radius: 0;
+    padding: 0 18px;
+    font-size: 13px;
+}
+
+/* 顶栏右侧状态徽章区 */
+.header-status-area {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.status-badge-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: #94a3b8;
+    background: #1f2937;
+    padding: 4px 8px;
+    border-radius: 6px;
+    border: 1px solid #374151;
+}
 
 .main-layout { display: flex; flex: 1; overflow: hidden; }
 
@@ -96,7 +129,6 @@ button:hover { background-color: #1d4ed8; }
 
 .action-buttons { display: flex; align-items: center; gap: 6px; }
 
-/* 筛选面板收起动画 */
 .filter-panel {
     background: #111827;
     padding: 10px 14px;
@@ -139,7 +171,30 @@ button:hover { background-color: #1d4ed8; }
 .card-info { padding: 8px; display: flex; flex-direction: column; gap: 2px; justify-content: space-between; flex: 1; }
 .movie-title { font-size: 12px; font-weight: 600; color: #f8fafc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-/* 模态弹窗及控制台 */
+/* 🎯 首页日志抽屉 */
+.log-drawer {
+    background: #111827;
+    border: 1px solid #1f2937;
+    border-radius: 6px;
+    display: none;
+    flex-direction: column;
+    overflow: hidden;
+}
+.log-drawer.open { display: flex; }
+.drawer-header { padding: 6px 12px; background: #1e293b; display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: #e2e8f0; }
+
+/* 🎯 后台铺满宽屏卡片 */
+.admin-card-full {
+    background: #111827;
+    border: 1px solid #1f2937;
+    border-radius: 8px;
+    padding: 24px;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
 .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); align-items: center; justify-content: center; z-index: 1000; }
 .modal-content { background: #111827; border: 1px solid #1f2937; border-radius: 10px; padding: 20px; display: flex; flex-direction: column; gap: 12px; }
 .modal-content.medium { width: 480px; }
