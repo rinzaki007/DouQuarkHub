@@ -3,7 +3,6 @@ import json
 import re
 
 def clean_tv_filename(raw_name, title):
-    """解析提取集数与洗净文件名"""
     ep_match = re.search(r'E(\d{1,3})', raw_name, re.I) or re.search(r'第(\d{1,3})集', raw_name)
     ep_num = int(ep_match.group(1)) if ep_match else None
     
@@ -20,6 +19,7 @@ def clean_tv_filename(raw_name, title):
 class QuarkEngine:
     def __init__(self, cookie):
         self.cookie = cookie
+        # 🎯 补全夸克 PC/Web 端防风控通用请求头
         self.headers = {
             "Cookie": self.cookie,
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -29,23 +29,22 @@ class QuarkEngine:
         }
 
     def check_cookie_valid(self):
-        """校验夸克 Cookie 是否生效"""
+        """精准校验夸克 Cookie 是否有效"""
         url = "https://drive-pc.quark.cn/1/clouddrive/user/info?pr=uc_drive&fr=pc"
         try:
-            resp = requests.get(url, headers=self.headers, timeout=5)
+            resp = requests.get(url, headers=self.headers, timeout=6)
             if resp.status_code == 200:
                 data = resp.json()
-                return data.get("status") == 200 or data.get("code") == 0
+                # 兼容 status 200 或 code 0
+                return data.get("status") == 200 or data.get("code") == 0 or data.get("message") == "ok"
         except Exception:
             pass
         return False
 
     def get_or_create_subfolder(self, folder_name, parent_fid='0'):
-        """在 parent_fid 目录下检索或新建名为 folder_name 的专属文件夹"""
         if not parent_fid:
             parent_fid = '0'
 
-        # 1. 查找现有同名文件夹
         try:
             list_url = f"https://drive-pc.quark.cn/1/clouddrive/file/sort?pdir_fid={parent_fid}&file_type=0&_size=100&pr=uc_drive&fr=pc"
             res = requests.get(list_url, headers=self.headers, timeout=5).json()
@@ -56,7 +55,6 @@ class QuarkEngine:
         except Exception as e:
             print(f"查找文件夹异常: {e}")
 
-        # 2. 新建文件夹
         mkdir_url = "https://drive-pc.quark.cn/1/clouddrive/file/mkdir?pr=uc_drive&fr=pc"
         payload = {
             "pdir_fid": parent_fid,
@@ -71,7 +69,6 @@ class QuarkEngine:
                 if new_fid:
                     return new_fid
             
-            # 兼容文件夹已存在 (code 41013)
             if res.get("code") == 41013 or res.get("status") == 41013:
                 list_url = f"https://drive-pc.quark.cn/1/clouddrive/file/sort?pdir_fid={parent_fid}&file_type=0&_size=100&pr=uc_drive&fr=pc"
                 res_list = requests.get(list_url, headers=self.headers, timeout=5).json()
@@ -84,10 +81,6 @@ class QuarkEngine:
         return parent_fid
 
     def get_share_files(self, pwd_id, pdir_fid="0", only_video=True):
-        """
-        穿透解析夸克分享链接
-        🎯 核心修复：完善参数，并自动递归解析子目录下的视频文件
-        """
         url = "https://drive-pc.quark.cn/1/clouddrive/share/sharepage/detail"
         params = {
             "pwd_id": pwd_id,
@@ -97,14 +90,11 @@ class QuarkEngine:
             "fr": "pc"
         }
         
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "Referer": f"https://pan.quark.cn/s/{pwd_id}",
-            "Cookie": self.cookie
-        }
+        detail_headers = self.headers.copy()
+        detail_headers["Referer"] = f"https://pan.quark.cn/s/{pwd_id}"
 
         try:
-            resp = requests.get(url, headers=headers, params=params, timeout=8)
+            resp = requests.get(url, headers=detail_headers, params=params, timeout=8)
             if resp.status_code == 200:
                 data = resp.json()
                 if data.get("status") == 200 or data.get("code") == 0:
@@ -115,7 +105,6 @@ class QuarkEngine:
                     result_files = []
 
                     for f in raw_files:
-                        # 如果是文件夹，递归穿透一层
                         if f.get("dir"):
                             sub_files, _, _ = self.get_share_files(pwd_id, pdir_fid=f.get("fid"), only_video=only_video)
                             if sub_files:
@@ -136,7 +125,7 @@ class QuarkEngine:
             return None, None, str(e)
 
     def save_files(self, pwd_id, files, stoken, target_fid='0'):
-        """转存文件至目标 FID"""
+        """🎯 修复 460 错误：转存接口绑定正确的 pr/fr 参数与防风控 Header"""
         url = "https://drive-pc.quark.cn/1/clouddrive/share/sharepage/save?pr=uc_drive&fr=pc"
         payload = {
             "pwd_id": pwd_id,
@@ -144,13 +133,20 @@ class QuarkEngine:
             "fid_list": [f['fid'] for f in files],
             "to_pdir_fid": target_fid
         }
+        
+        save_headers = self.headers.copy()
+        save_headers["Referer"] = f"https://pan.quark.cn/s/{pwd_id}"
+
         try:
-            resp = requests.post(url, json=payload, headers=self.headers, timeout=10)
+            resp = requests.post(url, json=payload, headers=save_headers, timeout=10)
             if resp.status_code == 200:
                 data = resp.json()
                 if data.get("status") == 200 or data.get("code") == 0:
                     return True, "转存成功"
                 return False, data.get("message", "转存失败")
+            elif resp.status_code == 460:
+                return False, "触发夸克风控 (HTTP 460)，请更换 Cookie 或稍后再试"
+            return False, f"HTTP 状态码: {resp.status_code}"
         except Exception as e:
             return False, str(e)
         return False, "请求转存接口超时"
