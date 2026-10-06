@@ -222,7 +222,7 @@
         </div>
     </div>
 
-    <!-- 底部固定实时日志面板（使用 40% 透明度 + 强模糊，展现真实透光毛玻璃效果） -->
+    <!-- 底部固定实时日志面板（毛玻璃效果） -->
     <div id="log-panel" class="fixed bottom-0 left-0 right-0 z-50 bg-slate-950/40 backdrop-blur-2xl border-t border-slate-700/40 shadow-2xl transition-all duration-300 hidden">
         <div class="flex items-center justify-between px-4 py-2 bg-slate-900/40 backdrop-blur-xl border-b border-slate-800/40">
             <div class="flex items-center gap-2 text-xs text-slate-300 font-medium">
@@ -238,6 +238,9 @@
         <div id="log-box" class="h-48 overflow-y-auto p-3 bg-transparent"></div>
     </div>
 
+    <!-- 依次引入细分后的三个独立 JS 脚本 -->
+    <script src="{{ url_for('static', filename='js/transfer.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/subscription.js') }}"></script>
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
 </html>
