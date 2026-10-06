@@ -159,9 +159,12 @@
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <!-- 🚀 优化：将原本的文本输入框改为从后台配置自动读取的下拉菜单 -->
                     <div class="bg-slate-950 border border-slate-800 rounded p-4 space-y-2">
-                        <div class="text-xs font-semibold text-amber-400">第三步：选择存储父目录 FID (系统将在此目录下自动创建剧名专属文件夹)</div>
-                        <input type="text" id="chase-target-fid" value="fe24e17d8d254997b21710c73b22b6e7" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500">
+                        <div class="text-xs font-semibold text-amber-400">第三步：选择存储目录 (将在该目录下自动创建剧名专属文件夹)</div>
+                        <select id="chase-target-fid" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500">
+                            <option value="0">正在加载后台目录配置...</option>
+                        </select>
                     </div>
                     <div class="bg-slate-950 border border-slate-800 rounded p-4 space-y-2">
                         <div class="text-xs font-semibold text-emerald-400">第四步：设定自动检测更新频率</div>
@@ -220,7 +223,7 @@
         </div>
     </div>
 
-    <!-- 底部固定实时日志面板 (仅在手动批量转存时弹出，追剧管理不再干扰) -->
+    <!-- 底部固定实时日志面板 -->
     <div id="log-panel" class="fixed bottom-0 left-0 right-0 z-50 bg-slate-950 border-t border-slate-800 shadow-2xl transition-all duration-300 hidden">
         <div class="flex items-center justify-between px-4 py-2 bg-slate-900 border-b border-slate-800">
             <div class="flex items-center gap-2 text-xs text-slate-300 font-medium">
@@ -254,17 +257,55 @@
             initFilterOptions();
             fetchMovies();
             checkSystemHealth();
+            loadChaseCategories(); // 页面加载时自动拉取后台目录配置填充下拉框
         });
+
+        // 🚀 核心新增：异步从后端获取全局及各分类 FID 并填充到第三步的下拉菜单中
+        async function loadChaseCategories() {
+            try {
+                const resp = await fetch('/api/config');
+                const res = await resp.json();
+                if (res.success && res.config) {
+                    const cfg = res.config;
+                    const selectEl = document.getElementById('chase-target-fid');
+                    selectEl.innerHTML = '';
+
+                    // 1. 默认全局目录
+                    const defaultFid = cfg.default_fid || '0';
+                    const optDefault = document.createElement('option');
+                    optDefault.value = defaultFid;
+                    optDefault.textContent = `默认全局目录 (FID: ${defaultFid})`;
+                    selectEl.appendChild(optDefault);
+
+                    // 2. 各分类专属目录 (电影、电视剧、综艺、动漫)
+                    const catFids = cfg.category_fids || {};
+                    for (const [catName, fid] of Object.entries(catFids)) {
+                        if (fid) {
+                            const opt = document.createElement('option');
+                            opt.value = fid;
+                            opt.textContent = `${catName}专属目录 (FID: ${fid})`;
+                            // 如果是电视剧，默认帮用户选中它（最符合追剧场景）
+                            if (catName === '电视剧') {
+                                opt.selected = true;
+                            }
+                            selectEl.appendChild(opt);
+                        }
+                    }
+
+                    // 如果没有默认选中电视剧，则默认选第一个
+                    if (!selectEl.value && selectEl.options.length > 0) {
+                        selectEl.selectedIndex = 0;
+                    }
+                }
+            } catch (err) {
+                console.error("加载后台目录配置失败:", err);
+                const selectEl = document.getElementById('chase-target-fid');
+                selectEl.innerHTML = `<option value="0">默认根目录 (0)</option>`;
+            }
+        }
 
         async function checkSystemHealth() {
             try {
-                const respConfig = await fetch('/api/config');
-                const resConfig = await respConfig.json();
-                if (resConfig.success && resConfig.config) {
-                    const tvFid = resConfig.config.category_fids?.['电视剧'] || resConfig.config.default_fid || '0';
-                    document.getElementById('chase-target-fid').value = tvFid;
-                }
-
                 const localCookie = localStorage.getItem('quark_cookie') || '';
                 const resp = await fetch('/api/check-cookie', { 
                     method: 'POST',
@@ -473,10 +514,10 @@
         // 🚀 智能追剧管理中心逻辑
         // ==========================================
         function openChaseModal() { 
-            // 打开弹窗时保持底部的批量日志框关闭状态
             document.getElementById('chase-modal').classList.remove('hidden');
             switchChaseTab('add');
             loadModalSubscriptions();
+            loadChaseCategories(); // 每次打开弹窗也同步刷新一次目录选项
         }
 
         function closeChaseModal() { 
@@ -549,7 +590,7 @@
                 });
                 const res = await resp.json();
                 alert(res.message || '已执行检视');
-                loadModalSubscriptions(); // 仅刷新列表，不弹出底部的批量转存日志框
+                loadModalSubscriptions();
             } catch (err) {
                 alert('手动执行失败');
             }
@@ -645,7 +686,7 @@
         async function submitSmartChase() {
             const title = document.getElementById('chase-title-input').value.trim();
             const intervalHours = parseInt(document.getElementById('chase-interval-select').value) || 6;
-            const targetFid = document.getElementById('chase-target-fid').value.trim() || '0';
+            const targetFid = document.getElementById('chase-target-fid').value;
 
             if (!title || !currentChaseSelectedCandidate) {
                 return alert('请先输入名称并锁定一个有效的频道分享源！');
