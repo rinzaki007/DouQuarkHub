@@ -3,146 +3,211 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>后台管理 - MovieSync</title>
-    <link rel="stylesheet" href="/static/css/style.css">
+    <title>MovieSync - 后台控制中心</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        /* 修复 TG 检索频道标签浮动与重叠错乱问题 */
-.tg-channel-container, [class*="channel-list"] {
-    display: flex !important;
-    flex-wrap: wrap !important;
-    gap: 8px !important;
-    margin-bottom: 16px !important;
-    clear: both !important;
-}
-
-/* 规范频道标签内边距与边框 */
-.tg-channel-tag, [class*="channel-item"] {
-    position: relative !important;
-    display: inline-flex !important;
-    align-items: center !important;
-    background-color: #1e293b !important;
-    border: 1px solid #334155 !important;
-    border-radius: 6px !important;
-    padding: 6px 12px !important;
-    margin: 0 !important;
-}
-
-/* 规范按钮布局 */
-.admin-action-btns {
-    display: flex !important;
-    align-items: center !important;
-    gap: 12px !important;
-    margin-top: 12px !important;
-}
-        .admin-layout { display: flex; height: calc(100vh - 56px); }
-        .sidebar { width: 220px; background: #111827; border-right: 1px solid #1f2937; padding: 12px; flex-shrink: 0; }
-        .sidebar-menu { list-style: none; display: flex; flex-direction: column; gap: 4px; }
-        .sidebar-menu li { padding: 10px 12px; border-radius: 6px; cursor: pointer; color: #94a3b8; font-size: 13px; font-weight: 600; }
-        .sidebar-menu li:hover, .sidebar-menu li.active { background: #1f2937; color: #38bdf8; }
-        .admin-main { flex: 1; padding: 24px; overflow-y: auto; background: #0b0f19; }
-        .admin-section { display: none; width: 100%; }
-        .admin-section.active { display: flex; flex-direction: column; gap: 16px; }
+        body {
+            background-color: #0f172a;
+            color: #f8fafc;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
     </style>
 </head>
-<body>
-    <header class="app-header">
-        <div class="logo-area">
-            <span class="logo-icon">⚙️</span>
-            <h1>MovieSync 后台控制中心</h1>
+<body class="min-h-screen flex flex-col bg-slate-950 text-slate-100">
+
+    <!-- 顶栏 -->
+    <header class="bg-slate-900 border-b border-slate-800 px-6 py-3.5 flex justify-between items-center shrink-0">
+        <div class="flex items-center gap-2 text-lg font-bold text-white">
+            <i class="fa-solid fa-gear text-blue-500"></i> MovieSync 后台控制中心
         </div>
-        <div>
-            <a href="/"><button class="action-btn btn-secondary">返回前台首页</button></a>
-            <a href="/logout"><button class="action-btn btn-secondary">退出登录</button></a>
+        <div class="flex gap-2">
+            <a href="/" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-3.5 py-2 rounded transition">
+                返回前台首页
+            </a>
+            <a href="/logout" class="bg-rose-900/60 hover:bg-rose-800 text-rose-200 text-xs px-3.5 py-2 rounded transition">
+                退出登录
+            </a>
         </div>
     </header>
 
-    <div class="admin-layout">
-        <!-- 侧边栏菜单 -->
-        <div class="sidebar">
-            <ul class="sidebar-menu">
-                <li class="active" onclick="switchSection('config')">⚙️ 全局设置与配置迁移</li>
-                <li onclick="switchSection('sub')">📊 自动化追剧任务</li>
-                <li onclick="switchSection('status')">📋 系统运行日志</li>
-            </ul>
-        </div>
+    <!-- 双栏主体 -->
+    <div class="flex-1 flex overflow-hidden">
+        <!-- 侧边栏 -->
+        <aside class="w-60 bg-slate-900/80 border-r border-slate-800 p-4 shrink-0 flex flex-col gap-2">
+            <button class="w-full text-left bg-blue-600 text-white px-3.5 py-2.5 rounded text-xs font-semibold flex items-center gap-2">
+                <i class="fa-solid fa-sliders"></i> 全局设置与配置迁移
+            </button>
+        </aside>
 
-        <!-- 主内容区 -->
-        <div class="admin-main">
-            <!-- 🎯 模块 1: 全局设置 (补全四大分类目录 FID) -->
-            <div id="sec-config" class="admin-section active">
-                <div class="admin-card-full">
-                    <h2>⚙️ 全局系统参数设置</h2>
-                    
-                    <div class="form-group" style="margin-top: 10px;">
-                        <label>夸克网盘 Cookie (ck):</label>
-                        <textarea id="quark-cookie-input" style="height:85px; width:100%;"></textarea>
-                    </div>
-                    
-                    <div class="form-row">
-                        <div class="form-group"><label>默认全局存储目录 FID:</label><input type="text" id="folder-id-input" placeholder="默认为 0 (根目录)"></div>
-                        <div class="form-group"><label>OpenList 访问地址:</label><input type="text" id="openlist-url-input"></div>
-                    </div>
+        <!-- 内容主区 -->
+        <main class="flex-1 overflow-y-auto p-6 bg-slate-950 text-sm">
+            <div class="max-w-4xl space-y-6">
+                <h2 class="text-base font-bold text-white flex items-center gap-2 border-b border-slate-800 pb-3">
+                    <i class="fa-solid fa-gears text-blue-400"></i> 全局系统参数设置
+                </h2>
 
-                    <h3 style="margin-top:12px; font-size:13px; color:#38bdf8;">📁 各分类专属存储目录 FID (未设定则自动使用默认全局 FID)</h3>
-                    <div class="form-row">
-                        <div class="form-group"><label>🎬 电影目录 FID:</label><input type="text" id="folder-movie-input" placeholder="留空使用默认 FID"></div>
-                        <div class="form-group"><label>📺 电视剧目录 FID:</label><input type="text" id="folder-tv-input" placeholder="留空使用默认 FID"></div>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group"><label>🎤 综艺目录 FID:</label><input type="text" id="folder-show-input" placeholder="留空使用默认 FID"></div>
-                        <div class="form-group"><label>🎨 动漫目录 FID:</label><input type="text" id="folder-anime-input" placeholder="留空使用默认 FID"></div>
-                    </div>
+                <!-- Cookie -->
+                <div class="space-y-1.5">
+                    <label class="block text-xs text-slate-400 font-semibold">夸克网盘 Cookie (ck):</label>
+                    <textarea id="quark-cookie" rows="4" 
+                        class="w-full bg-slate-900 border border-slate-800 rounded p-3 text-xs font-mono text-slate-200 focus:outline-none focus:border-blue-500 break-all" 
+                        placeholder="请粘贴夸克网盘 Cookie..."></textarea>
+                </div>
 
-                    <div class="form-group" style="margin-top: 10px;">
-                        <label>TG 检索频道配置管理:</label>
-                        <div class="channel-manage-box">
-                            <div id="channel-list-box" class="channel-list-scroll" style="max-height: 160px;"></div>
-                            <div class="channel-add-row" style="margin-top: 8px;">
-                                <input type="text" id="new-ch-name" placeholder="频道名称 (例如: 夸克电影分享)">
-                                <input type="text" id="new-ch-id" placeholder="频道 ID (例如: quark_movies)">
-                                <button type="button" class="btn-primary" onclick="addChannel()">添加频道</button>
-                            </div>
-                        </div>
+                <!-- 存储目录 -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="space-y-1">
+                        <label class="block text-xs text-slate-400 font-semibold">默认全局存储目录 FID:</label>
+                        <input type="text" id="fid-default" value="0" class="w-full bg-slate-900 border border-slate-800 rounded px-3 py-2 text-xs text-slate-200">
                     </div>
-
-                    <!-- 配置导入/导出 -->
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:20px; padding-top:16px; border-top:1px solid #1f2937;">
-                        <div style="display:flex; gap:10px;">
-                            <button class="btn-secondary" onclick="exportConfig()">📤 导出配置 JSON</button>
-                            <button class="btn-secondary" onclick="triggerImportConfig()">📥 导入配置 JSON</button>
-                            <input type="file" id="import-file-input" accept=".json" style="display:none;" onchange="handleImportConfig(event)">
-                        </div>
-                        <button class="btn-primary" style="height:38px; padding:0 24px;" onclick="saveAdminConfig()">💾 保存全部设置</button>
+                    <div class="space-y-1">
+                        <label class="block text-xs text-slate-400 font-semibold">OpenList 访问地址:</label>
+                        <input type="text" id="openlist-url" value="https://openlist.88888807.xyz:8807/" class="w-full bg-slate-900 border border-slate-800 rounded px-3 py-2 text-xs text-slate-200">
                     </div>
                 </div>
-            </div>
 
-            <!-- 模块 2: 追剧订阅列表 -->
-            <div id="sec-sub" class="admin-section">
-                <h2>📊 自动化追踪任务管理</h2>
-                <div id="sub-list-box" class="sub-list-scroll" style="max-height:550px;"></div>
-            </div>
-
-            <!-- 🎯 模块 3: 系统运行控制台日志 (移除多余状态监控，增加彩色日志分级过滤) -->
-            <div id="sec-status" class="admin-section">
-                <div class="panel" style="width: 100%;">
-                    <div class="panel-header">
-                        <h3>📋 详细控制台运行日志</h3>
-                        <div style="display:flex; gap:6px;">
-                            <button class="btn-sm" onclick="filterLogs('ALL')">全部</button>
-                            <button class="btn-sm" style="color:#38bdf8;" onclick="filterLogs('INFO')">普通</button>
-                            <button class="btn-sm" style="color:#34d399;" onclick="filterLogs('SUCCESS')">成功</button>
-                            <button class="btn-sm" style="color:#fbbf24;" onclick="filterLogs('WARN')">警告</button>
-                            <button class="btn-sm" style="color:#f87171;" onclick="filterLogs('ERROR')">错误</button>
-                            <button class="btn-sm" onclick="clearAdminLog()">清空</button>
+                <!-- 各分类专属 FID -->
+                <div class="space-y-2 pt-2">
+                    <h3 class="text-xs font-bold text-amber-400 flex items-center gap-1">
+                        <i class="fa-solid fa-folder"></i> 各分类专属存储目录 FID (未设定则自动使用默认全局 FID)
+                    </h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1">🎬 电影目录 FID:</label>
+                            <input type="text" id="fid-movie" value="3ef79d1b370a4b27bd334b7bbba7e6e1" class="w-full bg-slate-900 border border-slate-800 rounded px-3 py-1.5 text-xs text-slate-200">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1">📺 电视剧目录 FID:</label>
+                            <input type="text" id="fid-tv" value="fe24e17d8d254997b21710c73b22b6e7" class="w-full bg-slate-900 border border-slate-800 rounded px-3 py-1.5 text-xs text-slate-200">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1">🎤 综艺目录 FID:</label>
+                            <input type="text" id="fid-show" value="6999ba53a9384525881f785976bd09f1" class="w-full bg-slate-900 border border-slate-800 rounded px-3 py-1.5 text-xs text-slate-200">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1">🎨 动漫目录 FID:</label>
+                            <input type="text" id="fid-anime" value="55a44b99fac641679e1ebf55dcb38be9" class="w-full bg-slate-900 border border-slate-800 rounded px-3 py-1.5 text-xs text-slate-200">
                         </div>
                     </div>
-                    <div id="admin-log-body" class="log-body" style="height: 520px;"></div>
+                </div>
+
+                <!-- TG 检索频道配置管理（彻底修复元素重叠遮挡问题） -->
+                <div class="space-y-3 pt-4 border-t border-slate-800">
+                    <h3 class="text-xs font-bold text-slate-300">TG 检索频道配置管理:</h3>
+                    
+                    <!-- 频道标签列表：采用规范的 flex-wrap 自然流排版 -->
+                    <div id="tg-channels-container" class="flex flex-wrap gap-2 p-3 bg-slate-900/60 rounded-lg border border-slate-800">
+                        <!-- JS 动态渲染 -->
+                    </div>
+
+                    <!-- 添加频道表单：独立的 flex 行，绝不重叠 -->
+                    <div class="flex flex-wrap items-center gap-2 pt-2 p-3 bg-slate-900/40 rounded-lg border border-slate-800/80">
+                        <input type="text" id="new-ch-name" placeholder="频道名称 (例如: 夸克电影)" class="bg-slate-900 border border-slate-800 rounded px-3 py-1.5 text-xs flex-1 min-w-[150px] text-slate-200">
+                        <input type="text" id="new-ch-id" placeholder="频道 ID (例如: quark_movies)" class="bg-slate-900 border border-slate-800 rounded px-3 py-1.5 text-xs flex-1 min-w-[150px] text-slate-200">
+                        <button onclick="addTGChannel()" class="bg-blue-600 hover:bg-blue-500 text-white text-xs px-4 py-1.5 rounded font-medium shrink-0">
+                            添加频道
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 底部保存按钮行 -->
+                <div class="border-t border-slate-800 pt-6 flex flex-wrap justify-between items-center gap-3 mb-10">
+                    <div class="flex gap-2">
+                        <button onclick="exportConfig()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-3.5 py-2 rounded flex items-center gap-1 border border-slate-700">
+                            <i class="fa-solid fa-download"></i> 导出配置 JSON
+                        </button>
+                        <button onclick="importConfig()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-3.5 py-2 rounded flex items-center gap-1 border border-slate-700">
+                            <i class="fa-solid fa-upload"></i> 导入配置 JSON
+                        </button>
+                    </div>
+                    <button onclick="saveAllSettings()" class="bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs px-6 py-2.5 rounded flex items-center gap-2 shadow-lg">
+                        <i class="fa-solid fa-floppy-disk"></i> 保存全部设置
+                    </button>
                 </div>
             </div>
-        </div>
+        </main>
     </div>
 
-    <script src="/static/js/admin.js"></script>
+    <script>
+        let tgChannels = [
+            { name: '夸克云盘综合资源', id: 'Quark_Movies' },
+            { name: 'YOYO资源|夸克|短剧', id: 'yoyokuakeduanju' },
+            { name: 'UC夸克百度迅雷资源分享', id: 'ucquark' },
+            { name: '夸克网盘资源收藏夹', id: 'QuarkFree' },
+            { name: 'leo资源(夸克)', id: 'leoziyuan' },
+            { name: '夸克 (百草)', id: 'baicaozi' },
+            { name: '夸克(网盘高分影视)', id: 'SharePanFilms' },
+            { name: '夸克(书籍)', id: 'BooksRealm' },
+            { name: 'Q_dongman', id: 'Q_dongman' },
+            { name: '夸克网盘动漫资源', id: 'kuakedongman' },
+            { name: 'kduanju', id: 'kduanju' },
+            { name: 'Q_jilupian', id: 'Q_jilupian' },
+            { name: 'yunpanquark', id: 'yunpanquark' },
+            { name: 'Q_dianying', id: 'Q_dianying' },
+            { name: 'gokuapan', id: 'gokuapan' },
+            { name: 'kuyupan', id: 'kuyupan' },
+            { name: 'kuakenetpan', id: 'kuakenetpan' }
+        ];
+
+        document.addEventListener("DOMContentLoaded", () => {
+            renderTGChannels();
+        });
+
+        function renderTGChannels() {
+            const container = document.getElementById('tg-channels-container');
+            container.innerHTML = '';
+            tgChannels.forEach((ch, idx) => {
+                const badge = document.createElement('div');
+                badge.className = "bg-slate-800 border border-slate-700 rounded-md px-2.5 py-1.5 flex items-center gap-2 text-xs text-slate-200 shrink-0";
+                badge.innerHTML = `
+                    <span><strong>${ch.name}</strong> (${ch.id})</span>
+                    <button onclick="removeTGChannel(${idx})" class="text-slate-400 hover:text-rose-400 font-bold ml-1">✕</button>
+                `;
+                container.appendChild(badge);
+            });
+        }
+
+        function addTGChannel() {
+            const name = document.getElementById('new-ch-name').value.trim();
+            const id = document.getElementById('new-ch-id').value.trim().replace('@', '');
+            if (!name || !id) return alert('请填写频道名称和 ID');
+            tgChannels.push({ name, id });
+            document.getElementById('new-ch-name').value = '';
+            document.getElementById('new-ch-id').value = '';
+            renderTGChannels();
+        }
+
+        function removeTGChannel(idx) {
+            tgChannels.splice(idx, 1);
+            renderTGChannels();
+        }
+
+        async function saveAllSettings() {
+            const payload = {
+                cookie: document.getElementById('quark-cookie').value.trim(),
+                default_fid: document.getElementById('fid-default').value.trim(),
+                openlist_url: document.getElementById('openlist-url').value.trim(),
+                category_fids: {
+                    '电影': document.getElementById('fid-movie').value.trim(),
+                    '电视剧': document.getElementById('fid-tv').value.trim(),
+                    '综艺': document.getElementById('fid-show').value.trim(),
+                    '动漫': document.getElementById('fid-anime').value.trim()
+                },
+                channels: tgChannels
+            };
+
+            try {
+                const resp = await fetch('/api/channels', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ channels: tgChannels })
+                });
+                alert('设置保存成功！');
+            } catch (e) {
+                alert('保存设置异常: ' + e.message);
+            }
+        }
+    </script>
 </body>
 </html>
