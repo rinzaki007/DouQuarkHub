@@ -1,20 +1,105 @@
 import os
+import json
 import requests
-from flask import Flask, render_template, request, jsonify, Response, stream_with_context
+from flask import Flask, render_template, request, jsonify, Response, stream_with_context, session, redirect, url_for
+from werkzeug.security import generate_password_hash, check_password_hash
 from concurrent.futures import ThreadPoolExecutor
+
 from quark_engine import QuarkEngine, clean_tv_filename
 from subscription_manager import SubscriptionManager
 from search_service import SearchService
 from utils import load_channels, save_channels, DOUBAN_HEADERS
 
 app = Flask(__name__)
+app.secret_key = os.environ.get('SECRET_KEY', 'moviesync_secret_key_2026_secure')
 
+AUTH_FILE = 'auth.json'
+
+def load_auth():
+    if os.path.exists(AUTH_FILE):
+        try:
+            with open(AUTH_FILE, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception:
+            pass
+    # 默认账户: admin / admin123  重置密码 Token: moviesync2026
+    default_auth = {
+        "username": "admin",
+        "password_hash": generate_password_hash("admin123"),
+        "reset_token": "moviesync2026"
+    }
+    save_auth(default_auth)
+    return default_auth
+
+def save_auth(data):
+    with open(AUTH_FILE, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+# 初始化追剧订阅管理器
 sub_manager = SubscriptionManager(get_cookie_func=lambda: app.config.get('QUARK_COOKIE', ''))
 sub_manager.start_scheduler()
+
+# 🎯 登录全局拦截器 (未登录访问任何页面自动重定向到 /login)
+@app.before_request
+def require_login():
+    allowed_paths = ['/login', '/api/login', '/api/reset-password']
+    if request.path.startswith('/static') or request.path in allowed_paths:
+        return
+    if not session.get('logged_in'):
+        if request.path.startswith('/api/'):
+            return jsonify({'success': False, 'message': '未登录', 'need_login': True}), 401
+        return redirect('/login')
+
+@app.route('/login')
+def login_page():
+    if session.get('logged_in'):
+        return redirect('/')
+    return render_template('login.html')
+
+@app.route('/api/login', methods=['POST'])
+def api_login():
+    data = request.json or {}
+    username = data.get('username', '').strip()
+    password = data.get('password', '').strip()
+    
+    auth_data = load_auth()
+    if username == auth_data.get('username') and check_password_hash(auth_data.get('password_hash'), password):
+        session['logged_in'] = True
+        session['username'] = username
+        return jsonify({'success': True, 'message': '登录成功'})
+    return jsonify({'success': False, 'message': '用户名或密码错误'})
+
+@app.route('/api/reset-password', methods=['POST'])
+def api_reset_password():
+    data = request.json or {}
+    token = data.get('token', '').strip()
+    new_password = data.get('new_password', '').strip()
+
+    if not token or not new_password:
+        return jsonify({'success': False, 'message': '请填写完整凭证与新密码'})
+
+    auth_data = load_auth()
+    if token != auth_data.get('reset_token'):
+        return jsonify({'success': False, 'message': '重置凭证 Token 错误'})
+
+    auth_data['password_hash'] = generate_password_hash(new_password)
+    save_auth(auth_data)
+    return jsonify({'success': True, 'message': '密码重置成功，请重新登录'})
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect('/login')
 
 @app.route('/')
 def index():
     return render_template('index.html')
+
+@app.route('/admin')
+def admin():
+    return render_template('admin.html')
+
+# ==================== 影视与转存 API ====================
 
 @app.route('/api/get-movies', methods=['GET'])
 def get_movies():
@@ -117,7 +202,6 @@ def check_channels_health():
             url = f"https://t.me/s/{ch_id}"
             headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
             try:
-                # 🎯 放宽单频道检测超时到 3 秒
                 resp = requests.head(url, headers=headers, timeout=3.0)
                 return resp.status_code == 200
             except Exception:
@@ -218,7 +302,7 @@ def search_link_for_sub():
         
         if pwd_id:
             return jsonify({'success': True, 'pwd_id': pwd_id})
-        return jsonify({'success': False, 'message': f'未在所设频道中找到 [{title}] 的有效夸克链接'})
+        return jsonify({'success': False, 'message': f'未在所设频道中找到 [{title}] 的夸克链接'})
     except Exception as e:
         return jsonify({'success': False, 'message': f'后台检索异常: {str(e)}'})
 
