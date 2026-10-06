@@ -26,23 +26,30 @@ async function refreshAdminStatus() {
     const cookie = localStorage.getItem('quark_cookie') || '';
     const badge = document.getElementById('quark-status-badge');
     if (cookie) {
-        const res = await fetch('/api/check-cookie', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({cookie})
-        });
-        const data = await res.json();
-        badge.className = data.valid ? 'badge badge-success' : 'badge badge-danger';
-        badge.textContent = data.valid ? '🟢 有效' : '🔴 失效';
+        try {
+            const res = await fetch('/api/check-cookie', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({cookie})
+            });
+            const data = await res.json();
+            badge.className = data.valid ? 'badge badge-success' : 'badge badge-danger';
+            badge.textContent = data.valid ? '🟢 有效' : '🔴 失效';
+        } catch (e) { badge.textContent = '检测出错'; }
+    } else {
+        badge.className = 'badge badge-danger';
+        badge.textContent = '未配置';
     }
 
     const chBadge = document.getElementById('channel-status-badge');
-    const chRes = await fetch('/api/check-channels');
-    const chData = await chRes.json();
-    if (chData.success) {
-        chBadge.className = 'badge badge-success';
-        chBadge.textContent = `🟢 ${chData.valid_count}/${chData.total} 联通`;
-    }
+    try {
+        const chRes = await fetch('/api/check-channels');
+        const chData = await chRes.json();
+        if (chData.success) {
+            chBadge.className = 'badge badge-success';
+            chBadge.textContent = `🟢 ${chData.valid_count}/${chData.total} 联通`;
+        }
+    } catch (e) { chBadge.textContent = '检测超时'; }
 }
 
 function clearAdminLog() {
@@ -141,4 +148,61 @@ async function saveAdminConfig() {
     });
     alert('全部设置保存成功！');
     refreshAdminStatus();
+}
+
+// 🎯 配置导出 JSON 功能
+function exportConfig() {
+    const configData = {
+        quark_cookie: localStorage.getItem('quark_cookie') || '',
+        target_folder_id: localStorage.getItem('target_folder_id') || '0',
+        openlist_url: localStorage.getItem('openlist_url') || '',
+        folder_movie: localStorage.getItem('folder_movie') || '',
+        folder_tv: localStorage.getItem('folder_tv') || '',
+        channels: channelList
+    };
+
+    const blob = new Blob([JSON.stringify(configData, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `moviesync_config_${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+}
+
+// 🎯 配置导入 JSON 功能
+function triggerImportConfig() {
+    document.getElementById('import-file-input').click();
+}
+
+function handleImportConfig(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async function(e) {
+        try {
+            const config = JSON.parse(e.target.result);
+            if (config.quark_cookie !== undefined) localStorage.setItem('quark_cookie', config.quark_cookie);
+            if (config.target_folder_id !== undefined) localStorage.setItem('target_folder_id', config.target_folder_id);
+            if (config.openlist_url !== undefined) localStorage.setItem('openlist_url', config.openlist_url);
+            if (config.folder_movie !== undefined) localStorage.setItem('folder_movie', config.folder_movie);
+            if (config.folder_tv !== undefined) localStorage.setItem('folder_tv', config.folder_tv);
+
+            if (Array.isArray(config.channels)) {
+                channelList = config.channels;
+                await fetch('/api/channels', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({channels: channelList})
+                });
+            }
+
+            loadAdminConfig();
+            renderAdminChannels();
+            alert('配置已成功导入！');
+            refreshAdminStatus();
+        } catch (err) {
+            alert('导入失败，请检查 JSON 格式是否正确: ' + err.message);
+        }
+    };
+    reader.readAsText(file);
 }
