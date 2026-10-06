@@ -12,8 +12,7 @@ class SearchService:
 
     def search_movie_candidates(self, movie, channels):
         """
-        【阶段一：并发搜刮与候选聚合】
-        使用线程池同时并发检索所有 TG 频道，数倍提速，彻底避免反向代理 502 超时。
+        【阶段一：并发搜刮与候选聚合（含详细后端日志）】
         """
         engine = QuarkEngine(self.cookie)
         video_extensions = ('.mp4', '.mkv', '.avi', '.mov', '.flv', '.wmv', '.m4v', '.ts', '.m2ts', '.iso')
@@ -36,8 +35,10 @@ class SearchService:
         candidates = []
         seen_pwd_ids = set()
 
+        print(f"[后端检索] 🚀 开始并发搜刮影片: 《{title}》 (清洗后: {clean_title})，共检查 {len(channels)} 个频道")
+
         def search_single_channel(ch):
-            """内部函数：单个频道的检索逻辑"""
+            """内部函数：单个频道的检索逻辑（带详细排查日志）"""
             ch_id = ch.get('id', '').strip() if isinstance(ch, dict) else str(ch).strip()
             ch_name = ch.get('name', ch_id) if isinstance(ch, dict) else ch_id
             if not ch_id:
@@ -48,6 +49,7 @@ class SearchService:
             try:
                 resp = requests.get(search_url, headers=self.headers, timeout=5)
                 if resp.status_code != 200:
+                    print(f"  [频道跳过] 频道 [{ch_name}] (ID: {ch_id}) 请求失败，状态码: {resp.status_code}")
                     return []
 
                 messages = re.findall(r'<div class="tgme_widget_message_text js-message_text.*?">([\s\S]*?)</div>', resp.text)
@@ -62,6 +64,7 @@ class SearchService:
                         for pwd_id in pwd_matches:
                             files, stoken, err = engine.get_share_files(pwd_id)
                             if err or not files:
+                                print(f"  [解析提示] 频道 [{ch_name}] 命中短码 {pwd_id} 但获取文件失败: {err}")
                                 continue
                             
                             video_files = [
@@ -75,6 +78,7 @@ class SearchService:
                             
                             if video_files:
                                 first_name = video_files[0]['file_name']
+                                print(f"  [有效命中] 🎯 频道 [{ch_name}] 发现资源! 短码: {pwd_id}, 有效视频数: {len(video_files)}, 示例: {first_name}")
                                 local_candidates.append({
                                     "channel": ch_name,
                                     "pwd_id": pwd_id,
@@ -82,11 +86,11 @@ class SearchService:
                                     "files": video_files,
                                     "summary": f"频道: [{ch_name}] | 包含 {len(video_files)} 个视频 | 示例: {first_name}"
                                 })
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"  [频道异常] ❌ 频道 [{ch_name}] 搜刮抛出异常: {str(e)}")
             return local_candidates
 
-        # 🚀 使用线程池并发请求所有频道（最大并发数 10）
+        # 使用线程池并发请求所有频道
         with ThreadPoolExecutor(max_workers=10) as executor:
             futures = [executor.submit(search_single_channel, ch) for ch in channels]
             for future in as_completed(futures):
@@ -98,15 +102,15 @@ class SearchService:
                             if pwd_id not in seen_pwd_ids:
                                 seen_pwd_ids.add(pwd_id)
                                 candidates.append(cand)
-                except Exception:
-                    pass
+                except Exception as e:
+                    print(f"[线程池异常] {str(e)}")
 
+        print(f"[后端检索完成] ✅ 《{title}》 最终汇总有效候选资源数: {len(candidates)} 个\n")
         return candidates
 
     def transfer_selected_resource(self, movie, candidate, target_fid='0', category_fids=None):
         """
-        【阶段二：用户选定后执行转存】
-        根据你手动挑选的候选资源，创建专属文件夹并完成转存。
+        【阶段二：用户选定后执行转存（含详细后端日志）】
         """
         category_fids = category_fids or {}
         engine = QuarkEngine(self.cookie)
@@ -123,9 +127,12 @@ class SearchService:
         if not parent_fid:
             parent_fid = '0'
 
+        print(f"[转存服务] 📥 开始处理《{title}》，目标父目录ID: {parent_fid}，来源频道: {candidate.get('channel')}")
+
         # 1. 创建以电影名命名的专属文件夹
         folder_fid, create_err = engine.get_or_create_subfolder(title, parent_fid)
         if not folder_fid:
+            print(f"[转存失败] ❌ 创建专属文件夹失败: {create_err}")
             return False, f"创建专属文件夹失败: {create_err}"
 
         # 2. 提取选中的文件 ID 列表
@@ -135,11 +142,14 @@ class SearchService:
         
         fid_list = [f.get('fid') for f in selected_files if f.get('fid')]
         if not fid_list:
+            print(f"[转存失败] ❌ 所选候选资源中没有有效的视频文件")
             return False, "所选候选资源中没有有效的视频文件"
 
         # 3. 执行转存
         ok, msg = engine.save_files(pwd_id, [{'fid': fid} for fid in fid_list], stoken, folder_fid)
         if ok:
+            print(f"[转存成功] 🎉 《{title}》 成功转存至专属文件夹，短码: {pwd_id}")
             return True, f"《{title}》转存成功！已精准归档至专属文件夹"
         else:
+            print(f"[转存失败] ❌ 夸克接口返回错误: {msg}")
             return False, f"转存失败: {msg}"
