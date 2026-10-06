@@ -125,47 +125,53 @@
         <div id="movie-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 hidden"></div>
     </main>
 
-    <!-- 🚀 智能追剧管理弹窗（内含：新增追剧 + 现有任务管理双 Tab） -->
+    <!-- 🚀 智能追剧管理弹窗（max-w-5xl 宽屏优化） -->
     <div id="chase-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-[100] flex items-center justify-center hidden">
-        <div class="bg-slate-900 border border-slate-800 rounded-lg w-full max-w-3xl p-5 shadow-2xl space-y-4 max-h-[85vh] flex flex-col">
+        <div class="bg-slate-900 border border-slate-800 rounded-lg w-full max-w-5xl p-6 shadow-2xl space-y-4 max-h-[90vh] flex flex-col">
             <div class="flex items-center justify-between border-b border-slate-800 pb-3">
                 <div class="flex items-center gap-3">
-                    <h3 class="text-base font-medium text-white flex items-center gap-2">
+                    <h3 class="text-base font-semibold text-white flex items-center gap-2">
                         <i class="fa-solid fa-heart text-purple-500"></i> 智能自动化追剧管理中心
                     </h3>
                     <div class="flex bg-slate-950 p-0.5 rounded border border-slate-800 text-xs">
-                        <button onclick="switchChaseTab('add')" id="chase-tab-add" class="px-3 py-1 rounded bg-purple-600 text-white font-medium transition">添加新追剧</button>
-                        <button onclick="switchChaseTab('list')" id="chase-tab-list" class="px-3 py-1 rounded text-slate-400 hover:text-white transition">已订阅任务 (<span id="sub-count-badge">0</span>)</button>
+                        <button onclick="switchChaseTab('add')" id="chase-tab-add" class="px-3.5 py-1.5 rounded bg-purple-600 text-white font-medium transition">添加新追剧</button>
+                        <button onclick="switchChaseTab('list')" id="chase-tab-list" class="px-3.5 py-1.5 rounded text-slate-400 hover:text-white transition">已订阅任务 (<span id="sub-count-badge">0</span>)</button>
                     </div>
                 </div>
-                <button onclick="closeChaseModal()" class="text-slate-400 hover:text-white">✕</button>
+                <button onclick="closeChaseModal()" class="text-slate-400 hover:text-white text-lg">✕</button>
             </div>
 
             <!-- Tab 1: 添加追剧向导 -->
             <div id="chase-panel-add" class="flex-1 overflow-y-auto space-y-4 pr-1">
-                <div class="bg-slate-950 border border-slate-800 rounded p-3 space-y-3">
+                <div class="bg-slate-950 border border-slate-800 rounded p-4 space-y-3">
                     <div class="text-xs font-semibold text-purple-400">第一步：填写剧名并检索全网频道</div>
                     <div class="flex gap-2">
-                        <input type="text" id="chase-title-input" placeholder="例如: 庆余年 第二季" class="flex-1 bg-slate-900 border border-slate-700 rounded px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-purple-500">
-                        <button onclick="searchChaseCandidates()" class="px-4 py-1.5 bg-purple-600 hover:bg-purple-500 text-white rounded text-xs font-medium transition shadow">
+                        <input type="text" id="chase-title-input" placeholder="例如: 绝命毒师" class="flex-1 bg-slate-900 border border-slate-700 rounded px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-purple-500">
+                        <button onclick="searchChaseCandidates()" class="px-5 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded text-xs font-medium transition shadow">
                             🔍 检索频道资源
                         </button>
                     </div>
                 </div>
 
                 <div id="chase-candidates-container" class="space-y-3 hidden">
-                    <div class="text-xs font-semibold text-blue-400">第二步：选择要监控的 TG 频道及指定集数/版本</div>
-                    <div id="chase-candidates-list" class="space-y-2"></div>
+                    <div class="text-xs font-semibold text-blue-400">第二步：选择要监控的 TG 频道及具体集数白名单</div>
+                    <div id="chase-candidates-list" class="space-y-3"></div>
                 </div>
 
-                <div class="bg-slate-950 border border-slate-800 rounded p-3 space-y-2">
-                    <div class="text-xs font-semibold text-emerald-400">第三步：设定自动检测更新频率</div>
-                    <select id="chase-interval-select" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-sm text-slate-200 focus:outline-none">
-                        <option value="3">每 3 小时检测一次</option>
-                        <option value="6" selected>每 6 小时检测一次</option>
-                        <option value="9">每 9 小时检测一次</option>
-                        <option value="12">每 12 小时检测一次</option>
-                    </select>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="bg-slate-950 border border-slate-800 rounded p-4 space-y-2">
+                        <div class="text-xs font-semibold text-amber-400">第三步：选择存储父目录 FID (系统将在此目录下自动创建剧名专属文件夹)</div>
+                        <input type="text" id="chase-target-fid" value="fe24e17d8d254997b21710c73b22b6e7" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500">
+                    </div>
+                    <div class="bg-slate-950 border border-slate-800 rounded p-4 space-y-2">
+                        <div class="text-xs font-semibold text-emerald-400">第四步：设定自动检测更新频率</div>
+                        <select id="chase-interval-select" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-xs text-slate-200 focus:outline-none">
+                            <option value="3">每 3 小时检测一次</option>
+                            <option value="6" selected>每 6 小时检测一次</option>
+                            <option value="9">每 9 小时检测一次</option>
+                            <option value="12">每 12 小时检测一次</option>
+                        </select>
+                    </div>
                 </div>
             </div>
 
@@ -175,23 +181,23 @@
                     <table class="w-full text-left text-xs text-slate-300">
                         <thead class="bg-slate-900 text-slate-400 uppercase font-semibold border-b border-slate-800">
                             <tr>
-                                <th class="px-3 py-2.5">剧集名称</th>
-                                <th class="px-3 py-2.5">监控频道</th>
-                                <th class="px-3 py-2.5">频率</th>
-                                <th class="px-3 py-2.5">状态/上次检测</th>
-                                <th class="px-3 py-2.5 text-right">操作</th>
+                                <th class="px-3.5 py-3">剧集名称</th>
+                                <th class="px-3.5 py-3">监控频道</th>
+                                <th class="px-3.5 py-3">频率</th>
+                                <th class="px-3.5 py-3">状态/上次检测</th>
+                                <th class="px-3.5 py-3 text-right">操作</th>
                             </tr>
                         </thead>
                         <tbody id="modal-sub-table-body" class="divide-y divide-slate-800/80">
-                            <tr><td colspan="5" class="px-3 py-4 text-center text-slate-500">正在加载...</td></tr>
+                            <tr><td colspan="5" class="px-3 py-6 text-center text-slate-500">正在加载...</td></tr>
                         </tbody>
                     </table>
                 </div>
             </div>
 
-            <div class="flex justify-between items-center pt-2 border-t border-slate-800">
-                <button onclick="closeChaseModal()" class="px-4 py-1.5 text-xs bg-slate-800 text-slate-300 rounded hover:bg-slate-700">关闭</button>
-                <button id="btn-submit-chase" onclick="submitSmartChase()" class="px-4 py-1.5 text-xs bg-purple-600 text-white rounded hover:bg-purple-500 font-medium hidden">
+            <div class="flex justify-between items-center pt-3 border-t border-slate-800">
+                <button onclick="closeChaseModal()" class="px-4 py-2 text-xs bg-slate-800 text-slate-300 rounded hover:bg-slate-700">关闭</button>
+                <button id="btn-submit-chase" onclick="submitSmartChase()" class="px-5 py-2 text-xs bg-purple-600 text-white rounded hover:bg-purple-500 font-medium hidden shadow">
                     🚀 保存并开启自动化追剧
                 </button>
             </div>
@@ -214,7 +220,7 @@
         </div>
     </div>
 
-    <!-- 底部固定实时日志面板 -->
+    <!-- 底部固定实时日志面板 (仅在手动批量转存时弹出，追剧管理不再干扰) -->
     <div id="log-panel" class="fixed bottom-0 left-0 right-0 z-50 bg-slate-950 border-t border-slate-800 shadow-2xl transition-all duration-300 hidden">
         <div class="flex items-center justify-between px-4 py-2 bg-slate-900 border-b border-slate-800">
             <div class="flex items-center gap-2 text-xs text-slate-300 font-medium">
@@ -252,6 +258,13 @@
 
         async function checkSystemHealth() {
             try {
+                const respConfig = await fetch('/api/config');
+                const resConfig = await respConfig.json();
+                if (resConfig.success && resConfig.config) {
+                    const tvFid = resConfig.config.category_fids?.['电视剧'] || resConfig.config.default_fid || '0';
+                    document.getElementById('chase-target-fid').value = tvFid;
+                }
+
                 const localCookie = localStorage.getItem('quark_cookie') || '';
                 const resp = await fetch('/api/check-cookie', { 
                     method: 'POST',
@@ -268,7 +281,7 @@
                     badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-rose-500"></span><span>Cookie 失效</span>`;
                 }
             } catch (err) {
-                console.error("Cookie 检测异常", err);
+                console.error("初始化检测异常", err);
             }
 
             try {
@@ -336,8 +349,6 @@
                 if (res.success) {
                     moviesData = res.movies || [];
                     renderGrid();
-                } else {
-                    alert('获取资源失败: ' + res.message);
                 }
             } catch (err) {
                 console.error(err);
@@ -459,10 +470,10 @@
         }
 
         // ==========================================
-        // 🚀 智能追剧管理中心逻辑 (Tab 切换与任务管理)
+        // 🚀 智能追剧管理中心逻辑
         // ==========================================
         function openChaseModal() { 
-            toggleLogBox(false);
+            // 打开弹窗时保持底部的批量日志框关闭状态
             document.getElementById('chase-modal').classList.remove('hidden');
             switchChaseTab('add');
             loadModalSubscriptions();
@@ -480,14 +491,14 @@
             const submitBtn = document.getElementById('btn-submit-chase');
 
             if (tabName === 'add') {
-                tabAdd.className = "px-3 py-1 rounded bg-purple-600 text-white font-medium transition";
-                tabList.className = "px-3 py-1 rounded text-slate-400 hover:text-white transition";
+                tabAdd.className = "px-3.5 py-1.5 rounded bg-purple-600 text-white font-medium transition";
+                tabList.className = "px-3.5 py-1.5 rounded text-slate-400 hover:text-white transition";
                 panelAdd.classList.remove('hidden');
                 panelList.classList.add('hidden');
                 if(currentChaseSelectedCandidate) submitBtn.classList.remove('hidden');
             } else {
-                tabList.className = "px-3 py-1 rounded bg-purple-600 text-white font-medium transition";
-                tabAdd.className = "px-3 py-1 rounded text-slate-400 hover:text-white transition";
+                tabList.className = "px-3.5 py-1.5 rounded bg-purple-600 text-white font-medium transition";
+                tabAdd.className = "px-3.5 py-1.5 rounded text-slate-400 hover:text-white transition";
                 panelList.classList.remove('hidden');
                 panelAdd.classList.add('hidden');
                 submitBtn.classList.add('hidden');
@@ -497,14 +508,14 @@
 
         async function loadModalSubscriptions() {
             const tbody = document.getElementById('modal-sub-table-body');
-            tbody.innerHTML = '<tr><td colspan="5" class="px-3 py-4 text-center text-slate-500"><i class="fa-solid fa-spinner fa-spin"></i> 正在加载...</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="5" class="px-3.5 py-6 text-center text-slate-500"><i class="fa-solid fa-spinner fa-spin"></i> 正在加载...</td></tr>';
             try {
                 const resp = await fetch('/api/subscriptions');
                 const res = await resp.json();
                 if (res.success && res.subscriptions) {
                     document.getElementById('sub-count-badge').innerText = res.subscriptions.length;
                     if (res.subscriptions.length === 0) {
-                        tbody.innerHTML = '<tr><td colspan="5" class="px-3 py-6 text-center text-slate-500">暂无自动化追剧任务，请先去【添加新追剧】创建。</td></tr>';
+                        tbody.innerHTML = '<tr><td colspan="5" class="px-3.5 py-8 text-center text-slate-500">暂无自动化追剧任务，请先去【添加新追剧】创建。</td></tr>';
                         return;
                     }
                     tbody.innerHTML = '';
@@ -512,20 +523,20 @@
                         const tr = document.createElement('tr');
                         tr.className = "hover:bg-slate-900/60";
                         tr.innerHTML = `
-                            <td class="px-3 py-2.5 font-medium text-slate-200">${sub.title}</td>
-                            <td class="px-3 py-2.5 text-emerald-400">${sub.channel || '默认频道'}</td>
-                            <td class="px-3 py-2.5 text-slate-400">${sub.interval_hours} 小时</td>
-                            <td class="px-3 py-2.5 text-slate-400">${sub.last_check || '等待触发'}</td>
-                            <td class="px-3 py-2.5 text-right space-x-1.5">
-                                <button onclick="runSubNow('${sub.id}')" class="bg-purple-600 hover:bg-purple-500 text-white px-2 py-1 rounded text-[10px]">立即运行</button>
-                                <button onclick="deleteSub('${sub.id}')" class="bg-rose-900/60 hover:bg-rose-800 text-rose-200 px-2 py-1 rounded text-[10px]">删除</button>
+                            <td class="px-3.5 py-3 font-medium text-slate-200">${sub.title}</td>
+                            <td class="px-3.5 py-3 text-emerald-400">${sub.channel || '默认频道'}</td>
+                            <td class="px-3.5 py-3 text-slate-400">${sub.interval_hours} 小时</td>
+                            <td class="px-3.5 py-3 text-slate-400">${sub.last_check || '等待触发'}</td>
+                            <td class="px-3.5 py-3 text-right space-x-2">
+                                <button onclick="runSubNow('${sub.id}')" class="bg-purple-600 hover:bg-purple-500 text-white px-2.5 py-1 rounded text-[11px]">立即运行</button>
+                                <button onclick="deleteSub('${sub.id}')" class="bg-rose-900/60 hover:bg-rose-800 text-rose-200 px-2.5 py-1 rounded text-[11px]">删除</button>
                             </td>
                         `;
                         tbody.appendChild(tr);
                     });
                 }
             } catch (err) {
-                tbody.innerHTML = '<tr><td colspan="5" class="px-3 py-4 text-center text-rose-400">加载失败</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="5" class="px-3.5 py-4 text-center text-rose-400">加载失败</td></tr>';
             }
         }
 
@@ -538,7 +549,7 @@
                 });
                 const res = await resp.json();
                 alert(res.message || '已执行检视');
-                loadModalSubscriptions();
+                loadModalSubscriptions(); // 仅刷新列表，不弹出底部的批量转存日志框
             } catch (err) {
                 alert('手动执行失败');
             }
@@ -560,7 +571,7 @@
 
             const cookie = localStorage.getItem('quark_cookie') || '';
             const listContainer = document.getElementById('chase-candidates-list');
-            listContainer.innerHTML = `<div class="text-xs text-slate-400 py-3 text-center"><i class="fa-solid fa-spinner fa-spin"></i> 正在全网并发检索频道...</div>`;
+            listContainer.innerHTML = `<div class="text-xs text-slate-400 py-6 text-center"><i class="fa-solid fa-spinner fa-spin"></i> 正在全网并发检索频道...</div>`;
             document.getElementById('chase-candidates-container').classList.remove('hidden');
 
             try {
@@ -582,31 +593,31 @@
                 const candidates = candidatesMap[title] || [];
 
                 if (candidates.length === 0) {
-                    listContainer.innerHTML = `<div class="text-xs text-amber-400 py-2">未在任何配置频道中找到匹配资源，请检查片名是否正确。</div>`;
+                    listContainer.innerHTML = `<div class="text-xs text-amber-400 py-4 text-center">未在任何配置频道中找到匹配资源，请检查片名是否正确。</div>`;
                     return;
                 }
 
                 listContainer.innerHTML = '';
                 candidates.forEach((cand) => {
                     const fileNames = cand.files.map((f) => `
-                        <label class="flex items-center gap-2 py-0.5 text-[11px] text-slate-300 hover:text-white cursor-pointer">
+                        <label class="flex items-center gap-2 py-1 text-xs text-slate-300 hover:text-white cursor-pointer">
                             <input type="checkbox" name="chase-file-item" value="${f.fid}" checked class="chase-file-cb rounded bg-slate-900 border-slate-700 text-purple-600">
                             <span class="font-mono">${f.file_name}</span>
                         </label>
                     `).join('');
 
                     const itemDiv = document.createElement('div');
-                    itemDiv.className = 'bg-slate-900 border border-slate-800 rounded p-3 space-y-2';
+                    itemDiv.className = 'bg-slate-950 border border-slate-800 rounded-lg p-4 space-y-3';
                     itemDiv.innerHTML = `
                         <div class="flex items-center justify-between">
-                            <span class="text-xs font-semibold text-emerald-400"><i class="fa-brands fa-telegram"></i> 频道: ${cand.channel}</span>
-                            <button onclick='selectThisChaseCandidate(${JSON.stringify(cand)}, this)' class="px-3 py-1 bg-purple-600 hover:bg-purple-500 text-white rounded text-xs font-medium transition">
+                            <span class="text-xs font-bold text-emerald-400"><i class="fa-brands fa-telegram"></i> 频道: ${cand.channel}</span>
+                            <button onclick='selectThisChaseCandidate(${JSON.stringify(cand)}, this)' class="px-3.5 py-1.5 bg-purple-600 hover:bg-purple-500 text-white rounded text-xs font-medium transition">
                                 👈 锁定此源并追剧
                             </button>
                         </div>
-                        <div class="text-[11px] text-slate-400">夸克短码: <span class="font-mono text-slate-200">${cand.pwd_id}</span> | 包含文件数: ${cand.files.length}</div>
-                        <div class="bg-slate-950 p-2 rounded max-h-32 overflow-y-auto space-y-1 border border-slate-800">
-                            <div class="text-[10px] text-slate-500 mb-1">勾选您需要监控/下载的具体集数或版本（不勾选的集数将跳过）：</div>
+                        <div class="text-xs text-slate-400">夸克短码: <span class="font-mono text-slate-200">${cand.pwd_id}</span> | 包含视频数: ${cand.files.length}</div>
+                        <div class="bg-slate-900 p-3 rounded-md max-h-48 overflow-y-auto space-y-1 border border-slate-800">
+                            <div class="text-[11px] text-slate-400 mb-2 font-medium">勾选您需要监控/下载的具体集数或版本（不勾选的集数将自动跳过）：</div>
                             ${fileNames}
                         </div>
                     `;
@@ -621,19 +632,20 @@
         function selectThisChaseCandidate(candidate, btnElement) {
             currentChaseSelectedCandidate = candidate;
             document.querySelectorAll('#chase-candidates-list button').forEach(btn => {
-                btn.className = "px-3 py-1 bg-purple-600 hover:bg-purple-500 text-white rounded text-xs font-medium transition";
+                btn.className = "px-3.5 py-1.5 bg-purple-600 hover:bg-purple-500 text-white rounded text-xs font-medium transition";
                 btn.innerText = "👈 锁定此源并追剧";
             });
-            btnElement.className = "px-3 py-1 bg-emerald-600 text-white rounded text-xs font-medium";
+            btnElement.className = "px-3.5 py-1.5 bg-emerald-600 text-white rounded text-xs font-medium";
             btnElement.innerText = "✅ 已锁定此源";
             
             document.getElementById('btn-submit-chase').classList.remove('hidden');
-            alert(`已成功锁定频道 [${candidate.channel}] 的分享源！请在下方设置检测频率并点击保存。`);
+            alert(`已成功锁定频道 [${candidate.channel}] 的分享源！请在下方设置存储目录和频率并点击保存。`);
         }
 
         async function submitSmartChase() {
             const title = document.getElementById('chase-title-input').value.trim();
             const intervalHours = parseInt(document.getElementById('chase-interval-select').value) || 6;
+            const targetFid = document.getElementById('chase-target-fid').value.trim() || '0';
 
             if (!title || !currentChaseSelectedCandidate) {
                 return alert('请先输入名称并锁定一个有效的频道分享源！');
@@ -653,7 +665,8 @@
                 pwd_id: currentChaseSelectedCandidate.pwd_id,
                 stoken: currentChaseSelectedCandidate.stoken,
                 files: filteredFiles,
-                interval_hours: intervalHours
+                interval_hours: intervalHours,
+                target_fid: targetFid
             };
 
             try {
@@ -664,15 +677,12 @@
                 });
                 const res = await resp.json();
                 alert(res.message || '自动化追剧规则保存成功！');
-                switchChaseTab('list'); // 保存成功后自动切到列表页查看
+                switchChaseTab('list');
             } catch (err) {
                 alert('保存追剧任务失败');
             }
         }
 
-        // ==========================================
-        // 🎯 核心交互改造：第一阶段（搜刮候选与详细日志）
-        // ==========================================
         async function batchTransfer() {
             if (selectedIndices.size === 0) return alert('请先选择至少一部影片');
 
@@ -723,7 +733,7 @@
                     } else {
                         appendLogLine(`[结果统计] 🎯 《${title}》：成功检索到 ${candidates.length} 个可用版本。`, 'success');
                         candidates.forEach((cand, idx) => {
-                            appendLogLine(`    [${idx + 1}] 频道名称: "${cand.channel}" | 夸克短码(pwd_id): ${cand.pwd_id} | 包含视频: ${cand.files.length} 个`, 'info');
+                            appendLogLine(`    [${idx + 1}] 频道名称: "${cand.channel}" | 夸克短码: ${cand.pwd_id} | 包含视频: ${cand.files.length} 个`, 'info');
                         });
                     }
                 }
@@ -741,12 +751,9 @@
             const container = document.getElementById('candidate-content');
             container.innerHTML = '';
             
-            let totalCandidates = 0;
-
             movies.forEach(movie => {
                 const title = movie.title;
                 const candidates = candidatesMap[title] || [];
-                totalCandidates += candidates.length;
 
                 const movieSection = document.createElement('div');
                 movieSection.className = 'bg-slate-950 border border-slate-800 rounded p-3 space-y-2';
