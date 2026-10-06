@@ -16,20 +16,14 @@ app.secret_key = os.environ.get('SECRET_KEY', 'moviesync_secret_key_2026_secure'
 AUTH_FILE = 'auth.json'
 
 def load_auth():
+    """读取配置，若文件不存在则返回 None (未初始化)"""
     if os.path.exists(AUTH_FILE):
         try:
             with open(AUTH_FILE, 'r', encoding='utf-8') as f:
                 return json.load(f)
         except Exception:
             pass
-    # 默认账户: admin / admin123  重置密码 Token: moviesync2026
-    default_auth = {
-        "username": "admin",
-        "password_hash": generate_password_hash("admin123"),
-        "reset_token": "moviesync2026"
-    }
-    save_auth(default_auth)
-    return default_auth
+    return None
 
 def save_auth(data):
     with open(AUTH_FILE, 'w', encoding='utf-8') as f:
@@ -39,22 +33,64 @@ def save_auth(data):
 sub_manager = SubscriptionManager(get_cookie_func=lambda: app.config.get('QUARK_COOKIE', ''))
 sub_manager.start_scheduler()
 
-# 🎯 登录全局拦截器 (未登录访问任何页面自动重定向到 /login)
+# 🎯 全局智能拦截器
 @app.before_request
 def require_login():
-    allowed_paths = ['/login', '/api/login', '/api/reset-password']
-    if request.path.startswith('/static') or request.path in allowed_paths:
+    if request.path.startswith('/static'):
         return
-    if not session.get('logged_in'):
+
+    auth_data = load_auth()
+
+    # 1. 状态：系统未初始化 -> 强制跳转到首次设置页面
+    if not auth_data or not auth_data.get('initialized'):
+        if request.path not in ['/setup', '/api/setup']:
+            return redirect('/setup')
+        return
+
+    # 2. 状态：已初始化 -> 禁止再次访问 setup
+    if request.path in ['/setup', '/api/setup']:
+        return redirect('/login')
+
+    # 3. 状态：正常访问 -> 未登录拦截
+    allowed_paths = ['/login', '/api/login']
+    if request.path not in allowed_paths and not session.get('logged_in'):
         if request.path.startswith('/api/'):
             return jsonify({'success': False, 'message': '未登录', 'need_login': True}), 401
         return redirect('/login')
+
+@app.route('/setup')
+def setup_page():
+    return render_template('login.html', is_setup=True)
+
+@app.route('/api/setup', methods=['POST'])
+def api_setup():
+    auth_data = load_auth()
+    if auth_data and auth_data.get('initialized'):
+        return jsonify({'success': False, 'message': '系统已完成过初始化，禁止重复设定'})
+
+    data = request.json or {}
+    username = data.get('username', '').strip()
+    password = data.get('password', '').strip()
+
+    if not username or not password:
+        return jsonify({'success': False, 'message': '账号与密码不能为空'})
+
+    new_auth = {
+        "initialized": True,
+        "username": username,
+        "password_hash": generate_password_hash(password)
+    }
+    save_auth(new_auth)
+
+    session['logged_in'] = True
+    session['username'] = username
+    return jsonify({'success': True, 'message': '管理员账号创建成功！'})
 
 @app.route('/login')
 def login_page():
     if session.get('logged_in'):
         return redirect('/')
-    return render_template('login.html')
+    return render_template('login.html', is_setup=False)
 
 @app.route('/api/login', methods=['POST'])
 def api_login():
@@ -63,28 +99,11 @@ def api_login():
     password = data.get('password', '').strip()
     
     auth_data = load_auth()
-    if username == auth_data.get('username') and check_password_hash(auth_data.get('password_hash'), password):
+    if auth_data and username == auth_data.get('username') and check_password_hash(auth_data.get('password_hash'), password):
         session['logged_in'] = True
         session['username'] = username
         return jsonify({'success': True, 'message': '登录成功'})
     return jsonify({'success': False, 'message': '用户名或密码错误'})
-
-@app.route('/api/reset-password', methods=['POST'])
-def api_reset_password():
-    data = request.json or {}
-    token = data.get('token', '').strip()
-    new_password = data.get('new_password', '').strip()
-
-    if not token or not new_password:
-        return jsonify({'success': False, 'message': '请填写完整凭证与新密码'})
-
-    auth_data = load_auth()
-    if token != auth_data.get('reset_token'):
-        return jsonify({'success': False, 'message': '重置凭证 Token 错误'})
-
-    auth_data['password_hash'] = generate_password_hash(new_password)
-    save_auth(auth_data)
-    return jsonify({'success': True, 'message': '密码重置成功，请重新登录'})
 
 @app.route('/logout')
 def logout():
@@ -98,6 +117,7 @@ def index():
 @app.route('/admin')
 def admin():
     return render_template('admin.html')
+
 
 # ==================== 影视与转存 API ====================
 
