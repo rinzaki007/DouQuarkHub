@@ -169,16 +169,22 @@ button:hover { background-color: #1d4ed8; }
 .card-info { padding: 8px; display: flex; flex-direction: column; gap: 2px; justify-content: space-between; flex: 1; }
 .movie-title { font-size: 12px; font-weight: 600; color: #f8fafc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-/* 🎯 豆瓣详情页跳转链接 */
+/* 🎯 提亮后的豆瓣详情链接样式 */
 .douban-link {
-    font-size: 10px;
-    color: #64748b;
+    font-size: 11px;
+    color: #38bdf8 !important; /* 提亮为鲜艳的天蓝色 */
     text-decoration: none;
-    margin-top: 2px;
-    display: inline-block;
-    transition: color 0.2s;
+    margin-top: 3px;
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    font-weight: 600;
+    transition: all 0.2s;
 }
-.douban-link:hover { color: #38bdf8; }
+.douban-link:hover {
+    color: #7dd3fc !important;
+    text-decoration: underline;
+}
 
 .log-drawer {
     background: #111827;
