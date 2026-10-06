@@ -32,6 +32,7 @@ def save_auth(data):
 sub_manager = SubscriptionManager(get_cookie_func=lambda: app.config.get('QUARK_COOKIE', ''))
 sub_manager.start_scheduler()
 
+# 🎯 登录与初始化守卫
 @app.before_request
 def require_login():
     if request.path.startswith('/static'):
@@ -118,25 +119,54 @@ def admin():
 @app.route('/api/get-movies', methods=['GET'])
 def get_movies():
     main_tag = request.args.get('tag', '电影')
-    sort_type = request.args.get('sort', 'U')
+    sort_type = request.args.get('sort', 'U')  # U: 热门, T: 最新, S: 高分, R: 最多评价
     genre = request.args.get('genre', '')
     country = request.args.get('country', '')
     year_range = request.args.get('year', '')
 
-    if main_tag == '动漫':
-        main_tag = '动画'
+    category_type = 'movie' if main_tag == '电影' else 'tv'
 
-    # 🎯 修复问题 1：当选择“最新”排序时，若未指定年份，豆瓣默认按标注时间返回，混入经典高分老片。
-    # 此处自动锁定近年年份范围，精准获取真正的最新影片！
-    if sort_type == 'T' and not year_range:
-        current_year = datetime.datetime.now().year
-        year_range = f"{current_year-1},{current_year}"
+    # 🎯 解决方案：当点击“最新”且无其他子筛选条件时，优先调用 Douban 官方【最新上架/上映】标签 API
+    # 彻底解决未上映的未来预告片和老片混入的问题
+    if sort_type == 'T' and not genre and not country and not year_range:
+        url = "https://movie.douban.com/j/search_subjects"
+        sub_tag = '最新'
+        if main_tag == '综艺':
+            sub_tag = '综艺'
+        elif main_tag in ['动漫', '动画']:
+            sub_tag = '动漫'
+
+        params = {
+            "type": category_type,
+            "tag": sub_tag,
+            "page_limit": 100,
+            "page_start": 0
+        }
+        try:
+            resp = requests.get(url, headers=DOUBAN_HEADERS, params=params, timeout=10)
+            if resp.status_code == 200 and 'json' in resp.headers.get('Content-Type', '').lower():
+                data = resp.json()
+                raw_list = data.get('subjects', [])
+                movies = [{
+                    'title': item.get('title'),
+                    'cover': item.get('cover'),
+                    'rate': item.get('rate') if item.get('rate') else '暂无',
+                    'url': item.get('url', f"https://movie.douban.com/subject/{item.get('id')}/")
+                } for item in raw_list]
+                return jsonify({'success': True, 'movies': movies})
+        except Exception:
+            pass  # 降级处理
+
+    # 🎯 带子类筛选的通用查询：附加 playable=1 过滤掉未上映电影
+    search_tag = main_tag
+    if main_tag == '动漫':
+        search_tag = '动画'
 
     url = "https://movie.douban.com/j/new_search_subjects"
     params = {
         "sort": sort_type,
         "range": "0,10",
-        "tags": main_tag,
+        "tags": search_tag,
         "start": 0,
         "limit": 100
     }
@@ -146,6 +176,9 @@ def get_movies():
         params["countries"] = country
     if year_range:
         params["year_range"] = year_range
+
+    if sort_type == 'T':
+        params["playable"] = "1"  # 过滤未上映预告片
 
     try:
         resp = requests.get(url, headers=DOUBAN_HEADERS, params=params, timeout=10)
@@ -258,7 +291,6 @@ def parse_share_detail():
         return jsonify({'success': False, 'message': '参数缺失'})
 
     engine = QuarkEngine(cookie)
-    # 🎯 仅保留视频文件
     files, stoken, err = engine.get_share_files(pwd_id, only_video=True)
     if not files:
         return jsonify({'success': False, 'message': f'未包含有效视频文件: {err}'})
@@ -302,7 +334,7 @@ def save_selected_files():
 
     engine = QuarkEngine(cookie)
     
-    # 🎯 自动建文件夹转存
+    # 自动创建专属子目录
     if title:
         target_fid = engine.get_or_create_subfolder(title, target_fid)
 
