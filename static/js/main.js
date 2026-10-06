@@ -17,16 +17,10 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 function applyGlassmorphismStyles() {
-    // 为顶部导航栏及工具栏增强毛玻璃效果
     const topNavs = document.querySelectorAll('header, nav');
     topNavs.forEach(el => {
         el.classList.add('backdrop-blur-md', 'bg-slate-900/80', 'border-b', 'border-slate-800/80');
     });
-
-    const logPanel = document.getElementById('log-panel');
-    if (logPanel) {
-        logPanel.classList.add('backdrop-blur-md', 'bg-slate-950/90', 'border', 'border-slate-800');
-    }
 }
 
 async function loadCategoryOptions() {
@@ -268,8 +262,8 @@ function updateSelectedCount() {
                 : selectedTitles.map(t => `《${t}》`).join(', ');
 
             previewTag.innerHTML = `
-                <span class="text-slate-400 text-xs">已选:</span>
-                <span class="px-2 py-0.5 bg-blue-950/80 text-blue-300 border border-blue-800/60 rounded text-xs font-medium truncate max-w-[200px] sm:max-w-xs" title="${selectedTitles.join(', ')}">
+                <span class="text-slate-400 text-xs shrink-0">已选:</span>
+                <span class="px-2 py-0.5 bg-blue-950/80 text-blue-300 border border-blue-800/60 rounded text-xs font-medium truncate max-w-[280px]" title="${selectedTitles.join(', ')}">
                     ${displayText}
                 </span>
             `;
@@ -280,10 +274,9 @@ function updateSelectedCount() {
 function toggleLogBox(show = true) {
     const panel = document.getElementById('log-panel');
     if (show) {
-        panel.classList.remove('hidden');
-        panel.classList.add('backdrop-blur-md', 'bg-slate-950/90');
+        panel.classList.remove('hidden'); // 不再强制覆盖不透明背景，保持 HTML 中的透明毛玻璃样式
     } else {
-        panel.classList.toggle('hidden');
+        panel.classList.add('hidden');
     }
 }
 
@@ -724,7 +717,7 @@ async function confirmTransferAndSave(movie, candidate, targetFid = '0') {
             appendLogLine(`[转存成功] 🎉 ${res.message} (耗时 ${elapsed}秒)`, 'success');
             appendLogLine(`[系统提示] ⏳ 转存成功，日志将在 3 秒后自动收起...`, 'info');
             
-            if (logAutoCloseTimer) clearTimeout(logAutoCloseTimer);
+            if (logAutoCloseTimer) clearInterval(logAutoCloseTimer);
             let countdown = 3;
             const badge = document.getElementById('log-timer-badge');
             if (badge) badge.innerText = `成功 · ${countdown}s后收起`;
