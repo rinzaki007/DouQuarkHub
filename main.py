@@ -2,7 +2,7 @@ import os
 import json
 import datetime
 import requests
-from flask import Flask, render_template, request, jsonify, Response, stream_with_context, session, redirect
+from flask import Flask, render_template, request, jsonify, Response, session, redirect
 from werkzeug.security import generate_password_hash, check_password_hash
 from concurrent.futures import ThreadPoolExecutor
 
@@ -145,7 +145,6 @@ def handle_config():
 @app.route('/api/admin/logs', methods=['GET'])
 def get_admin_logs(): return jsonify({'success': True, 'logs': SYSTEM_LOGS})
 
-# 🎯 修复：Cookie 校验接口
 @app.route('/api/check-cookie', methods=['POST'])
 def check_cookie():
     try:
@@ -157,7 +156,6 @@ def check_cookie():
     except Exception as e:
         return jsonify({'valid': False, 'message': str(e)})
 
-# 🎯 修复：TG 频道联网健康探针检测
 @app.route('/api/check-channels', methods=['GET'])
 def check_channels_health():
     try:
@@ -226,24 +224,74 @@ def handle_channels():
         return jsonify({'success': True})
     return jsonify({'success': True, 'channels': config.get('channels', [])})
 
-@app.route('/api/transfer', methods=['POST'])
-def transfer():
+# ==========================================
+# 🎯 核心改动：两阶段交互转存接口
+# ==========================================
+
+@app.route('/api/search-candidates', methods=['POST'])
+def api_search_candidates():
+    """
+    【阶段一】搜刮候选资源
+    """
     data = request.json or {}
-    movies, config = data.get('movies', []), load_full_config()
+    movies = data.get('movies', [])
+    config = load_full_config()
     cookie = data.get('cookie', '').strip() or config.get('quark_cookie', '')
-    if not movies: return Response("[系统] ❌ 未选择影片\n", mimetype='text/plain; charset=utf-8')
-    if not cookie: return Response("[系统] ❌ 未配置夸克 Cookie\n", mimetype='text/plain; charset=utf-8')
+    
+    if not movies: 
+        return jsonify({'success': False, 'message': '未选择影片'})
+    if not cookie: 
+        return jsonify({'success': False, 'message': '未配置夸克 Cookie'})
 
     service = SearchService(cookie)
-    channels, category_fids, default_fid = config.get('channels', []), config.get('category_fids', {}), config.get('default_fid', '0')
+    channels = config.get('channels', [])
+    
+    candidates_map = {}
+    for movie in movies:
+        title = movie.get('title', str(movie)) if isinstance(movie, dict) else str(movie)
+        log_system(f"正在搜刮《{title}》的候选资源...")
+        candidates = service.search_movie_candidates(movie, channels)
+        candidates_map[title] = candidates
 
-    def generate_logs():
-        log_system(f"触发批量转存，共 {len(movies)} 项")
-        for line in service.batch_search_and_transfer_stream(movies, channels, target_fid=default_fid, category_fids=category_fids):
-            log_system(line.strip())
-            yield line
+    return jsonify({'success': True, 'candidates_map': candidates_map})
 
-    return Response(stream_with_context(generate_logs()), mimetype='text/plain; charset=utf-8')
+@app.route('/api/transfer-selected', methods=['POST'])
+def api_transfer_selected():
+    """
+    【阶段二】执行指定转存
+    """
+    data = request.json or {}
+    movie = data.get('movie')
+    candidate = data.get('candidate')
+    config = load_full_config()
+    cookie = data.get('cookie', '').strip() or config.get('quark_cookie', '')
+    
+    if not movie or not candidate:
+        return jsonify({'success': False, 'message': '参数不完整'})
+    if not cookie:
+        return jsonify({'success': False, 'message': '未配置夸克 Cookie'})
+
+    service = SearchService(cookie)
+    default_fid = config.get('default_fid', '0')
+    category_fids = config.get('category_fids', {})
+
+    title = movie.get('title', '未知影片') if isinstance(movie, dict) else str(movie)
+    log_system(f"用户已确认选择，开始转存《{title}》...")
+
+    success, msg = service.transfer_selected_resource(
+        movie=movie,
+        candidate=candidate,
+        target_fid=default_fid,
+        category_fids=category_fids
+    )
+    
+    log_system(msg)
+    if success:
+        return jsonify({'success': True, 'message': msg})
+    else:
+        return jsonify({'success': False, 'message': msg})
+
+# ==========================================
 
 @app.route('/api/subscriptions', methods=['GET', 'POST', 'DELETE'])
 def handle_subscriptions():
