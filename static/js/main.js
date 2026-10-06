@@ -5,8 +5,39 @@ let selectedMovies = new Set();
 
 window.onload = () => {
     fetchMovies();
+    refreshHomeStatus();
     initScrollCollapseFilter();
 };
+
+async function refreshHomeStatus() {
+    const cookie = localStorage.getItem('quark_cookie') || '';
+    const badge = document.getElementById('quark-status-badge');
+    if (cookie) {
+        try {
+            const res = await fetch('/api/check-cookie', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({cookie})
+            });
+            const data = await res.json();
+            badge.className = data.valid ? 'badge badge-success' : 'badge badge-danger';
+            badge.textContent = data.valid ? '🟢 有效' : '🔴 失效';
+        } catch (e) { badge.textContent = '异常'; }
+    } else {
+        badge.className = 'badge badge-danger';
+        badge.textContent = '未配置';
+    }
+
+    const chBadge = document.getElementById('channel-status-badge');
+    try {
+        const chRes = await fetch('/api/check-channels');
+        const chData = await chRes.json();
+        if (chData.success) {
+            chBadge.className = 'badge badge-success';
+            chBadge.textContent = `🟢 ${chData.valid_count}/${chData.total} 联通`;
+        }
+    } catch (e) { chBadge.textContent = '超时'; }
+}
 
 function initScrollCollapseFilter() {
     const gridContainer = document.getElementById('movie-grid-container');
@@ -23,6 +54,21 @@ function initScrollCollapseFilter() {
         }
         lastScrollTop = currentScroll;
     });
+}
+
+function toggleLogDrawer() {
+    const drawer = document.getElementById('log-drawer');
+    drawer.classList.toggle('open');
+}
+
+function clearHomeLog() {
+    document.getElementById('log-body').textContent = '日志已清空...';
+}
+
+function appendLog(text) {
+    const logBody = document.getElementById('log-body');
+    logBody.textContent += (logBody.textContent ? '\n' : '') + text;
+    logBody.scrollTop = logBody.scrollHeight;
 }
 
 function switchCategory(cat) {
@@ -158,15 +204,49 @@ async function addSubscriptionFromModal() {
     closeSubModal();
 }
 
+// 🎯 点击批量转存时自动弹出日志抽屉，并流式输出结果
 async function startBatchTransfer() {
-    if (selectedMovies.size === 0) { alert('请勾选目标'); return; }
+    if (selectedMovies.size === 0) { alert('请先勾选需要转存的影视！'); return; }
     const cookie = localStorage.getItem('quark_cookie') || '';
-    if (!cookie) { alert('请先在后台填入 Cookie！'); return; }
+    if (!cookie) { alert('请先在后台填入夸克 Cookie！'); return; }
+
+    // 自动打开底部日志抽屉
+    document.getElementById('log-drawer').classList.add('open');
+    document.getElementById('log-body').textContent = '';
+
     const targets = Array.from(selectedMovies);
-    const res = await fetch('/api/transfer', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({movies: targets, cookie: cookie, folderId: localStorage.getItem('target_folder_id') || '0'})
-    });
-    alert('转存任务已提交！');
+    const targetFolderId = localStorage.getItem('target_folder_id') || '0';
+    
+    appendLog(`[系统] 🚀 开始处理批量转存，共 ${targets.length} 个目标...`);
+    appendLog(`[系统] 📁 存储目标目录 FID: ${targetFolderId}`);
+
+    try {
+        const response = await fetch('/api/transfer', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                movies: targets,
+                cookie: cookie,
+                folderId: targetFolderId
+            })
+        });
+
+        if (!response.ok) {
+            const text = await response.text();
+            appendLog(`\n❌ 服务异常 (${response.status}): ${text.substring(0, 100)}`);
+            return;
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder('utf-8');
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            const chunk = decoder.decode(value, { stream: true });
+            appendLog(chunk);
+        }
+    } catch (err) {
+        appendLog(`\n❌ 转存网络请求异常: ${err.message}`);
+    }
 }
