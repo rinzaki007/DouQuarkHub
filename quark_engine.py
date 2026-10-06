@@ -18,24 +18,31 @@ def clean_tv_filename(raw_name, title):
 
 class QuarkEngine:
     def __init__(self, cookie):
+        # 🎯 核心修复：自动剥离 Cookie 中的换行符与多余空格，彻底解决 HTTP 400 与 Cookie 误判失效
+        if cookie:
+            cookie = "".join(cookie.splitlines()).strip()
+            if cookie.lower().startswith('cookie:'):
+                cookie = cookie[7:].strip()
         self.cookie = cookie
-        # 🎯 补全夸克 PC/Web 端防风控通用请求头
+
         self.headers = {
             "Cookie": self.cookie,
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
             "Referer": "https://pan.quark.cn/",
             "Origin": "https://pan.quark.cn",
+            "Accept": "application/json, text/plain, */*",
             "Content-Type": "application/json"
         }
 
     def check_cookie_valid(self):
         """精准校验夸克 Cookie 是否有效"""
+        if not self.cookie:
+            return False
         url = "https://drive-pc.quark.cn/1/clouddrive/user/info?pr=uc_drive&fr=pc"
         try:
             resp = requests.get(url, headers=self.headers, timeout=6)
             if resp.status_code == 200:
                 data = resp.json()
-                # 兼容 status 200 或 code 0
                 return data.get("status") == 200 or data.get("code") == 0 or data.get("message") == "ok"
         except Exception:
             pass
@@ -125,7 +132,6 @@ class QuarkEngine:
             return None, None, str(e)
 
     def save_files(self, pwd_id, files, stoken, target_fid='0'):
-        """🎯 修复 460 错误：转存接口绑定正确的 pr/fr 参数与防风控 Header"""
         url = "https://drive-pc.quark.cn/1/clouddrive/share/sharepage/save?pr=uc_drive&fr=pc"
         payload = {
             "pwd_id": pwd_id,
@@ -145,7 +151,7 @@ class QuarkEngine:
                     return True, "转存成功"
                 return False, data.get("message", "转存失败")
             elif resp.status_code == 460:
-                return False, "触发夸克风控 (HTTP 460)，请更换 Cookie 或稍后再试"
+                return False, "触发夸克风控 (HTTP 460)，请稍后再试"
             return False, f"HTTP 状态码: {resp.status_code}"
         except Exception as e:
             return False, str(e)
