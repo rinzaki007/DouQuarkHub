@@ -308,6 +308,9 @@ function getTargetFolderId() {
     return defaultFid;
 }
 
+// ==========================================
+// 🎬 核心重构：第一阶段（搜刮候选并弹出交互窗口）
+// ==========================================
 async function startBatchTransfer() {
     if (selectedMovies.size === 0) { alert('请先勾选需要转存的影视！'); return; }
     const cookie = localStorage.getItem('quark_cookie') || '';
@@ -320,38 +323,138 @@ async function startBatchTransfer() {
     if (logBody) logBody.textContent = '';
 
     const targets = Array.from(selectedMovies);
-    const targetFolderId = getTargetFolderId();
+    const selectedObjs = targets.map(title => movieList.find(m => m.title === title)).filter(Boolean).map(m => ({
+        title: m.title,
+        tag: currentCategory || '电影',
+        cover: m.cover,
+        url: m.url
+    }));
     
-    appendLog(`[系统] 🚀 开始处理批量转存 [分类: ${currentCategory}]，共 ${targets.length} 个目标...`);
-    appendLog(`[系统] 📁 存储目标目录 FID: ${targetFolderId}`);
+    appendLog(`[系统] 🔍 正在各大 TG 频道中深度搜刮候选资源，请稍候...`);
 
     try {
-        const response = await fetch('/api/transfer', {
+        const response = await fetch('/api/search-candidates', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({
-                movies: targets,
-                cookie: cookie,
-                folderId: targetFolderId
+                movies: selectedObjs,
+                cookie: cookie
             })
         });
 
-        if (!response.ok) {
-            const text = await response.text();
-            appendLog(`\n❌ 服务异常 (${response.status}): ${text.substring(0, 100)}`);
+        const res = await response.json();
+        if (!res.success) {
+            appendLog(`[系统] ❌ 搜刮失败: ${res.message || '未知错误'}`);
             return;
         }
 
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder('utf-8');
+        appendLog(`[系统] ✅ 搜刮完成，正在弹出候选资源选择窗口...`);
+        showCandidateSelectionModal(selectedObjs, res.candidates_map || {});
+    } catch (err) {
+        appendLog(`[系统] ❌ 请求异常: ${err.message}`);
+    }
+}
 
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            const chunk = decoder.decode(value, { stream: true });
-            appendLog(chunk);
+// 📌 渲染候选资源交互选择弹窗
+function showCandidateSelectionModal(movies, candidatesMap) {
+    let existing = document.getElementById('custom-candidate-modal');
+    if (existing) existing.remove();
+
+    const modal = document.createElement('div');
+    modal.id = 'custom-candidate-modal';
+    modal.style.cssText = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:9999; display:flex; justify-content:center; align-items:center;";
+
+    let htmlContent = `
+        <div style="background:#1e293b; color:#f8fafc; width:700px; max-height:85vh; border-radius:8px; padding:20px; overflow-y:auto; box-shadow:0 10px 25px rgba(0,0,0,0.5); border:1px solid #334155;">
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #334155; padding-bottom:10px; margin-bottom:15px;">
+                <h3 style="margin:0; font-size:18px; color:#38bdf8;"><i class="fa-solid fa-list-check"></i> 选择要转存的资源版本</h3>
+                <button onclick="document.getElementById('custom-candidate-modal').remove()" style="background:none; border:none; color:#94a3b8; font-size:20px; cursor:pointer;">&times;</button>
+            </div>
+            <div>
+    `;
+
+    movies.forEach(movie => {
+        const title = movie.title;
+        const candidates = candidatesMap[title] || [];
+
+        htmlContent += `<div style="margin-bottom:15px; background:#0f172a; padding:12px; border-radius:6px; border:1px solid #1e293b;">`;
+        htmlContent += `<div style="font-weight:bold; color:#60a5fa; margin-bottom:8px;">🎬 《${title}》 (找到 ${candidates.length} 个候选源)</div>`;
+
+        if (candidates.length === 0) {
+            htmlContent += `<div style="color:#f43f5e; font-size:13px;">未能在配置的频道中找到匹配资源</div>`;
+        } else {
+            candidates.forEach((cand) => {
+                const fileNames = cand.files.map(f => f.file_name).join('<br>');
+                const movieStr = encodeURIComponent(JSON.stringify(movie));
+                const candStr = encodeURIComponent(JSON.stringify(cand));
+
+                htmlContent += `
+                    <div style="background:#1e293b; border:1px solid #334155; border-radius:6px; padding:10px; margin-top:8px; font-size:13px;">
+                        <div style="display:flex; justify-content:space-between; margin-bottom:6px; color:#34d399;">
+                            <span>🌐 频道: ${cand.channel}</span>
+                            <span style="color:#94a3b8;">包含 ${cand.files.length} 个视频文件</span>
+                        </div>
+                        <div style="background:#020617; padding:8px; border-radius:4px; max-height:90px; overflow-y:auto; font-family:monospace; font-size:12px; color:#cbd5e1; margin-bottom:8px;">
+                            ${fileNames}
+                        </div>
+                        <div style="text-align:right;">
+                            <button onclick='executeConfirmedTransfer("${movieStr}", "${candStr}")' style="background:#059669; color:white; border:none; padding:6px 12px; border-radius:4px; cursor:pointer; font-weight:500;">
+                                🚀 确认转存此版本
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+        htmlContent += `</div>`;
+    });
+
+    htmlContent += `
+            </div>
+            <div style="text-align:right; margin-top:15px; border-top:1px solid #334155; padding-top:10px;">
+                <button onclick="document.getElementById('custom-candidate-modal').remove()" style="background:#475569; color:white; border:none; padding:6px 14px; border-radius:4px; cursor:pointer;">关闭</button>
+            </div>
+        </div>
+    `;
+
+    modal.innerHTML = htmlContent;
+    document.body.appendChild(modal);
+}
+
+// ==========================================
+// 🎯 核心重构：第二阶段（用户确认后执行指定转存）
+// ==========================================
+async function executeConfirmedTransfer(movieEncoded, candEncoded) {
+    const modal = document.getElementById('custom-candidate-modal');
+    if (modal) modal.remove();
+
+    const movie = JSON.parse(decodeURIComponent(movieEncoded));
+    const candidate = JSON.parse(decodeURIComponent(candEncoded));
+    const cookie = localStorage.getItem('quark_cookie') || '';
+
+    const drawer = document.getElementById('log-drawer');
+    if (drawer) drawer.classList.add('open');
+    
+    appendLog(`[系统] 📥 正在为《${movie.title}》创建专属文件夹并转存选中版本...`);
+
+    try {
+        const response = await fetch('/api/transfer-selected', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                movie: movie,
+                candidate: candidate,
+                cookie: cookie
+            })
+        });
+
+        const res = await response.json();
+        if (res.success) {
+            appendLog(`[完成] 🎉 ${res.message}`);
+        } else {
+            appendLog(`[完成] ❌ 转存失败: ${res.message}`);
         }
     } catch (err) {
-        appendLog(`\n❌ 转存网络请求异常: ${err.message}`);
+        appendLog(`[系统] ❌ 转存请求异常: ${err.message}`);
     }
 }
