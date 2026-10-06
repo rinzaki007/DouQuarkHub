@@ -1,7 +1,7 @@
 import re
 import requests
 
-# 🎯 严格校验视频文件扩展名，排除 .flac / .mp3 / .pdf / .txt 等干扰文件
+# 🎯 视频后缀白名单
 VIDEO_EXTS = {'.mp4', '.mkv', '.avi', '.mov', '.wmv', '.flv', '.m4v', '.rmvb', '.rm', '.ts', '.webm', '.iso', '.m2ts'}
 
 def is_video_file(filename):
@@ -24,7 +24,6 @@ def sanitize_pwd_id(pwd_id):
     return pwd_id
 
 def clean_tv_filename(raw_name, title=""):
-    # 非视频文件直接排除
     if not raw_name or not is_video_file(raw_name):
         return None, raw_name
     
@@ -78,16 +77,15 @@ class QuarkEngine:
             return False
 
     def get_or_create_subfolder(self, title, target_fid='0'):
-        """🎯 核心：在存储目录下检查或新建以【影视名称】命名的专属子文件夹，返回其 fid"""
+        """🎯 自动在目标目录下检查或创建以影视名命名的专属子文件夹"""
         if not title or not self.cookie:
             return target_fid
         
-        # 清洗文件名合法字符
         safe_title = re.sub(r'[\\/:*?"<>|]', '', title).strip()
         if not safe_title:
             safe_title = title.strip()
 
-        # 1. 检查目标目录下是否已存在同名文件夹
+        # 检查是否已有同名目录
         sort_url = f"https://drive.quark.cn/1/clouddrive/file/sort?pr=ucpro&fr=pc&pdir_fid={target_fid}&num=100"
         try:
             r = requests.get(sort_url, headers=self.headers, timeout=6)
@@ -101,7 +99,7 @@ class QuarkEngine:
         except Exception:
             pass
 
-        # 2. 不存在时自动在夸克网盘新建专属文件夹
+        # 新建目录
         mkdir_url = "https://drive.quark.cn/1/clouddrive/file/mkdir?pr=ucpro&fr=pc"
         payload = {
             "file_name": safe_title,
@@ -120,7 +118,6 @@ class QuarkEngine:
         return target_fid
 
     def get_share_files(self, pwd_id, max_depth=3, only_video=True):
-        """🎯 递归穿透文件夹，并严格过滤仅保留视频文件"""
         pwd_id = sanitize_pwd_id(pwd_id)
         if not pwd_id:
             return None, None, "分享链接 ID 无效"
@@ -158,7 +155,6 @@ class QuarkEngine:
                                 fetch_folder_files(item.get('fid'), current_depth + 1)
                             else:
                                 file_name = item.get('file_name', '')
-                                # 过滤非视频文件（如 flac/mp3/pdf/txt）
                                 if not only_video or is_video_file(file_name):
                                     all_files.append(item)
             except Exception:
