@@ -7,12 +7,12 @@
     <link rel="stylesheet" href="/static/css/style.css">
     <style>
         .admin-layout { display: flex; height: calc(100vh - 56px); }
-        .sidebar { width: 220px; background: #111827; border-right: 1px solid #1f2937; padding: 12px; }
+        .sidebar { width: 220px; background: #111827; border-right: 1px solid #1f2937; padding: 12px; flex-shrink: 0; }
         .sidebar-menu { list-style: none; display: flex; flex-direction: column; gap: 4px; }
         .sidebar-menu li { padding: 10px 12px; border-radius: 6px; cursor: pointer; color: #94a3b8; font-size: 13px; font-weight: 600; }
         .sidebar-menu li:hover, .sidebar-menu li.active { background: #1f2937; color: #38bdf8; }
-        .admin-main { flex: 1; padding: 20px; overflow-y: auto; background: #0b0f19; }
-        .admin-section { display: none; }
+        .admin-main { flex: 1; padding: 24px; overflow-y: auto; background: #0b0f19; }
+        .admin-section { display: none; width: 100%; }
         .admin-section.active { display: flex; flex-direction: column; gap: 16px; }
     </style>
 </head>
@@ -23,7 +23,7 @@
             <h1>MovieSync 后台控制中心</h1>
         </div>
         <div>
-            <a href="/"><button class="action-btn btn-secondary">返回前台</button></a>
+            <a href="/"><button class="action-btn btn-secondary">返回前台首页</button></a>
             <a href="/logout"><button class="action-btn btn-secondary">退出登录</button></a>
         </div>
     </header>
@@ -32,16 +32,67 @@
         <!-- 侧边栏菜单 -->
         <div class="sidebar">
             <ul class="sidebar-menu">
-                <li class="active" onclick="switchSection('status')">⚡ 系统监控与日志</li>
+                <li class="active" onclick="switchSection('config')">⚙️ 全局设置与配置迁移</li>
                 <li onclick="switchSection('sub')">📊 自动化追剧任务</li>
-                <li onclick="switchSection('config')">⚙️ 夸克与系统设置</li>
+                <li onclick="switchSection('status')">⚡ 服务监控与日志</li>
             </ul>
         </div>
 
         <!-- 主内容区 -->
         <div class="admin-main">
-            <!-- 模块 1: 系统监控与日志 -->
-            <div id="sec-status" class="admin-section active">
+            <!-- 🎯 模块 1: 全局设置 (取消狭窄限制，铺满页面宽度) -->
+            <div id="sec-config" class="admin-section active">
+                <div class="admin-card-full">
+                    <h2>⚙️ 全局系统参数设置</h2>
+                    
+                    <div class="form-group" style="margin-top: 10px;">
+                        <label>夸克网盘 Cookie (ck):</label>
+                        <textarea id="quark-cookie-input" style="height:85px; width:100%;"></textarea>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group"><label>默认全局 FID:</label><input type="text" id="folder-id-input"></div>
+                        <div class="form-group"><label>OpenList 地址:</label><input type="text" id="openlist-url-input"></div>
+                    </div>
+
+                    <h3 style="margin-top:12px; font-size:13px; color:#38bdf8;">📁 各分类目录 FID (可选)</h3>
+                    <div class="form-row">
+                        <div class="form-group"><label>电影目录 FID:</label><input type="text" id="folder-movie-input"></div>
+                        <div class="form-group"><label>电视剧目录 FID:</label><input type="text" id="folder-tv-input"></div>
+                    </div>
+
+                    <div class="form-group" style="margin-top: 10px;">
+                        <label>TG 检索频道配置管理:</label>
+                        <div class="channel-manage-box">
+                            <div id="channel-list-box" class="channel-list-scroll" style="max-height: 160px;"></div>
+                            <div class="channel-add-row" style="margin-top: 8px;">
+                                <input type="text" id="new-ch-name" placeholder="频道名称 (例如: 夸克电影分享)">
+                                <input type="text" id="new-ch-id" placeholder="频道 ID (例如: quark_movies)">
+                                <button type="button" class="btn-primary" onclick="addChannel()">添加频道</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 🎯 配置导入/导出按钮栏 -->
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:20px; padding-top:16px; border-top:1px solid #1f2937;">
+                        <div style="display:flex; gap:10px;">
+                            <button class="btn-secondary" onclick="exportConfig()">📤 导出配置 JSON</button>
+                            <button class="btn-secondary" onclick="triggerImportConfig()">📥 导入配置 JSON</button>
+                            <input type="file" id="import-file-input" accept=".json" style="display:none;" onchange="handleImportConfig(event)">
+                        </div>
+                        <button class="btn-primary" style="height:38px; padding:0 24px;" onclick="saveAdminConfig()">💾 保存全部设置</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 模块 2: 追剧订阅列表 -->
+            <div id="sec-sub" class="admin-section">
+                <h2>📊 自动化追踪任务管理</h2>
+                <div id="sub-list-box" class="sub-list-scroll" style="max-height:550px;"></div>
+            </div>
+
+            <!-- 模块 3: 系统监控与日志 -->
+            <div id="sec-status" class="admin-section">
                 <div class="panel">
                     <div class="panel-header">
                         <h3>⚡ 运行状态服务监控</h3>
@@ -53,56 +104,12 @@
                     </div>
                 </div>
 
-                <div class="panel" style="flex:1;">
+                <div class="panel">
                     <div class="panel-header">
-                        <h3>🟢 实时日志控制台</h3>
+                        <h3>🟢 运行控制台日志</h3>
                         <button class="btn-sm" onclick="clearAdminLog()">清空日志</button>
                     </div>
-                    <div id="log-body" class="log-body" style="height: 380px;">MovieSync 服务就绪...</div>
-                </div>
-            </div>
-
-            <!-- 模块 2: 追剧订阅列表 -->
-            <div id="sec-sub" class="admin-section">
-                <h2>📊 自动化追踪任务管理</h2>
-                <div id="sub-list-box" class="sub-list-scroll" style="max-height:500px;"></div>
-            </div>
-
-            <!-- 模块 3: 全局系统设置 (夸克 Cookie / 目录 FID / TG 频道) -->
-            <div id="sec-config" class="admin-section">
-                <div class="modal-content" style="box-shadow:none; border:1px solid #1f2937;">
-                    <h2>⚙️ 全局设置项</h2>
-                    <div class="form-group">
-                        <label>夸克网盘 Cookie (ck):</label>
-                        <textarea id="quark-cookie-input" style="height:70px;"></textarea>
-                    </div>
-                    
-                    <div class="form-row">
-                        <div class="form-group"><label>默认全局 FID:</label><input type="text" id="folder-id-input"></div>
-                        <div class="form-group"><label>OpenList 地址:</label><input type="text" id="openlist-url-input"></div>
-                    </div>
-
-                    <h3 style="margin-top:5px; font-size:13px; color:#38bdf8;">📁 各分类目录 FID</h3>
-                    <div class="form-row">
-                        <div class="form-group"><label>电影目录 FID:</label><input type="text" id="folder-movie-input"></div>
-                        <div class="form-group"><label>电视剧目录 FID:</label><input type="text" id="folder-tv-input"></div>
-                    </div>
-
-                    <div class="form-group">
-                        <label>TG 检索频道管理:</label>
-                        <div class="channel-manage-box">
-                            <div id="channel-list-box" class="channel-list-scroll"></div>
-                            <div class="channel-add-row">
-                                <input type="text" id="new-ch-name" placeholder="频道名称">
-                                <input type="text" id="new-ch-id" placeholder="频道 ID">
-                                <button type="button" class="btn-primary" onclick="addChannel()">添加</button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div style="display:flex; justify-content:flex-end;">
-                        <button class="btn-primary" onclick="saveAdminConfig()">保存全部设置</button>
-                    </div>
+                    <div id="log-body" class="log-body" style="height: 300px;">MovieSync 服务就绪...</div>
                 </div>
             </div>
         </div>
