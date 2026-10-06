@@ -58,7 +58,6 @@ button:hover { background-color: #1d4ed8; }
 .logo-area { display: flex; align-items: center; gap: 8px; }
 .logo-area h1 { font-size: 16px; font-weight: 700; color: #38bdf8; }
 
-/* 🎯 居中大搜索框样式优化 */
 .search-bar {
     display: flex;
     width: 580px;
@@ -84,7 +83,6 @@ button:hover { background-color: #1d4ed8; }
     font-size: 13px;
 }
 
-/* 顶栏右侧状态徽章区 */
 .header-status-area {
     display: flex;
     align-items: center;
@@ -171,7 +169,17 @@ button:hover { background-color: #1d4ed8; }
 .card-info { padding: 8px; display: flex; flex-direction: column; gap: 2px; justify-content: space-between; flex: 1; }
 .movie-title { font-size: 12px; font-weight: 600; color: #f8fafc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-/* 🎯 首页日志抽屉 */
+/* 🎯 豆瓣详情页跳转链接 */
+.douban-link {
+    font-size: 10px;
+    color: #64748b;
+    text-decoration: none;
+    margin-top: 2px;
+    display: inline-block;
+    transition: color 0.2s;
+}
+.douban-link:hover { color: #38bdf8; }
+
 .log-drawer {
     background: #111827;
     border: 1px solid #1f2937;
@@ -182,18 +190,6 @@ button:hover { background-color: #1d4ed8; }
 }
 .log-drawer.open { display: flex; }
 .drawer-header { padding: 6px 12px; background: #1e293b; display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: #e2e8f0; }
-
-/* 🎯 后台铺满宽屏卡片 */
-.admin-card-full {
-    background: #111827;
-    border: 1px solid #1f2937;
-    border-radius: 8px;
-    padding: 24px;
-    width: 100%;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-}
 
 .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); align-items: center; justify-content: center; z-index: 1000; }
 .modal-content { background: #111827; border: 1px solid #1f2937; border-radius: 10px; padding: 20px; display: flex; flex-direction: column; gap: 12px; }
@@ -207,37 +203,7 @@ button:hover { background-color: #1d4ed8; }
 
 .modal-footer { display: flex; justify-content: flex-end; gap: 8px; padding-top: 6px; border-top: 1px solid #1f2937; }
 
-.panel { background: #0f172a; border: 1px solid #1f2937; border-radius: 6px; display: flex; flex-direction: column; }
-.panel-header { padding: 8px 12px; background: #1e293b; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #334155; }
-.panel-header h3 { font-size: 12px; color: #e2e8f0; }
-
-.status-items { padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
-.status-row { display: flex; justify-content: space-between; font-size: 12px; color: #94a3b8; }
-
-.log-body { padding: 10px; font-family: monospace; font-size: 11px; color: #38bdf8; background: #0b0f19; overflow-y: auto; white-space: pre-wrap; line-height: 1.4; }
-
 .badge { padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 600; }
 .badge-success { background: rgba(16, 185, 129, 0.2); color: #34d399; }
 .badge-warning { background: rgba(245, 158, 11, 0.2); color: #fbbf24; }
 .badge-danger { background: rgba(239, 68, 68, 0.2); color: #f87171; }
-
-.sub-list-scroll { max-height: 200px; overflow-y: auto; background: #0f172a; border: 1px solid #1f2937; border-radius: 6px; padding: 6px; }
-.channel-manage-box { background: #0f172a; border: 1px solid #1f2937; border-radius: 6px; padding: 6px; display: flex; flex-direction: column; gap: 6px; }
-.channel-list-scroll { max-height: 100px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
-.channel-item { display: flex; justify-content: space-between; background: #1e293b; padding: 5px 8px; border-radius: 4px; font-size: 11px; }
-
-/* 🎯 彩色分级日志样式 */
-.log-line {
-    margin-bottom: 3px;
-    line-height: 1.5;
-    font-family: Consolas, Monaco, monospace;
-}
-.log-tag-info { color: #38bdf8; }
-.log-tag-success { color: #34d399; font-weight: 600; }
-.log-tag-warn { color: #fbbf24; font-weight: 600; }
-.log-tag-error { color: #f87171; font-weight: 700; }
-
-select option {
-    background-color: #1f2937;
-    color: #f8fafc;
-}
