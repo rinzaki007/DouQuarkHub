@@ -1,5 +1,6 @@
 import re
 import requests
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from quark_engine import QuarkEngine
 
 class SearchService:
@@ -11,8 +12,8 @@ class SearchService:
 
     def search_movie_candidates(self, movie, channels):
         """
-        【阶段一：搜刮并聚合候选资源】
-        在所有配置的 TG 频道中检索该电影，返回所有命中的夸克网盘候选列表供前端人工选择。
+        【阶段一：并发搜刮与候选聚合】
+        使用线程池同时并发检索所有 TG 频道，数倍提速，彻底避免反向代理 502 超时。
         """
         engine = QuarkEngine(self.cookie)
         video_extensions = ('.mp4', '.mkv', '.avi', '.mov', '.flv', '.wmv', '.m4v', '.ts', '.m2ts', '.iso')
@@ -35,17 +36,19 @@ class SearchService:
         candidates = []
         seen_pwd_ids = set()
 
-        for ch in channels:
+        def search_single_channel(ch):
+            """内部函数：单个频道的检索逻辑"""
             ch_id = ch.get('id', '').strip() if isinstance(ch, dict) else str(ch).strip()
             ch_name = ch.get('name', ch_id) if isinstance(ch, dict) else ch_id
             if not ch_id:
-                continue
+                return []
 
+            local_candidates = []
             search_url = f"https://t.me/s/{ch_id}?q={requests.utils.quote(clean_title)}"
             try:
-                resp = requests.get(search_url, headers=self.headers, timeout=6)
+                resp = requests.get(search_url, headers=self.headers, timeout=5)
                 if resp.status_code != 200:
-                    continue
+                    return []
 
                 messages = re.findall(r'<div class="tgme_widget_message_text js-message_text.*?">([\s\S]*?)</div>', resp.text)
                 
@@ -57,10 +60,6 @@ class SearchService:
                         pwd_matches = quark_pattern.findall(msg)
                         
                         for pwd_id in pwd_matches:
-                            if pwd_id in seen_pwd_ids:
-                                continue
-                            seen_pwd_ids.add(pwd_id)
-
                             files, stoken, err = engine.get_share_files(pwd_id)
                             if err or not files:
                                 continue
@@ -76,7 +75,7 @@ class SearchService:
                             
                             if video_files:
                                 first_name = video_files[0]['file_name']
-                                candidates.append({
+                                local_candidates.append({
                                     "channel": ch_name,
                                     "pwd_id": pwd_id,
                                     "stoken": stoken,
@@ -84,7 +83,23 @@ class SearchService:
                                     "summary": f"频道: [{ch_name}] | 包含 {len(video_files)} 个视频 | 示例: {first_name}"
                                 })
             except Exception:
-                continue
+                pass
+            return local_candidates
+
+        # 🚀 使用线程池并发请求所有频道（最大并发数 10）
+        with ThreadPoolExecutor(max_workers=10) as executor:
+            futures = [executor.submit(search_single_channel, ch) for ch in channels]
+            for future in as_completed(futures):
+                try:
+                    res = future.result()
+                    if res:
+                        for cand in res:
+                            pwd_id = cand['pwd_id']
+                            if pwd_id not in seen_pwd_ids:
+                                seen_pwd_ids.add(pwd_id)
+                                candidates.append(cand)
+                except Exception:
+                    pass
 
         return candidates
 
