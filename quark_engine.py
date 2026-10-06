@@ -18,16 +18,16 @@ def clean_tv_filename(raw_name, title):
 
 class QuarkEngine:
     def __init__(self, cookie):
-        # 🎯 核心修复：自动剥离 Cookie 中的换行符与多余空格，彻底解决 HTTP 400 与 Cookie 误判失效
         if cookie:
             cookie = "".join(cookie.splitlines()).strip()
             if cookie.lower().startswith('cookie:'):
                 cookie = cookie[7:].strip()
         self.cookie = cookie
 
+        # 🎯 补全夸克官方客户端标准请求头，防止触发 HTTP 400
         self.headers = {
             "Cookie": self.cookie,
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36 QuarkCloudDrive/2.5.20",
             "Referer": "https://pan.quark.cn/",
             "Origin": "https://pan.quark.cn",
             "Accept": "application/json, text/plain, */*",
@@ -35,7 +35,7 @@ class QuarkEngine:
         }
 
     def check_cookie_valid(self):
-        """精准校验夸克 Cookie 是否有效"""
+        """精准联网校验夸克 Cookie"""
         if not self.cookie:
             return False
         url = "https://drive-pc.quark.cn/1/clouddrive/user/info?pr=uc_drive&fr=pc"
