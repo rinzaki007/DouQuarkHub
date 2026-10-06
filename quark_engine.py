@@ -69,13 +69,13 @@ class QuarkEngine:
             return False
 
     def get_or_create_subfolder(self, folder_name, parent_fid='0'):
-        """在指定的父级目录 FID 下精准创建或获取专属文件夹"""
+        """在指定的父级目录 FID 下精准创建或获取专属文件夹（含强力容错兜底）"""
         if not parent_fid:
             parent_fid = '0'
 
         # 1. 先检查该目录下是否存在同名字文件夹
         try:
-            list_url = f"https://drive.quark.cn/1/clouddrive/file/sort?pr=ucpro&fr=pc&pdir_fid={parent_fid}&num=100"
+            list_url = f"https://drive.quark.cn/1/clouddrive/file/sort?pr=ucpro&fr=pc&pdir_fid={parent_fid}&num=200"
             resp = requests.get(list_url, headers=self.headers, timeout=6)
             if resp.status_code == 200:
                 d = resp.json()
@@ -101,12 +101,12 @@ class QuarkEngine:
                 new_fid = data_obj.get('fid') or data_obj.get('file_id') or d.get('fid')
                 if new_fid:
                     return new_fid
-        except Exception as e:
-            print(f"创建文件夹异常: {e}")
+        except Exception:
+            pass
 
-        # 3. 再次拉取确认（防止并发创建时漏掉）
+        # 3. 兜底保障：无论创建成功与否、或是因为重名报错，再次拉取目录直接定位该文件夹 FID
         try:
-            list_url = f"https://drive.quark.cn/1/clouddrive/file/sort?pr=ucpro&fr=pc&pdir_fid={parent_fid}&num=100"
+            list_url = f"https://drive.quark.cn/1/clouddrive/file/sort?pr=ucpro&fr=pc&pdir_fid={parent_fid}&num=200"
             resp = requests.get(list_url, headers=self.headers, timeout=6)
             if resp.status_code == 200:
                 d = resp.json()
