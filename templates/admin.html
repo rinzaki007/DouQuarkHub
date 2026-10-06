@@ -12,7 +12,6 @@
             color: #f8fafc;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
         }
-        /* 强制日志卡片与控制台自然换行 */
         .log-box-style {
             white-space: pre-wrap !important;
             word-break: break-all !important;
@@ -45,7 +44,7 @@
     <!-- 侧边栏 + 内容区双栏布局 -->
     <div class="flex-1 flex overflow-hidden">
         
-        <!-- 侧边栏菜单 (全功能 3 个标签栏) -->
+        <!-- 侧边栏菜单 -->
         <aside class="w-60 bg-slate-900/90 border-r border-slate-800 p-4 shrink-0 flex flex-col gap-2">
             <button onclick="switchTab('global')" id="tab-btn-global" 
                 class="tab-btn w-full text-left bg-blue-600 text-white px-3.5 py-2.5 rounded text-xs font-semibold flex items-center gap-2 transition">
@@ -98,19 +97,19 @@
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <div>
                             <label class="block text-xs text-slate-400 mb-1">🎬 电影目录 FID:</label>
-                            <input type="text" id="fid-movie" value="3ef79d1b370a4b27bd334b7bbba7e6e1" class="w-full bg-slate-900 border border-slate-800 rounded px-3 py-1.5 text-xs text-slate-200">
+                            <input type="text" id="fid-movie" value="" class="w-full bg-slate-900 border border-slate-800 rounded px-3 py-1.5 text-xs text-slate-200">
                         </div>
                         <div>
                             <label class="block text-xs text-slate-400 mb-1">📺 电视剧目录 FID:</label>
-                            <input type="text" id="fid-tv" value="fe24e17d8d254997b21710c73b22b6e7" class="w-full bg-slate-900 border border-slate-800 rounded px-3 py-1.5 text-xs text-slate-200">
+                            <input type="text" id="fid-tv" value="" class="w-full bg-slate-900 border border-slate-800 rounded px-3 py-1.5 text-xs text-slate-200">
                         </div>
                         <div>
                             <label class="block text-xs text-slate-400 mb-1">🎤 综艺目录 FID:</label>
-                            <input type="text" id="fid-show" value="6999ba53a9384525881f785976bd09f1" class="w-full bg-slate-900 border border-slate-800 rounded px-3 py-1.5 text-xs text-slate-200">
+                            <input type="text" id="fid-show" value="" class="w-full bg-slate-900 border border-slate-800 rounded px-3 py-1.5 text-xs text-slate-200">
                         </div>
                         <div>
                             <label class="block text-xs text-slate-400 mb-1">🎨 动漫目录 FID:</label>
-                            <input type="text" id="fid-anime" value="55a44b99fac641679e1ebf55dcb38be9" class="w-full bg-slate-900 border border-slate-800 rounded px-3 py-1.5 text-xs text-slate-200">
+                            <input type="text" id="fid-anime" value="" class="w-full bg-slate-900 border border-slate-800 rounded px-3 py-1.5 text-xs text-slate-200">
                         </div>
                     </div>
                 </div>
@@ -119,7 +118,6 @@
                 <div class="space-y-3 pt-4 border-t border-slate-800">
                     <h3 class="text-xs font-bold text-slate-300">TG 检索频道配置管理:</h3>
                     
-                    <!-- 频道卡片容器：用 flex-wrap 自然折行，绝不遮挡底部 -->
                     <div id="tg-channels-container" class="flex flex-wrap gap-2 p-3 bg-slate-900/60 rounded-lg border border-slate-800 min-h-[60px]">
                         <!-- JS 动态渲染 -->
                     </div>
@@ -161,7 +159,6 @@
                     </button>
                 </div>
 
-                <!-- 订阅任务表格 -->
                 <div class="bg-slate-900 border border-slate-800 rounded-lg overflow-hidden">
                     <table class="w-full text-left text-xs text-slate-300">
                         <thead class="bg-slate-800/80 text-slate-400 uppercase font-semibold border-b border-slate-700/60">
@@ -187,15 +184,17 @@
                         <i class="fa-solid fa-terminal text-emerald-400"></i> 后台系统实时控制台日志
                     </h2>
                     <div class="flex gap-2">
+                        <button onclick="fetchAdminLogs()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-3 py-1.5 rounded border border-slate-700 flex items-center gap-1">
+                            <i class="fa-solid fa-arrows-rotate"></i> 手动刷新
+                        </button>
                         <button onclick="clearAdminLogs()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs px-3 py-1.5 rounded border border-slate-700">
-                            清空控制台
+                            清空本地视图
                         </button>
                     </div>
                 </div>
 
-                <!-- 控制台日志文本框 -->
                 <div id="admin-log-box" class="bg-slate-950 border border-slate-800 rounded-lg p-4 h-[550px] overflow-y-auto log-box-style text-xs text-sky-400 font-mono shadow-inner">
-                    [System] 日志控制台就绪，正在监听后台数据通道...\n
+                    正在连接系统日志服务...
                 </div>
             </div>
 
@@ -203,32 +202,43 @@
     </div>
 
     <script>
-        let tgChannels = [
-            { name: '夸克云盘综合资源', id: 'Quark_Movies' },
-            { name: 'YOYO资源|夸克|短剧', id: 'yoyokuakeduanju' },
-            { name: 'UC夸克百度迅雷资源分享', id: 'ucquark' },
-            { name: '夸克网盘资源收藏夹', id: 'QuarkFree' },
-            { name: 'leo资源(夸克)', id: 'leoziyuan' },
-            { name: '夸克 (百草)', id: 'baicaozi' },
-            { name: '夸克(网盘高分影视)', id: 'SharePanFilms' },
-            { name: '夸克(书籍)', id: 'BooksRealm' },
-            { name: 'Q_dongman', id: 'Q_dongman' },
-            { name: '夸克网盘动漫资源', id: 'kuakedongman' },
-            { name: 'kduanju', id: 'kduanju' },
-            { name: 'Q_jilupian', id: 'Q_jilupian' },
-            { name: 'yunpanquark', id: 'yunpanquark' },
-            { name: 'Q_dianying', id: 'Q_dianying' },
-            { name: 'gokuapan', id: 'gokuapan' },
-            { name: 'kuyupan', id: 'kuyupan' },
-            { name: 'kuakenetpan', id: 'kuakenetpan' }
-        ];
+        let tgChannels = [];
+        let logPollTimer = null;
 
         document.addEventListener("DOMContentLoaded", () => {
-            renderTGChannels();
-            loadSubscriptions();
+            loadConfigFromBackend();
         });
 
-        // 🎯 核心功能：侧边栏 3 大面板无缝切换
+        // 🎯 核心修复 1：页面加载时向后端请求已保存的 Cookie、FID、OpenList 及频道
+        async function loadConfigFromBackend() {
+            try {
+                const resp = await fetch('/api/config');
+                const res = await resp.json();
+                if (res.success && res.config) {
+                    const cfg = res.config;
+                    document.getElementById('quark-cookie').value = cfg.quark_cookie || '';
+                    document.getElementById('fid-default').value = cfg.default_fid || '0';
+                    document.getElementById('openlist-url').value = cfg.openlist_url || 'https://openlist.88888807.xyz:8807/';
+                    
+                    const catFids = cfg.category_fids || {};
+                    document.getElementById('fid-movie').value = catFids['电影'] || '3ef79d1b370a4b27bd334b7bbba7e6e1';
+                    document.getElementById('fid-tv').value = catFids['电视剧'] || 'fe24e17d8d254997b21710c73b22b6e7';
+                    document.getElementById('fid-show').value = catFids['综艺'] || '6999ba53a9384525881f785976bd09f1';
+                    document.getElementById('fid-anime').value = catFids['动漫'] || '55a44b99fac641679e1ebf55dcb38be9';
+
+                    tgChannels = cfg.channels || [];
+                    renderTGChannels();
+
+                    if (cfg.quark_cookie) {
+                        localStorage.setItem('quark_cookie', cfg.quark_cookie);
+                    }
+                }
+            } catch (err) {
+                console.error("加载全局配置失败:", err);
+            }
+        }
+
+        // 切换 Tab 并自动开启日志 3 秒轮询
         function switchTab(tabName) {
             document.querySelectorAll('.tab-btn').forEach(btn => {
                 btn.className = "tab-btn w-full text-left bg-slate-800/80 hover:bg-slate-700 text-slate-300 px-3.5 py-2.5 rounded text-xs font-semibold flex items-center gap-2 transition";
@@ -247,12 +257,19 @@
                 activePanel.classList.remove('hidden');
             }
 
+            if (logPollTimer) {
+                clearInterval(logPollTimer);
+                logPollTimer = null;
+            }
+
             if (tabName === 'auto') {
                 loadSubscriptions();
+            } else if (tabName === 'logs') {
+                fetchAdminLogs();
+                logPollTimer = setInterval(fetchAdminLogs, 3000); // 开启日志实时轮询
             }
         }
 
-        // 渲染频道列表
         function renderTGChannels() {
             const container = document.getElementById('tg-channels-container');
             container.innerHTML = '';
@@ -260,7 +277,7 @@
                 const badge = document.createElement('div');
                 badge.className = "bg-slate-800 border border-slate-700 rounded-md px-2.5 py-1.5 flex items-center gap-2 text-xs text-slate-200 shrink-0";
                 badge.innerHTML = `
-                    <span><strong>${ch.name}</strong> (${ch.id})</span>
+                    <span><strong>${ch.name || ch.id}</strong> (${ch.id})</span>
                     <button onclick="removeTGChannel(${idx})" class="text-slate-400 hover:text-rose-400 font-bold ml-1">✕</button>
                 `;
                 container.appendChild(badge);
@@ -282,7 +299,6 @@
             renderTGChannels();
         }
 
-        // 自动化追剧：拉取列表并渲染表格
         async function loadSubscriptions() {
             const tbody = document.getElementById('sub-table-body');
             tbody.innerHTML = '<tr><td colspan="5" class="px-4 py-4 text-center text-slate-500">正在加载追剧列表...</td></tr>';
@@ -316,7 +332,6 @@
         }
 
         async function runSubNow(subId) {
-            appendAdminLog(`[系统] 手动触发自动化追剧任务 ID: ${subId}`);
             try {
                 const resp = await fetch('/api/subscriptions/run-now', {
                     method: 'POST',
@@ -341,31 +356,75 @@
             }
         }
 
-        function appendAdminLog(text) {
-            const logBox = document.getElementById('admin-log-box');
-            logBox.innerText += text + '\n';
-            logBox.scrollTop = logBox.scrollHeight;
+        // 🎯 核心修复 2：实时拉取系统控制台日志
+        async function fetchAdminLogs() {
+            try {
+                const resp = await fetch('/api/admin/logs');
+                const res = await resp.json();
+                if (res.success && res.logs) {
+                    const logBox = document.getElementById('admin-log-box');
+                    logBox.innerText = res.logs.join('\n');
+                    logBox.scrollTop = logBox.scrollHeight;
+                }
+            } catch (err) {
+                console.error("拉取后台日志失败:", err);
+            }
         }
 
         function clearAdminLogs() {
-            document.getElementById('admin-log-box').innerText = '[System] 已清空控制台日志。\n';
+            document.getElementById('admin-log-box').innerText = '[System] 已清空本地视图日志。\n';
         }
 
+        // 🎯 核心修复 3：保存时把全局 Cookie、FID、OpenList URL 一并打包保存
         async function saveAllSettings() {
+            const cookieVal = document.getElementById('quark-cookie').value.trim();
+            const payload = {
+                quark_cookie: cookieVal,
+                default_fid: document.getElementById('fid-default').value.trim(),
+                openlist_url: document.getElementById('openlist-url').value.trim(),
+                category_fids: {
+                    '电影': document.getElementById('fid-movie').value.trim(),
+                    '电视剧': document.getElementById('fid-tv').value.trim(),
+                    '综艺': document.getElementById('fid-show').value.trim(),
+                    '动漫': document.getElementById('fid-anime').value.trim()
+                },
+                channels: tgChannels
+            };
+
             try {
-                await fetch('/api/channels', {
+                const resp = await fetch('/api/config', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ channels: tgChannels })
+                    body: JSON.stringify(payload)
                 });
-                alert('设置保存成功！');
+                const res = await resp.json();
+                if (res.success) {
+                    if (cookieVal) {
+                        localStorage.setItem('quark_cookie', cookieVal);
+                    }
+                    alert('全部设置保存成功并已持久化到磁盘！');
+                } else {
+                    alert('保存配置失败: ' + res.message);
+                }
             } catch (e) {
                 alert('保存设置异常: ' + e.message);
             }
         }
 
         function exportConfig() {
-            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({ channels: tgChannels }, null, 2));
+            const payload = {
+                quark_cookie: document.getElementById('quark-cookie').value.trim(),
+                default_fid: document.getElementById('fid-default').value.trim(),
+                openlist_url: document.getElementById('openlist-url').value.trim(),
+                category_fids: {
+                    '电影': document.getElementById('fid-movie').value.trim(),
+                    '电视剧': document.getElementById('fid-tv').value.trim(),
+                    '综艺': document.getElementById('fid-show').value.trim(),
+                    '动漫': document.getElementById('fid-anime').value.trim()
+                },
+                channels: tgChannels
+            };
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(payload, null, 2));
             const downloadAnchor = document.createElement('a');
             downloadAnchor.setAttribute("href", dataStr);
             downloadAnchor.setAttribute("download", "moviesync_config.json");
@@ -384,11 +443,22 @@
                 reader.readAsText(file, 'UTF-8');
                 reader.onload = readerEvent => {
                     try {
-                        const content = JSON.parse(readerEvent.target.result);
-                        if (content.channels) {
-                            tgChannels = content.channels;
-                            renderTGChannels();
-                            alert('配置成功导入！');
+                        const cfg = JSON.parse(readerEvent.target.result);
+                        if (cfg) {
+                            if (cfg.quark_cookie) document.getElementById('quark-cookie').value = cfg.quark_cookie;
+                            if (cfg.default_fid) document.getElementById('fid-default').value = cfg.default_fid;
+                            if (cfg.openlist_url) document.getElementById('openlist-url').value = cfg.openlist_url;
+                            if (cfg.category_fids) {
+                                document.getElementById('fid-movie').value = cfg.category_fids['电影'] || '';
+                                document.getElementById('fid-tv').value = cfg.category_fids['电视剧'] || '';
+                                document.getElementById('fid-show').value = cfg.category_fids['综艺'] || '';
+                                document.getElementById('fid-anime').value = cfg.category_fids['动漫'] || '';
+                            }
+                            if (cfg.channels) {
+                                tgChannels = cfg.channels;
+                                renderTGChannels();
+                            }
+                            alert('配置成功导入！请点击右下角【保存全部设置】。');
                         }
                     } catch (err) {
                         alert('读取配置文件失败: JSON 格式非法');
