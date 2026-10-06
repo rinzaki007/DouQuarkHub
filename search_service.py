@@ -9,40 +9,72 @@ class SearchService:
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
         }
 
+    def _fetch_year_from_url(self, url):
+        """通过豆瓣等详情页 URL 自动抓取年份"""
+        if not url or 'douban.com' not in url:
+            return ''
+        try:
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Referer': 'https://movie.douban.com/'
+            }
+            resp = requests.get(url, headers=headers, timeout=5)
+            if resp.status_code == 200:
+                html_text = resp.text
+                # 1. 尝试匹配豆瓣的 v:initialReleaseDate 标签
+                m = re.search(r'v:initialReleaseDate.*?content="(\d{4})', html_text)
+                if m:
+                    return m.group(1)
+                
+                # 2. 尝试从前序文本中匹配合法的电影年份 (20xx 或 19xx)
+                all_years = re.findall(r'\b(20\d{2}|19\d{2})\b', html_text[:3000])
+                for y in all_years:
+                    if 1950 <= int(y) <= 2030:
+                        return y
+        except Exception:
+            pass
+        return ''
+
     def batch_search_and_transfer_stream(self, movies, channels, target_fid='0', category_fids=None):
         category_fids = category_fids or {}
         engine = QuarkEngine(self.cookie)
         
         video_extensions = ('.mp4', '.mkv', '.avi', '.mov', '.flv', '.wmv', '.m4v', '.ts', '.m2ts', '.iso')
 
-        yield f"[系统] 🚀 批量转存任务正式启动，共计处理 {len(movies)} 部影片\n"
+        yield f"[系统] 🚀 批量转存任务正式启动, 共计处理 {len(movies)} 部影片\n"
 
         for idx, movie in enumerate(movies, 1):
             target_year = ''
             title = ''
             tag = '电影'
+            url = ''
 
             if isinstance(movie, dict):
                 title = movie.get('title', movie.get('name', '')).strip()
                 tag = movie.get('tag', '电影')
+                url = movie.get('url', '')
                 
-                # 【全字段盲扫】遍历电影字典所有属性值，只要发现 4 位年份直接提取
-                for k, v in movie.items():
-                    if v:
-                        v_str = str(v)
-                        m_y = re.search(r'\b(19\d{2}|20\d{2})\b', v_str)
-                        if m_y:
-                            target_year = m_y.group(1)
-                            break
+                # 1. 优先尝试从豆瓣链接网页中提取真实年份
+                if url:
+                    target_year = self._fetch_year_from_url(url)
                 
-                # 如果还没找到，尝试从标题括号中提取（如 "给阿嬷的情书 (2026)"）
+                # 2. 如果没抓到，尝试从数据字典其他字段提取
+                if not target_year:
+                    for k, v in movie.items():
+                        if k not in ['title', 'name', 'cover', 'url'] and v:
+                            m_y = re.search(r'\b(19\d{2}|20\d{2})\b', str(v))
+                            if m_y:
+                                target_year = m_y.group(1)
+                                break
+                
+                # 3. 尝试从标题括号中提取
                 if not target_year:
                     title_year_match = re.search(r'[\(\（]\s*(19\d{2}|20\d{2})\s*[\)\）]', title)
                     if title_year_match:
                         target_year = title_year_match.group(1)
             else:
                 title = str(movie).strip()
-                title_year_match = re.search(r'[\(\–\(]\s*(19\d{2}|20\d{2})\s*[\)\）]', title)
+                title_year_match = re.search(r'[\(\（]\s*(19\d{2}|20\d{2})\s*[\)\）]', title)
                 if title_year_match:
                     target_year = title_year_match.group(1)
 
@@ -52,7 +84,7 @@ class SearchService:
 
             yield f"\n----------------------------------------\n"
             yield f"[调试] 收到影片原始数据: {movie}\n"
-            yield f"[进度 {idx}/{len(movies)}] 🎬 目标影片: 《{title}》 | 锁定目标年份: 【{target_year or '未识别到年份'}】\n"
+            yield f"[进度 {idx}/{len(movies)}] 🎬 目标影片: 《{title}》 | 豆瓣链接解析年份: 【{target_year or '未识别到'}】\n"
             yield f"[分类] 🏷 目标分类: [{tag}] (父级网盘 FID: {parent_fid})\n"
             yield f"[检索] 🔍 正在 TG 频道中进行严格标题与年份甄别...\n"
 
