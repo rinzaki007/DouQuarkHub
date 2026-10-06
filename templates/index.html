@@ -10,7 +10,7 @@
 </head>
 <body class="min-h-screen flex flex-col">
 
-    <!-- 顶栏：左侧分类/功能，中间搜索框，右侧系统状态与设置（吸顶 + 毛玻璃） -->
+    <!-- 顶栏：左侧分类/功能，中间搜索框，右侧系统状态与设置 -->
     <header class="bg-slate-900/80 backdrop-blur-md border-b border-slate-800/80 sticky top-0 z-40 px-4 py-3">
         <div class="max-w-7xl mx-auto flex items-center justify-between gap-4">
             
@@ -62,7 +62,7 @@
         </div>
     </header>
 
-    <!-- 第二行：排序方式与超宽资源选择显示栏（吸顶 + 毛玻璃） -->
+    <!-- 第二行：排序方式与超宽资源选择显示栏 -->
     <div class="bg-slate-900/80 backdrop-blur-md border-b border-slate-800/80 px-4 py-2.5 sticky top-[57px] z-30 shadow-md">
         <div class="max-w-7xl mx-auto flex items-center justify-between gap-4">
             
@@ -113,132 +113,12 @@
         <div id="movie-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 hidden"></div>
     </main>
 
-    <!-- 智能追剧管理弹窗 -->
-    <div id="chase-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-[100] flex items-center justify-center hidden">
-        <div class="bg-slate-900 border border-slate-800 rounded-lg w-full max-w-5xl p-6 shadow-2xl space-y-4 max-h-[90vh] flex flex-col">
-            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
-                <div class="flex items-center gap-3">
-                    <h3 class="text-base font-semibold text-white flex items-center gap-2">
-                        <i class="fa-solid fa-heart text-purple-500"></i> 智能自动化追剧管理中心
-                    </h3>
-                    <div class="flex bg-slate-950 p-0.5 rounded border border-slate-800 text-xs">
-                        <button onclick="switchChaseTab('add')" id="chase-tab-add" class="px-3.5 py-1.5 rounded bg-purple-600 text-white font-medium transition">添加新追剧</button>
-                        <button onclick="switchChaseTab('list')" id="chase-tab-list" class="px-3.5 py-1.5 rounded text-slate-400 hover:text-white transition">已订阅任务 (<span id="sub-count-badge">0</span>)</button>
-                    </div>
-                </div>
-                <button onclick="closeChaseModal()" class="text-slate-400 hover:text-white text-lg">✕</button>
-            </div>
+    <!-- 引用弹窗与日志组件 -->
+    {% include 'components/chase_modal.html' %}
+    {% include 'components/transfer_modal.html' %}
+    {% include 'components/log_panel.html' %}
 
-            <!-- Tab 1: 添加追剧向导 -->
-            <div id="chase-panel-add" class="flex-1 overflow-y-auto space-y-4 pr-1">
-                <div class="bg-slate-950 border border-slate-800 rounded p-4 space-y-3">
-                    <div class="text-xs font-semibold text-purple-400">第一步：填写剧名并检索全网频道</div>
-                    <div class="flex gap-2">
-                        <input type="text" id="chase-title-input" placeholder="例如: 绝命毒师" class="flex-1 bg-slate-900 border border-slate-700 rounded px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-purple-500">
-                        <button onclick="searchChaseCandidates()" class="px-5 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded text-xs font-medium transition shadow">
-                            🔍 检索频道资源
-                        </button>
-                    </div>
-                </div>
-
-                <div id="chase-candidates-container" class="space-y-3 hidden">
-                    <div class="text-xs font-semibold text-blue-400">第二步：选择要监控的 TG 频道及具体集数白名单（默认全部不勾选，按需勾选）</div>
-                    <div id="chase-candidates-list" class="space-y-3"></div>
-                </div>
-
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div class="bg-slate-950 border border-slate-800 rounded p-4 space-y-2">
-                        <div class="text-xs font-semibold text-amber-400">第三步：选择存储目录 (将在该目录下自动创建剧名专属文件夹)</div>
-                        <select id="chase-target-fid" class="global-category-select w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500">
-                            <option value="0">正在加载后台目录配置...</option>
-                        </select>
-                    </div>
-                    <div class="bg-slate-950 border border-slate-800 rounded p-4 space-y-2">
-                        <div class="text-xs font-semibold text-emerald-400">第四步：设定自动检测更新频率</div>
-                        <select id="chase-interval-select" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-xs text-slate-200 focus:outline-none">
-                            <option value="3">每 3 小时检测一次</option>
-                            <option value="6" selected>每 6 小时检测一次</option>
-                            <option value="9">每 9 小时检测一次</option>
-                            <option value="12">每 12 小时检测一次</option>
-                        </select>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Tab 2: 已订阅任务列表管理 -->
-            <div id="chase-panel-list" class="flex-1 overflow-y-auto space-y-3 pr-1 hidden">
-                <div class="bg-slate-950 border border-slate-800 rounded-lg overflow-hidden">
-                    <table class="w-full text-left text-xs text-slate-300">
-                        <thead class="bg-slate-900 text-slate-400 uppercase font-semibold border-b border-slate-800">
-                            <tr>
-                                <th class="px-3.5 py-3">剧集名称</th>
-                                <th class="px-3.5 py-3">监控频道</th>
-                                <th class="px-3.5 py-3">频率</th>
-                                <th class="px-3.5 py-3">状态/上次检测</th>
-                                <th class="px-3.5 py-3 text-right">操作</th>
-                            </tr>
-                        </thead>
-                        <tbody id="modal-sub-table-body" class="divide-y divide-slate-800/80">
-                            <tr><td colspan="5" class="px-3 py-6 text-center text-slate-500">正在加载...</td></tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <div class="flex justify-between items-center pt-3 border-t border-slate-800">
-                <button onclick="closeChaseModal()" class="px-4 py-2 text-xs bg-slate-800 text-slate-300 rounded hover:bg-slate-700">关闭</button>
-                <button id="btn-submit-chase" onclick="submitSmartChase()" class="px-5 py-2 text-xs bg-purple-600 text-white rounded hover:bg-purple-500 font-medium hidden shadow">
-                    🚀 保存并开启自动化追剧
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- 批量转存资源弹窗 -->
-    <div id="candidate-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-[100] flex items-center justify-center hidden">
-        <div class="bg-slate-900 border border-slate-800 rounded-lg w-full max-w-4xl p-6 shadow-2xl space-y-4 max-h-[90vh] flex flex-col">
-            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
-                <div class="flex items-center gap-3">
-                    <h3 class="text-base font-medium text-white flex items-center gap-2">
-                        <i class="fa-solid fa-list-check text-blue-500"></i> 选择要转存的资源版本及文件白名单
-                    </h3>
-                </div>
-                <button onclick="closeCandidateModal()" class="text-slate-400 hover:text-white text-lg">✕</button>
-            </div>
-
-            <div class="bg-slate-950 border border-slate-800 rounded-lg p-3 flex items-center gap-3">
-                <span class="text-xs font-semibold text-amber-400 shrink-0"><i class="fa-solid fa-folder-tree"></i> 目标存储目录:</span>
-                <select id="batch-target-fid" class="global-category-select flex-1 bg-slate-900 border border-slate-700 rounded px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-amber-500">
-                    <option value="0">正在加载后台分类目录配置...</option>
-                </select>
-                <span class="text-[11px] text-slate-400 shrink-0">(将自动在此目录下新建影片专属文件夹)</span>
-            </div>
-
-            <div id="candidate-content" class="flex-1 overflow-y-auto space-y-4 pr-1"></div>
-            
-            <div class="flex justify-end pt-2 border-t border-slate-800">
-                <button onclick="closeCandidateModal()" class="px-4 py-2 text-xs bg-slate-800 text-slate-300 rounded hover:bg-slate-700">关闭</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- 底部固定实时日志面板（毛玻璃效果） -->
-    <div id="log-panel" class="fixed bottom-0 left-0 right-0 z-50 bg-slate-950/40 backdrop-blur-2xl border-t border-slate-700/40 shadow-2xl transition-all duration-300 hidden">
-        <div class="flex items-center justify-between px-4 py-2 bg-slate-900/40 backdrop-blur-xl border-b border-slate-800/40">
-            <div class="flex items-center gap-2 text-xs text-slate-300 font-medium">
-                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                <span>实时转存运行日志</span>
-                <span id="log-timer-badge" class="ml-2 px-2 py-0.5 rounded bg-blue-950/80 text-blue-400 font-mono text-[11px] hidden">耗时: 0 秒</span>
-            </div>
-            <div class="flex items-center gap-2">
-                <button onclick="clearLog()" class="px-2 py-0.5 text-xs bg-slate-800/80 hover:bg-slate-700 text-slate-300 rounded">清空</button>
-                <button onclick="toggleLogBox(false)" class="px-2 py-0.5 text-xs bg-slate-800/80 hover:bg-slate-700 text-slate-300 rounded">收起 ×</button>
-            </div>
-        </div>
-        <div id="log-box" class="h-48 overflow-y-auto p-3 bg-transparent"></div>
-    </div>
-
-    <!-- 依次引入细分后的三个独立 JS 脚本 -->
+    <!-- 引入细分后的三个独立 JS 脚本 -->
     <script src="{{ url_for('static', filename='js/transfer.js') }}"></script>
     <script src="{{ url_for('static', filename='js/subscription.js') }}"></script>
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
