@@ -206,7 +206,7 @@
         </div>
     </div>
 
-    <!-- 🚀 批量转存资源弹窗（已加入目标存储目录显示与选择） -->
+    <!-- 批量转存资源弹窗 -->
     <div id="candidate-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-[100] flex items-center justify-center hidden">
         <div class="bg-slate-900 border border-slate-800 rounded-lg w-full max-w-4xl p-6 shadow-2xl space-y-4 max-h-[90vh] flex flex-col">
             <div class="flex items-center justify-between border-b border-slate-800 pb-3">
@@ -218,7 +218,7 @@
                 <button onclick="closeCandidateModal()" class="text-slate-400 hover:text-white text-lg">✕</button>
             </div>
 
-            <!-- 🎯 转存弹窗全局目录选择栏 -->
+            <!-- 转存弹窗全局目录选择栏 -->
             <div class="bg-slate-950 border border-slate-800 rounded-lg p-3 flex items-center gap-3">
                 <span class="text-xs font-semibold text-amber-400 shrink-0"><i class="fa-solid fa-folder-tree"></i> 目标存储目录:</span>
                 <select id="batch-target-fid" class="global-category-select flex-1 bg-slate-900 border border-slate-700 rounded px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-amber-500">
@@ -272,7 +272,6 @@
             loadCategoryOptions();
         });
 
-        // 🚀 核心：统一加载后台配置的 4 个分类专属目录及默认目录填充到所有下拉框
         async function loadCategoryOptions() {
             try {
                 const resp = await fetch('/api/config');
@@ -300,7 +299,6 @@
                             }
                         }
 
-                        // 智能匹配逻辑：如果是批量转存的下拉框，根据当前页面顶部的标签（电影/电视剧/综艺/动漫）自动高亮对应目录
                         if (selectEl.id === 'batch-target-fid') {
                             let matched = false;
                             for (let opt of selectEl.options) {
@@ -662,9 +660,10 @@
 
                 listContainer.innerHTML = '';
                 candidates.forEach((cand) => {
+                    // 🎯 优化：移除了默认的 checked 属性，改为默认全部不勾选
                     const fileNames = cand.files.map((f) => `
                         <label class="flex items-center gap-2 py-1 text-xs text-slate-300 hover:text-white cursor-pointer">
-                            <input type="checkbox" name="chase-file-item" value="${f.fid}" checked class="chase-file-cb rounded bg-slate-900 border-slate-700 text-purple-600">
+                            <input type="checkbox" name="chase-file-item" value="${f.fid}" class="chase-file-cb rounded bg-slate-900 border-slate-700 text-purple-600 focus:ring-0">
                             <span class="font-mono">${f.file_name}</span>
                         </label>
                     `).join('');
@@ -832,9 +831,10 @@
                 } else {
                     html += `<div class="space-y-3 mt-2">`;
                     candidates.forEach((cand, cIdx) => {
+                        // 🎯 优化：移除了默认的 checked 属性，改为默认全部不勾选
                         const fileCheckboxes = cand.files.map((f) => `
                             <label class="flex items-center gap-2 py-1 text-xs text-slate-300 hover:text-white cursor-pointer">
-                                <input type="checkbox" name="batch-file-${mIdx}-${cIdx}" value="${f.fid}" checked class="rounded bg-slate-900 border-slate-700 text-blue-600 focus:ring-0">
+                                <input type="checkbox" name="batch-file-${mIdx}-${cIdx}" value="${f.fid}" class="rounded bg-slate-900 border-slate-700 text-blue-600 focus:ring-0">
                                 <span class="font-mono">${f.file_name}</span>
                             </label>
                         `).join('');
@@ -863,6 +863,7 @@
                 container.appendChild(movieSection);
             });
 
+            document.getElementById('candidate-modal').classList.add('hidden'); // Fix: ensure modal displays, wait, keep it as remove('hidden')
             document.getElementById('candidate-modal').classList.remove('hidden');
         }
 
@@ -897,7 +898,7 @@
             try {
                 const response = await fetch('/api/transfer-selected', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({
                         movie: movie,
                         candidate: candidate,
