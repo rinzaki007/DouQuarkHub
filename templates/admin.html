@@ -12,37 +12,60 @@
             color: #f8fafc;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
         }
+        /* 强制日志卡片与控制台自然换行 */
+        .log-box-style {
+            white-space: pre-wrap !important;
+            word-break: break-all !important;
+            line-height: 1.6 !important;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
     </style>
 </head>
 <body class="min-h-screen flex flex-col bg-slate-950 text-slate-100">
 
     <!-- 顶栏 -->
-    <header class="bg-slate-900 border-b border-slate-800 px-6 py-3.5 flex justify-between items-center shrink-0">
+    <header class="bg-slate-900 border-b border-slate-800 px-6 py-3.5 flex justify-between items-center shrink-0 sticky top-0 z-50">
         <div class="flex items-center gap-2 text-lg font-bold text-white">
             <i class="fa-solid fa-gear text-blue-500"></i> MovieSync 后台控制中心
         </div>
         <div class="flex gap-2">
-            <a href="/" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-3.5 py-2 rounded transition">
-                返回前台首页
+            <a href="/" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-3.5 py-2 rounded transition font-medium flex items-center gap-1">
+                <i class="fa-solid fa-house"></i> 返回前台首页
             </a>
-            <a href="/logout" class="bg-rose-900/60 hover:bg-rose-800 text-rose-200 text-xs px-3.5 py-2 rounded transition">
-                退出登录
+            <a href="/logout" class="bg-rose-900/60 hover:bg-rose-800 text-rose-200 text-xs px-3.5 py-2 rounded transition font-medium flex items-center gap-1">
+                <i class="fa-solid fa-right-from-bracket"></i> 退出登录
             </a>
         </div>
     </header>
 
-    <!-- 双栏主体 -->
+    <!-- 侧边栏 + 内容区双栏布局 -->
     <div class="flex-1 flex overflow-hidden">
-        <!-- 侧边栏 -->
-        <aside class="w-60 bg-slate-900/80 border-r border-slate-800 p-4 shrink-0 flex flex-col gap-2">
-            <button class="w-full text-left bg-blue-600 text-white px-3.5 py-2.5 rounded text-xs font-semibold flex items-center gap-2">
+        
+        <!-- 侧边栏菜单 (全功能 3 个标签栏) -->
+        <aside class="w-60 bg-slate-900/90 border-r border-slate-800 p-4 shrink-0 flex flex-col gap-2">
+            <button onclick="switchTab('global')" id="tab-btn-global" 
+                class="tab-btn w-full text-left bg-blue-600 text-white px-3.5 py-2.5 rounded text-xs font-semibold flex items-center gap-2 transition">
                 <i class="fa-solid fa-sliders"></i> 全局设置与配置迁移
+            </button>
+            <button onclick="switchTab('auto')" id="tab-btn-auto" 
+                class="tab-btn w-full text-left bg-slate-800/80 hover:bg-slate-700 text-slate-300 px-3.5 py-2.5 rounded text-xs font-semibold flex items-center gap-2 transition">
+                <i class="fa-solid fa-robot"></i> 自动化追剧任务
+            </button>
+            <button onclick="switchTab('logs')" id="tab-btn-logs" 
+                class="tab-btn w-full text-left bg-slate-800/80 hover:bg-slate-700 text-slate-300 px-3.5 py-2.5 rounded text-xs font-semibold flex items-center gap-2 transition">
+                <i class="fa-solid fa-terminal"></i> 系统运行日志
             </button>
         </aside>
 
-        <!-- 内容主区 -->
-        <main class="flex-1 overflow-y-auto p-6 bg-slate-950 text-sm">
-            <div class="max-w-4xl space-y-6">
+        <!-- 右侧内容主面板区域 -->
+        <main class="flex-1 overflow-y-auto p-6 bg-slate-950">
+            
+            <!-- 1. 全局系统参数设置 -->
+            <div id="panel-global" class="panel-content space-y-6 max-w-4xl">
                 <h2 class="text-base font-bold text-white flex items-center gap-2 border-b border-slate-800 pb-3">
                     <i class="fa-solid fa-gears text-blue-400"></i> 全局系统参数设置
                 </h2>
@@ -55,15 +78,15 @@
                         placeholder="请粘贴夸克网盘 Cookie..."></textarea>
                 </div>
 
-                <!-- 存储目录 -->
+                <!-- 默认全局存储与 OpenList 访问 -->
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div class="space-y-1">
                         <label class="block text-xs text-slate-400 font-semibold">默认全局存储目录 FID:</label>
-                        <input type="text" id="fid-default" value="0" class="w-full bg-slate-900 border border-slate-800 rounded px-3 py-2 text-xs text-slate-200">
+                        <input type="text" id="fid-default" value="0" class="w-full bg-slate-900 border border-slate-800 rounded px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-blue-500">
                     </div>
                     <div class="space-y-1">
                         <label class="block text-xs text-slate-400 font-semibold">OpenList 访问地址:</label>
-                        <input type="text" id="openlist-url" value="https://openlist.88888807.xyz:8807/" class="w-full bg-slate-900 border border-slate-800 rounded px-3 py-2 text-xs text-slate-200">
+                        <input type="text" id="openlist-url" value="https://openlist.88888807.xyz:8807/" class="w-full bg-slate-900 border border-slate-800 rounded px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-blue-500">
                     </div>
                 </div>
 
@@ -92,26 +115,26 @@
                     </div>
                 </div>
 
-                <!-- TG 检索频道配置管理（彻底修复元素重叠遮挡问题） -->
+                <!-- TG 检索频道配置管理 -->
                 <div class="space-y-3 pt-4 border-t border-slate-800">
                     <h3 class="text-xs font-bold text-slate-300">TG 检索频道配置管理:</h3>
                     
-                    <!-- 频道标签列表：采用规范的 flex-wrap 自然流排版 -->
-                    <div id="tg-channels-container" class="flex flex-wrap gap-2 p-3 bg-slate-900/60 rounded-lg border border-slate-800">
+                    <!-- 频道卡片容器：用 flex-wrap 自然折行，绝不遮挡底部 -->
+                    <div id="tg-channels-container" class="flex flex-wrap gap-2 p-3 bg-slate-900/60 rounded-lg border border-slate-800 min-h-[60px]">
                         <!-- JS 动态渲染 -->
                     </div>
 
-                    <!-- 添加频道表单：独立的 flex 行，绝不重叠 -->
+                    <!-- 添加新频道 -->
                     <div class="flex flex-wrap items-center gap-2 pt-2 p-3 bg-slate-900/40 rounded-lg border border-slate-800/80">
-                        <input type="text" id="new-ch-name" placeholder="频道名称 (例如: 夸克电影)" class="bg-slate-900 border border-slate-800 rounded px-3 py-1.5 text-xs flex-1 min-w-[150px] text-slate-200">
-                        <input type="text" id="new-ch-id" placeholder="频道 ID (例如: quark_movies)" class="bg-slate-900 border border-slate-800 rounded px-3 py-1.5 text-xs flex-1 min-w-[150px] text-slate-200">
+                        <input type="text" id="new-ch-name" placeholder="频道名称 (例如: 夸克电影)" class="bg-slate-900 border border-slate-800 rounded px-3 py-1.5 text-xs flex-1 min-w-[150px] text-slate-200 focus:outline-none focus:border-blue-500">
+                        <input type="text" id="new-ch-id" placeholder="频道 ID (例如: quark_movies)" class="bg-slate-900 border border-slate-800 rounded px-3 py-1.5 text-xs flex-1 min-w-[150px] text-slate-200 focus:outline-none focus:border-blue-500">
                         <button onclick="addTGChannel()" class="bg-blue-600 hover:bg-blue-500 text-white text-xs px-4 py-1.5 rounded font-medium shrink-0">
                             添加频道
                         </button>
                     </div>
                 </div>
 
-                <!-- 底部保存按钮行 -->
+                <!-- 底部保存按钮 -->
                 <div class="border-t border-slate-800 pt-6 flex flex-wrap justify-between items-center gap-3 mb-10">
                     <div class="flex gap-2">
                         <button onclick="exportConfig()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-3.5 py-2 rounded flex items-center gap-1 border border-slate-700">
@@ -126,6 +149,56 @@
                     </button>
                 </div>
             </div>
+
+            <!-- 2. 自动化追剧任务 -->
+            <div id="panel-auto" class="panel-content hidden space-y-6 max-w-5xl">
+                <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                    <h2 class="text-base font-bold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-robot text-purple-400"></i> 自动化追剧任务列表
+                    </h2>
+                    <button onclick="loadSubscriptions()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-3 py-1.5 rounded flex items-center gap-1 border border-slate-700">
+                        <i class="fa-solid fa-rotate"></i> 刷新列表
+                    </button>
+                </div>
+
+                <!-- 订阅任务表格 -->
+                <div class="bg-slate-900 border border-slate-800 rounded-lg overflow-hidden">
+                    <table class="w-full text-left text-xs text-slate-300">
+                        <thead class="bg-slate-800/80 text-slate-400 uppercase font-semibold border-b border-slate-700/60">
+                            <tr>
+                                <th class="px-4 py-3">剧集名称</th>
+                                <th class="px-4 py-3">检查间隔</th>
+                                <th class="px-4 py-3">已存起始集</th>
+                                <th class="px-4 py-3">状态/上次检测</th>
+                                <th class="px-4 py-3 text-right">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="sub-table-body" class="divide-y divide-slate-800">
+                            <!-- JS 动态渲染 -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 3. 系统运行日志控制台 -->
+            <div id="panel-logs" class="panel-content hidden space-y-4 max-w-5xl">
+                <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                    <h2 class="text-base font-bold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-terminal text-emerald-400"></i> 后台系统实时控制台日志
+                    </h2>
+                    <div class="flex gap-2">
+                        <button onclick="clearAdminLogs()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs px-3 py-1.5 rounded border border-slate-700">
+                            清空控制台
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 控制台日志文本框 -->
+                <div id="admin-log-box" class="bg-slate-950 border border-slate-800 rounded-lg p-4 h-[550px] overflow-y-auto log-box-style text-xs text-sky-400 font-mono shadow-inner">
+                    [System] 日志控制台就绪，正在监听后台数据通道...\n
+                </div>
+            </div>
+
         </main>
     </div>
 
@@ -152,8 +225,34 @@
 
         document.addEventListener("DOMContentLoaded", () => {
             renderTGChannels();
+            loadSubscriptions();
         });
 
+        // 🎯 核心功能：侧边栏 3 大面板无缝切换
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.className = "tab-btn w-full text-left bg-slate-800/80 hover:bg-slate-700 text-slate-300 px-3.5 py-2.5 rounded text-xs font-semibold flex items-center gap-2 transition";
+            });
+            document.querySelectorAll('.panel-content').forEach(panel => {
+                panel.classList.add('hidden');
+            });
+
+            const activeBtn = document.getElementById(`tab-btn-${tabName}`);
+            if (activeBtn) {
+                activeBtn.className = "tab-btn w-full text-left bg-blue-600 text-white px-3.5 py-2.5 rounded text-xs font-semibold flex items-center gap-2 transition";
+            }
+
+            const activePanel = document.getElementById(`panel-${tabName}`);
+            if (activePanel) {
+                activePanel.classList.remove('hidden');
+            }
+
+            if (tabName === 'auto') {
+                loadSubscriptions();
+            }
+        }
+
+        // 渲染频道列表
         function renderTGChannels() {
             const container = document.getElementById('tg-channels-container');
             container.innerHTML = '';
@@ -171,7 +270,7 @@
         function addTGChannel() {
             const name = document.getElementById('new-ch-name').value.trim();
             const id = document.getElementById('new-ch-id').value.trim().replace('@', '');
-            if (!name || !id) return alert('请填写频道名称和 ID');
+            if (!name || !id) return alert('请填写完整的频道名称和 ID');
             tgChannels.push({ name, id });
             document.getElementById('new-ch-name').value = '';
             document.getElementById('new-ch-id').value = '';
@@ -183,22 +282,78 @@
             renderTGChannels();
         }
 
-        async function saveAllSettings() {
-            const payload = {
-                cookie: document.getElementById('quark-cookie').value.trim(),
-                default_fid: document.getElementById('fid-default').value.trim(),
-                openlist_url: document.getElementById('openlist-url').value.trim(),
-                category_fids: {
-                    '电影': document.getElementById('fid-movie').value.trim(),
-                    '电视剧': document.getElementById('fid-tv').value.trim(),
-                    '综艺': document.getElementById('fid-show').value.trim(),
-                    '动漫': document.getElementById('fid-anime').value.trim()
-                },
-                channels: tgChannels
-            };
-
+        // 自动化追剧：拉取列表并渲染表格
+        async function loadSubscriptions() {
+            const tbody = document.getElementById('sub-table-body');
+            tbody.innerHTML = '<tr><td colspan="5" class="px-4 py-4 text-center text-slate-500">正在加载追剧列表...</td></tr>';
+            
             try {
-                const resp = await fetch('/api/channels', {
+                const resp = await fetch('/api/subscriptions');
+                const res = await resp.json();
+                if (res.success && res.subscriptions && res.subscriptions.length > 0) {
+                    tbody.innerHTML = '';
+                    res.subscriptions.forEach(sub => {
+                        const tr = document.createElement('tr');
+                        tr.className = "hover:bg-slate-800/40";
+                        tr.innerHTML = `
+                            <td class="px-4 py-3 font-medium text-slate-200">${sub.title || '未命名'}</td>
+                            <td class="px-4 py-3 text-slate-400">${sub.interval_hours || 6} 小时</td>
+                            <td class="px-4 py-3 text-slate-400">EP ${sub.start_ep || 0}</td>
+                            <td class="px-4 py-3 text-slate-400">${sub.last_check || '等待触发'}</td>
+                            <td class="px-4 py-3 text-right space-x-2">
+                                <button onclick="runSubNow('${sub.id}')" class="bg-purple-600 hover:bg-purple-500 text-white px-2.5 py-1 rounded text-[11px]">立即运行</button>
+                                <button onclick="deleteSub('${sub.id}')" class="bg-rose-900/60 hover:bg-rose-800 text-rose-200 px-2.5 py-1 rounded text-[11px]">删除</button>
+                            </td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                } else {
+                    tbody.innerHTML = '<tr><td colspan="5" class="px-4 py-6 text-center text-slate-500">暂无自动化追剧任务，可在前台点击【一键追剧】添加。</td></tr>';
+                }
+            } catch (err) {
+                tbody.innerHTML = '<tr><td colspan="5" class="px-4 py-4 text-center text-rose-400">加载追剧列表失败</td></tr>';
+            }
+        }
+
+        async function runSubNow(subId) {
+            appendAdminLog(`[系统] 手动触发自动化追剧任务 ID: ${subId}`);
+            try {
+                const resp = await fetch('/api/subscriptions/run-now', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ id: subId })
+                });
+                const res = await resp.json();
+                alert(res.message || '已执行追剧检视');
+                loadSubscriptions();
+            } catch (err) {
+                alert('手动执行追剧失败');
+            }
+        }
+
+        async function deleteSub(subId) {
+            if (!confirm('确定要删除该追剧任务吗？')) return;
+            try {
+                await fetch(`/api/subscriptions?id=${subId}`, { method: 'DELETE' });
+                loadSubscriptions();
+            } catch (err) {
+                alert('删除失败');
+            }
+        }
+
+        function appendAdminLog(text) {
+            const logBox = document.getElementById('admin-log-box');
+            logBox.innerText += text + '\n';
+            logBox.scrollTop = logBox.scrollHeight;
+        }
+
+        function clearAdminLogs() {
+            document.getElementById('admin-log-box').innerText = '[System] 已清空控制台日志。\n';
+        }
+
+        async function saveAllSettings() {
+            try {
+                await fetch('/api/channels', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({ channels: tgChannels })
@@ -207,6 +362,40 @@
             } catch (e) {
                 alert('保存设置异常: ' + e.message);
             }
+        }
+
+        function exportConfig() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({ channels: tgChannels }, null, 2));
+            const downloadAnchor = document.createElement('a');
+            downloadAnchor.setAttribute("href", dataStr);
+            downloadAnchor.setAttribute("download", "moviesync_config.json");
+            document.body.appendChild(downloadAnchor);
+            downloadAnchor.click();
+            downloadAnchor.remove();
+        }
+
+        function importConfig() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = 'application/json';
+            input.onchange = e => {
+                const file = e.target.files[0];
+                const reader = new FileReader();
+                reader.readAsText(file, 'UTF-8');
+                reader.onload = readerEvent => {
+                    try {
+                        const content = JSON.parse(readerEvent.target.result);
+                        if (content.channels) {
+                            tgChannels = content.channels;
+                            renderTGChannels();
+                            alert('配置成功导入！');
+                        }
+                    } catch (err) {
+                        alert('读取配置文件失败: JSON 格式非法');
+                    }
+                }
+            }
+            input.click();
         }
     </script>
 </body>
