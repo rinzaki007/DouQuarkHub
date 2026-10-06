@@ -31,18 +31,14 @@ def clean_tv_filename(raw_name, title=""):
         if m:
             try:
                 ep_num = int(m.group(1))
-                if ep_num > 1900 and ep_num < 2030:
-                    ep_num = None
-                    continue
-                if ep_num in [720, 1080, 2160, 4]:
+                if 1900 < ep_num < 2030 or ep_num in [720, 1080, 2160, 4]:
                     ep_num = None
                     continue
                 break
             except ValueError:
                 continue
 
-    cleaned_name = raw_name
-    return ep_num, cleaned_name
+    return ep_num, raw_name
 
 
 class QuarkEngine:
@@ -63,16 +59,59 @@ class QuarkEngine:
     def check_cookie_valid(self):
         if not self.cookie:
             return False
-        # 🎯 沿用你昨天能跑通的接口
         url = "https://drive.quark.cn/1/clouddrive/file/sort?pr=ucpro&fr=pc&pdir_fid=0&num=1"
         try:
             resp = requests.get(url, headers=self.headers, timeout=6)
             if resp.status_code == 200:
-                data = resp.json()
-                return data.get('code') == 0
+                return resp.json().get('code') == 0
             return False
         except Exception:
             return False
+
+    def get_or_create_subfolder(self, folder_name, parent_fid='0'):
+        """在指定的父级目录 FID 下检索或新建对应名字的文件夹"""
+        if not parent_fid:
+            parent_fid = '0'
+
+        # 1. 先检查该目录下是否存在同名字文件夹
+        try:
+            list_url = f"https://drive.quark.cn/1/clouddrive/file/sort?pr=ucpro&fr=pc&pdir_fid={parent_fid}&num=100"
+            resp = requests.get(list_url, headers=self.headers, timeout=6)
+            if resp.status_code == 200:
+                d = resp.json()
+                if d.get('code') == 0:
+                    for item in d.get('data', {}).get('list', []):
+                        if item.get('file_name') == folder_name:
+                            return item.get('fid')
+        except Exception:
+            pass
+
+        # 2. 不存在则发起新建文件夹请求
+        mkdir_url = "https://drive.quark.cn/1/clouddrive/file/mkdir?pr=ucpro&fr=pc"
+        payload = {
+            "pdir_fid": str(parent_fid),
+            "file_name": folder_name,
+            "dir_init_lock": False
+        }
+        try:
+            resp = requests.post(mkdir_url, json=payload, headers=self.headers, timeout=6)
+            d = resp.json()
+            if d.get('code') == 0:
+                return d.get('data', {}).get('fid')
+            
+            # 如果因为并发或其他原因已存在，再次拉取确认
+            list_url = f"https://drive.quark.cn/1/clouddrive/file/sort?pr=ucpro&fr=pc&pdir_fid={parent_fid}&num=100"
+            resp = requests.get(list_url, headers=self.headers, timeout=6)
+            if resp.status_code == 200:
+                d = resp.json()
+                if d.get('code') == 0:
+                    for item in d.get('data', {}).get('list', []):
+                        if item.get('file_name') == folder_name:
+                            return item.get('fid')
+        except Exception:
+            pass
+
+        return parent_fid
 
     def get_share_files(self, pwd_id, max_depth=3):
         pwd_id = sanitize_pwd_id(pwd_id)
