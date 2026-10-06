@@ -177,12 +177,15 @@ def handle_config():
 def get_admin_logs():
     return jsonify({'success': True, 'logs': SYSTEM_LOGS})
 
-# 🎯 核心修复：前端 Cookie 健康度检测 API
+# 🎯 修复：精准接收前端传来的 Cookie 并校验
 @app.route('/api/check-cookie', methods=['POST'])
 def check_cookie():
     try:
-        config = load_full_config()
-        cookie = config.get('quark_cookie', '')
+        data = request.json or {}
+        cookie = data.get('cookie', '').strip()
+        if not cookie:
+            config = load_full_config()
+            cookie = config.get('quark_cookie', '')
         if not cookie:
             return jsonify({'valid': False, 'message': '未配置 Cookie'})
         engine = QuarkEngine(cookie)
@@ -191,7 +194,7 @@ def check_cookie():
     except Exception as e:
         return jsonify({'valid': False, 'message': f'校验出错: {str(e)}'})
 
-# 🎯 核心修复：前端 TG 频道监控探针 API
+# 🎯 修复：真实联网探针检测 TG 频道连通性
 @app.route('/api/check-channels', methods=['GET'])
 def check_channels_health():
     try:
@@ -207,8 +210,8 @@ def check_channels_health():
             url = f"https://t.me/s/{ch_id}"
             headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
             try:
-                resp = requests.head(url, headers=headers, timeout=3.0)
-                return resp.status_code == 200
+                resp = requests.get(url, headers=headers, timeout=4.0)
+                return resp.status_code == 200 and "tgme_channel_info" in resp.text
             except Exception:
                 return False
 
