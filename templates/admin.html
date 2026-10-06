@@ -44,15 +44,11 @@
     <!-- 侧边栏 + 内容区双栏布局 -->
     <div class="flex-1 flex overflow-hidden">
         
-        <!-- 侧边栏菜单 -->
+        <!-- 侧边栏菜单（已精简） -->
         <aside class="w-60 bg-slate-900/90 border-r border-slate-800 p-4 shrink-0 flex flex-col gap-2">
             <button onclick="switchTab('global')" id="tab-btn-global" 
                 class="tab-btn w-full text-left bg-blue-600 text-white px-3.5 py-2.5 rounded text-xs font-semibold flex items-center gap-2 transition">
-                <i class="fa-solid fa-sliders"></i> 全局设置与配置迁移
-            </button>
-            <button onclick="switchTab('auto')" id="tab-btn-auto" 
-                class="tab-btn w-full text-left bg-slate-800/80 hover:bg-slate-700 text-slate-300 px-3.5 py-2.5 rounded text-xs font-semibold flex items-center gap-2 transition">
-                <i class="fa-solid fa-robot"></i> 自动化追剧任务
+                <i class="fa-solid fa-sliders"></i> 全局系统参数设置
             </button>
             <button onclick="switchTab('logs')" id="tab-btn-logs" 
                 class="tab-btn w-full text-left bg-slate-800/80 hover:bg-slate-700 text-slate-300 px-3.5 py-2.5 rounded text-xs font-semibold flex items-center gap-2 transition">
@@ -148,36 +144,7 @@
                 </div>
             </div>
 
-            <!-- 2. 自动化追剧任务 -->
-            <div id="panel-auto" class="panel-content hidden space-y-6 max-w-5xl">
-                <div class="flex items-center justify-between border-b border-slate-800 pb-3">
-                    <h2 class="text-base font-bold text-white flex items-center gap-2">
-                        <i class="fa-solid fa-robot text-purple-400"></i> 自动化追剧任务列表
-                    </h2>
-                    <button onclick="loadSubscriptions()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-3 py-1.5 rounded flex items-center gap-1 border border-slate-700">
-                        <i class="fa-solid fa-rotate"></i> 刷新列表
-                    </button>
-                </div>
-
-                <div class="bg-slate-900 border border-slate-800 rounded-lg overflow-hidden">
-                    <table class="w-full text-left text-xs text-slate-300">
-                        <thead class="bg-slate-800/80 text-slate-400 uppercase font-semibold border-b border-slate-700/60">
-                            <tr>
-                                <th class="px-4 py-3">剧集名称</th>
-                                <th class="px-4 py-3">检查间隔</th>
-                                <th class="px-4 py-3">已存起始集</th>
-                                <th class="px-4 py-3">状态/上次检测</th>
-                                <th class="px-4 py-3 text-right">操作</th>
-                            </tr>
-                        </thead>
-                        <tbody id="sub-table-body" class="divide-y divide-slate-800">
-                            <!-- JS 动态渲染 -->
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <!-- 3. 系统运行日志控制台 -->
+            <!-- 2. 系统运行日志控制台 -->
             <div id="panel-logs" class="panel-content hidden space-y-4 max-w-5xl">
                 <div class="flex items-center justify-between border-b border-slate-800 pb-3">
                     <h2 class="text-base font-bold text-white flex items-center gap-2">
@@ -209,7 +176,6 @@
             loadConfigFromBackend();
         });
 
-        // 🎯 核心修复 1：页面加载时向后端请求已保存的 Cookie、FID、OpenList 及频道
         async function loadConfigFromBackend() {
             try {
                 const resp = await fetch('/api/config');
@@ -238,7 +204,6 @@
             }
         }
 
-        // 切换 Tab 并自动开启日志 3 秒轮询
         function switchTab(tabName) {
             document.querySelectorAll('.tab-btn').forEach(btn => {
                 btn.className = "tab-btn w-full text-left bg-slate-800/80 hover:bg-slate-700 text-slate-300 px-3.5 py-2.5 rounded text-xs font-semibold flex items-center gap-2 transition";
@@ -262,11 +227,9 @@
                 logPollTimer = null;
             }
 
-            if (tabName === 'auto') {
-                loadSubscriptions();
-            } else if (tabName === 'logs') {
+            if (tabName === 'logs') {
                 fetchAdminLogs();
-                logPollTimer = setInterval(fetchAdminLogs, 3000); // 开启日志实时轮询
+                logPollTimer = setInterval(fetchAdminLogs, 3000);
             }
         }
 
@@ -299,64 +262,6 @@
             renderTGChannels();
         }
 
-        async function loadSubscriptions() {
-            const tbody = document.getElementById('sub-table-body');
-            tbody.innerHTML = '<tr><td colspan="5" class="px-4 py-4 text-center text-slate-500">正在加载追剧列表...</td></tr>';
-            
-            try {
-                const resp = await fetch('/api/subscriptions');
-                const res = await resp.json();
-                if (res.success && res.subscriptions && res.subscriptions.length > 0) {
-                    tbody.innerHTML = '';
-                    res.subscriptions.forEach(sub => {
-                        const tr = document.createElement('tr');
-                        tr.className = "hover:bg-slate-800/40";
-                        tr.innerHTML = `
-                            <td class="px-4 py-3 font-medium text-slate-200">${sub.title || '未命名'}</td>
-                            <td class="px-4 py-3 text-slate-400">${sub.interval_hours || 6} 小时</td>
-                            <td class="px-4 py-3 text-slate-400">EP ${sub.start_ep || 0}</td>
-                            <td class="px-4 py-3 text-slate-400">${sub.last_check || '等待触发'}</td>
-                            <td class="px-4 py-3 text-right space-x-2">
-                                <button onclick="runSubNow('${sub.id}')" class="bg-purple-600 hover:bg-purple-500 text-white px-2.5 py-1 rounded text-[11px]">立即运行</button>
-                                <button onclick="deleteSub('${sub.id}')" class="bg-rose-900/60 hover:bg-rose-800 text-rose-200 px-2.5 py-1 rounded text-[11px]">删除</button>
-                            </td>
-                        `;
-                        tbody.appendChild(tr);
-                    });
-                } else {
-                    tbody.innerHTML = '<tr><td colspan="5" class="px-4 py-6 text-center text-slate-500">暂无自动化追剧任务，可在前台点击【一键追剧】添加。</td></tr>';
-                }
-            } catch (err) {
-                tbody.innerHTML = '<tr><td colspan="5" class="px-4 py-4 text-center text-rose-400">加载追剧列表失败</td></tr>';
-            }
-        }
-
-        async function runSubNow(subId) {
-            try {
-                const resp = await fetch('/api/subscriptions/run-now', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ id: subId })
-                });
-                const res = await resp.json();
-                alert(res.message || '已执行追剧检视');
-                loadSubscriptions();
-            } catch (err) {
-                alert('手动执行追剧失败');
-            }
-        }
-
-        async function deleteSub(subId) {
-            if (!confirm('确定要删除该追剧任务吗？')) return;
-            try {
-                await fetch(`/api/subscriptions?id=${subId}`, { method: 'DELETE' });
-                loadSubscriptions();
-            } catch (err) {
-                alert('删除失败');
-            }
-        }
-
-        // 🎯 核心修复 2：实时拉取系统控制台日志
         async function fetchAdminLogs() {
             try {
                 const resp = await fetch('/api/admin/logs');
@@ -375,7 +280,6 @@
             document.getElementById('admin-log-box').innerText = '[System] 已清空本地视图日志。\n';
         }
 
-        // 🎯 核心修复 3：保存时把全局 Cookie、FID、OpenList URL 一并打包保存
         async function saveAllSettings() {
             const cookieVal = document.getElementById('quark-cookie').value.trim();
             const payload = {
