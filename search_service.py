@@ -8,7 +8,6 @@ class SearchService:
         self.engine = QuarkEngine(cookie)
 
     def search_single_movie_pwd_id(self, title, channels):
-        """在 TG 检索频道搜索链接，并校验链接内是否真的包含视频文件"""
         headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
         
         for ch in channels:
@@ -22,7 +21,6 @@ class SearchService:
                 if resp.status_code == 200:
                     matches = re.findall(r'pan\.quark\.cn/s/([a-zA-Z0-9]+)', resp.text)
                     for pwd_id in matches:
-                        # 🎯 解析链接内容，确保至少包含一个视频文件（排除音轨/文稿链接）
                         files, stoken, err = self.engine.get_share_files(pwd_id, only_video=True)
                         if files and len(files) > 0:
                             return pwd_id
@@ -31,7 +29,6 @@ class SearchService:
         return None
 
     def batch_search_and_transfer_stream(self, movie_titles, channels, target_fid='0'):
-        """批量检索并转存到对应影视的专属子文件夹中"""
         for title in movie_titles:
             yield f"\n🔍 正在检索: [{title}]..."
             
@@ -47,7 +44,7 @@ class SearchService:
                 yield f"⚠️ 链接解析失败或未发现有效视频文件: {err}"
                 continue
 
-            # 🎯 自动获取或在网盘中创建以影视名称命名的专属文件夹
+            # 自动定位或创建专属文件夹
             show_folder_fid = self.engine.get_or_create_subfolder(title, target_fid)
             yield f"📁 已建立/定位专属目录: [{title}] (FID: {show_folder_fid})"
 
