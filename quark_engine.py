@@ -69,7 +69,7 @@ class QuarkEngine:
             return False
 
     def get_or_create_subfolder(self, folder_name, parent_fid='0'):
-        """在指定的父级目录 FID 下精准创建或获取专属文件夹，返回 (fid, error_message)"""
+        """根据最新抓包更新：在指定的父级目录 FID 下创建或获取专属文件夹，返回 (fid, error_message)"""
         if not parent_fid:
             parent_fid = '0'
 
@@ -86,12 +86,13 @@ class QuarkEngine:
         except Exception:
             pass
 
-        # 2. 发起新建文件夹请求
-        mkdir_url = "https://drive.quark.cn/1/clouddrive/file/mkdir?pr=ucpro&fr=pc"
+        # 2. 依照抓包正确的接口和 Payload 发起新建文件夹请求
+        mkdir_url = "https://drive-pc.quark.cn/1/clouddrive/file?pr=ucpro&fr=pc"
         payload = {
             "pdir_fid": str(parent_fid),
             "file_name": folder_name,
-            "dir_init_lock": False
+            "dir_init_lock": False,
+            "dir_path": ""
         }
         
         err_msg = "未知网络或接口错误"
