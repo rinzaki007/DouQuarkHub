@@ -125,7 +125,6 @@ async function searchMovies() {
     } catch (err) { console.error(err); }
 }
 
-// 🎯 修复：增加 🔗 详情 链接，支持一键调转至豆瓣详情页
 function renderGrid() {
     const grid = document.getElementById('movie-grid');
     if (!grid) return;
