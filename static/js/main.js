@@ -7,12 +7,27 @@ let currentChaseSelectedCandidate = null;
 
 let logTimerInterval = null;
 let logTimerSeconds = 0;
+let logAutoCloseTimer = null;
 
 document.addEventListener("DOMContentLoaded", () => {
     fetchMovies();
     checkSystemHealth();
     loadCategoryOptions();
+    applyGlassmorphismStyles();
 });
+
+function applyGlassmorphismStyles() {
+    // 为顶部导航栏及工具栏增强毛玻璃效果
+    const topNavs = document.querySelectorAll('header, nav');
+    topNavs.forEach(el => {
+        el.classList.add('backdrop-blur-md', 'bg-slate-900/80', 'border-b', 'border-slate-800/80');
+    });
+
+    const logPanel = document.getElementById('log-panel');
+    if (logPanel) {
+        logPanel.classList.add('backdrop-blur-md', 'bg-slate-950/90', 'border', 'border-slate-800');
+    }
+}
 
 async function loadCategoryOptions() {
     try {
@@ -104,8 +119,8 @@ function changeTag(tag) {
     currentTag = tag;
     document.querySelectorAll('.nav-tag').forEach(btn => {
         btn.className = btn.dataset.tag === tag 
-            ? 'nav-tag px-3.5 py-1.5 rounded text-sm font-medium transition bg-blue-600 text-white'
-            : 'nav-tag px-3.5 py-1.5 rounded text-sm font-medium transition bg-slate-800 text-slate-300 hover:bg-slate-700';
+            ? 'nav-tag px-3.5 py-1.5 rounded text-sm font-medium transition bg-blue-600 text-white shadow-md'
+            : 'nav-tag px-3.5 py-1.5 rounded text-sm font-medium transition bg-slate-800/80 text-slate-300 hover:bg-slate-700';
     });
     loadCategoryOptions();
     fetchMovies();
@@ -182,7 +197,7 @@ function renderGrid() {
         const isSelected = selectedIndices.has(idx);
 
         const card = document.createElement('div');
-        card.className = `relative group bg-slate-900 border ${isSelected ? 'border-blue-500' : 'border-slate-800'} rounded-lg overflow-hidden card-shadow cursor-pointer transition`;
+        card.className = `relative group bg-slate-900/90 backdrop-blur border ${isSelected ? 'border-blue-500 ring-1 ring-blue-500' : 'border-slate-800/80'} rounded-lg overflow-hidden card-shadow cursor-pointer transition`;
         card.onclick = (e) => {
             if (!e.target.closest('a')) {
                 toggleSelect(idx);
@@ -229,13 +244,47 @@ function selectAll(select) {
 }
 
 function updateSelectedCount() {
-    document.getElementById('selected-count').innerText = selectedIndices.size;
+    const count = selectedIndices.size;
+    document.getElementById('selected-count').innerText = count;
+
+    const countSpan = document.getElementById('selected-count');
+    let parentContainer = countSpan ? countSpan.closest('div') : null;
+
+    if (parentContainer) {
+        let previewTag = document.getElementById('selected-titles-preview');
+        if (!previewTag) {
+            previewTag = document.createElement('div');
+            previewTag.id = 'selected-titles-preview';
+            previewTag.className = 'flex items-center gap-1.5 overflow-hidden ml-2';
+            parentContainer.appendChild(previewTag);
+        }
+
+        if (count === 0) {
+            previewTag.innerHTML = '';
+        } else {
+            const selectedTitles = Array.from(selectedIndices).map(idx => moviesData[idx]?.title).filter(Boolean);
+            const displayText = selectedTitles.length > 2 
+                ? `《${selectedTitles[0]}》等 ${selectedTitles.length} 部影片` 
+                : selectedTitles.map(t => `《${t}》`).join(', ');
+
+            previewTag.innerHTML = `
+                <span class="text-slate-400 text-xs">已选:</span>
+                <span class="px-2 py-0.5 bg-blue-950/80 text-blue-300 border border-blue-800/60 rounded text-xs font-medium truncate max-w-[200px] sm:max-w-xs" title="${selectedTitles.join(', ')}">
+                    ${displayText}
+                </span>
+            `;
+        }
+    }
 }
 
 function toggleLogBox(show = true) {
     const panel = document.getElementById('log-panel');
-    if (show) panel.classList.remove('hidden');
-    else panel.classList.toggle('hidden');
+    if (show) {
+        panel.classList.remove('hidden');
+        panel.classList.add('backdrop-blur-md', 'bg-slate-950/90');
+    } else {
+        panel.classList.toggle('hidden');
+    }
 }
 
 function clearLog() {
@@ -244,6 +293,10 @@ function clearLog() {
 
 function startLogTimer() {
     logTimerSeconds = 0;
+    if (logAutoCloseTimer) {
+        clearInterval(logAutoCloseTimer);
+        logAutoCloseTimer = null;
+    }
     const badge = document.getElementById('log-timer-badge');
     badge.classList.remove('hidden');
     badge.innerText = `耗时: 0 秒`;
@@ -300,13 +353,13 @@ function switchChaseTab(tabName) {
     const submitBtn = document.getElementById('btn-submit-chase');
 
     if (tabName === 'add') {
-        tabAdd.className = "px-3.5 py-1.5 rounded bg-purple-600 text-white font-medium transition";
+        tabAdd.className = "px-3.5 py-1.5 rounded bg-purple-600 text-white font-medium transition shadow";
         tabList.className = "px-3.5 py-1.5 rounded text-slate-400 hover:text-white transition";
         panelAdd.classList.remove('hidden');
         panelList.classList.add('hidden');
         if(currentChaseSelectedCandidate) submitBtn.classList.remove('hidden');
     } else {
-        tabList.className = "px-3.5 py-1.5 rounded bg-purple-600 text-white font-medium transition";
+        tabList.className = "px-3.5 py-1.5 rounded bg-purple-600 text-white font-medium transition shadow";
         tabAdd.className = "px-3.5 py-1.5 rounded text-slate-400 hover:text-white transition";
         panelList.classList.remove('hidden');
         panelAdd.classList.add('hidden');
@@ -669,11 +722,37 @@ async function confirmTransferAndSave(movie, candidate, targetFid = '0') {
 
         if (res.success) {
             appendLogLine(`[转存成功] 🎉 ${res.message} (耗时 ${elapsed}秒)`, 'success');
+            appendLogLine(`[系统提示] ⏳ 转存成功，日志将在 3 秒后自动收起...`, 'info');
+            
+            if (logAutoCloseTimer) clearTimeout(logAutoCloseTimer);
+            let countdown = 3;
+            const badge = document.getElementById('log-timer-badge');
+            if (badge) badge.innerText = `成功 · ${countdown}s后收起`;
+            
+            logAutoCloseTimer = setInterval(() => {
+                countdown--;
+                if (badge) badge.innerText = `成功 · ${countdown}s后收起`;
+                if (countdown <= 0) {
+                    clearInterval(logAutoCloseTimer);
+                    logAutoCloseTimer = null;
+                    toggleLogBox(false);
+                }
+            }, 1000);
         } else {
+            if (logAutoCloseTimer) {
+                clearInterval(logAutoCloseTimer);
+                logAutoCloseTimer = null;
+            }
             appendLogLine(`[转存失败] ❌ ${res.message} (耗时 ${elapsed}秒)`, 'error');
+            appendLogLine(`[系统提示] ⚠️ 转存发生错误，日志保持一直显示以便排查。`, 'warn');
         }
     } catch (err) {
         stopLogTimer();
+        if (logAutoCloseTimer) {
+            clearInterval(logAutoCloseTimer);
+            logAutoCloseTimer = null;
+        }
         appendLogLine(`[异常捕获] ❌ 转存请求发生异常: ${err.message}`, 'error');
+        appendLogLine(`[系统提示] ⚠️ 发生异常，日志保持一直显示。`, 'warn');
     }
 }
