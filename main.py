@@ -5,6 +5,7 @@ import requests
 import re
 from flask import Flask, render_template, request, jsonify, Response, stream_with_context, session, redirect, url_for
 from werkzeug.security import generate_password_hash, check_password_hash
+from concurrent.futures import ThreadPoolExecutor
 
 from quark_engine import QuarkEngine
 from subscription_manager import SubscriptionManager
@@ -16,8 +17,6 @@ app.secret_key = os.environ.get('SECRET_KEY', 'moviesync_secret_key_2026_secure'
 
 AUTH_FILE = 'auth.json'
 CONFIG_FILE = 'config.json'
-
-# 系统实时运行日志缓存
 SYSTEM_LOGS = []
 
 def log_system(msg):
@@ -177,6 +176,53 @@ def handle_config():
 @app.route('/api/admin/logs', methods=['GET'])
 def get_admin_logs():
     return jsonify({'success': True, 'logs': SYSTEM_LOGS})
+
+# 🎯 核心修复：前端 Cookie 健康度检测 API
+@app.route('/api/check-cookie', methods=['POST'])
+def check_cookie():
+    try:
+        config = load_full_config()
+        cookie = config.get('quark_cookie', '')
+        if not cookie:
+            return jsonify({'valid': False, 'message': '未配置 Cookie'})
+        engine = QuarkEngine(cookie)
+        valid = engine.check_cookie_valid()
+        return jsonify({'valid': valid, 'message': 'Cookie 有效' if valid else 'Cookie 已失效'})
+    except Exception as e:
+        return jsonify({'valid': False, 'message': f'校验出错: {str(e)}'})
+
+# 🎯 核心修复：前端 TG 频道监控探针 API
+@app.route('/api/check-channels', methods=['GET'])
+def check_channels_health():
+    try:
+        config = load_full_config()
+        channels = config.get('channels', [])
+        if not channels:
+            return jsonify({'success': True, 'total': 0, 'valid_count': 0})
+
+        def test_channel(ch):
+            ch_id = ch.get('id', '').strip() if isinstance(ch, dict) else str(ch).strip()
+            if not ch_id:
+                return False
+            url = f"https://t.me/s/{ch_id}"
+            headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+            try:
+                resp = requests.head(url, headers=headers, timeout=3.0)
+                return resp.status_code == 200
+            except Exception:
+                return False
+
+        with ThreadPoolExecutor(max_workers=5) as executor:
+            results = list(executor.map(test_channel, channels))
+
+        valid_count = sum(1 for is_valid in results if is_valid)
+        return jsonify({
+            'success': True,
+            'total': len(channels),
+            'valid_count': valid_count
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'total': 0, 'valid_count': 0, 'error': str(e)})
 
 @app.route('/api/get-movies', methods=['GET'])
 def get_movies():
