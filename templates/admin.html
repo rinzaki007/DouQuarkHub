@@ -6,6 +6,34 @@
     <title>后台管理 - MovieSync</title>
     <link rel="stylesheet" href="/static/css/style.css">
     <style>
+        /* 修复 TG 检索频道标签浮动与重叠错乱问题 */
+.tg-channel-container, [class*="channel-list"] {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+    margin-bottom: 16px !important;
+    clear: both !important;
+}
+
+/* 规范频道标签内边距与边框 */
+.tg-channel-tag, [class*="channel-item"] {
+    position: relative !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    background-color: #1e293b !important;
+    border: 1px solid #334155 !important;
+    border-radius: 6px !important;
+    padding: 6px 12px !important;
+    margin: 0 !important;
+}
+
+/* 规范按钮布局 */
+.admin-action-btns {
+    display: flex !important;
+    align-items: center !important;
+    gap: 12px !important;
+    margin-top: 12px !important;
+}
         .admin-layout { display: flex; height: calc(100vh - 56px); }
         .sidebar { width: 220px; background: #111827; border-right: 1px solid #1f2937; padding: 12px; flex-shrink: 0; }
         .sidebar-menu { list-style: none; display: flex; flex-direction: column; gap: 4px; }
