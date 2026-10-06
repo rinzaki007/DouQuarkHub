@@ -38,24 +38,26 @@
     <header class="bg-slate-900 border-b border-slate-800 sticky top-0 z-40 px-4 py-3">
         <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
             
-            <div class="flex items-center space-x-2">
-                <button onclick="changeTag('电影')" class="nav-tag px-3.5 py-1.5 rounded text-sm font-medium transition bg-blue-600 text-white" data-tag="电影">电影</button>
-                <button onclick="changeTag('电视剧')" class="nav-tag px-3.5 py-1.5 rounded text-sm font-medium transition bg-slate-800 text-slate-300 hover:bg-slate-700" data-tag="电视剧">电视剧</button>
-                <button onclick="changeTag('综艺')" class="nav-tag px-3.5 py-1.5 rounded text-sm font-medium transition bg-slate-800 text-slate-300 hover:bg-slate-700" data-tag="综艺">综艺</button>
-                <button onclick="changeTag('动漫')" class="nav-tag px-3.5 py-1.5 rounded text-sm font-medium transition bg-slate-800 text-slate-300 hover:bg-slate-700" data-tag="动漫">动漫</button>
+            <!-- 左侧分类与快捷跳转 -->
+            <div class="flex items-center space-x-2 shrink-0">
+                <button onclick="changeTag('电影')" class="nav-tag px-3 py-1.5 rounded text-sm font-medium transition bg-blue-600 text-white" data-tag="电影">电影</button>
+                <button onclick="changeTag('电视剧')" class="nav-tag px-3 py-1.5 rounded text-sm font-medium transition bg-slate-800 text-slate-300 hover:bg-slate-700" data-tag="电视剧">电视剧</button>
+                <button onclick="changeTag('综艺')" class="nav-tag px-3 py-1.5 rounded text-sm font-medium transition bg-slate-800 text-slate-300 hover:bg-slate-700" data-tag="综艺">综艺</button>
+                <button onclick="changeTag('动漫')" class="nav-tag px-3 py-1.5 rounded text-sm font-medium transition bg-slate-800 text-slate-300 hover:bg-slate-700" data-tag="动漫">动漫</button>
                 
-                <button onclick="openChaseModal()" class="px-3 py-1.5 rounded text-sm font-medium bg-purple-600 hover:bg-purple-500 text-white transition flex items-center gap-1">
-                    <i class="fa-solid fa-heart text-xs"></i> 一键追剧
+                <button onclick="openChaseModal()" class="px-2.5 py-1.5 rounded text-xs font-medium bg-purple-600 hover:bg-purple-500 text-white transition flex items-center gap-1">
+                    <i class="fa-solid fa-heart"></i> 一键追剧
                 </button>
-                <a href="/openlist" target="_blank" class="px-3 py-1.5 rounded text-sm font-medium bg-emerald-600 hover:bg-emerald-500 text-white transition flex items-center gap-1">
-                    <i class="fa-solid fa-folder-open text-xs"></i> OpenList
+                <a href="/openlist" target="_blank" class="px-2.5 py-1.5 rounded text-xs font-medium bg-emerald-600 hover:bg-emerald-500 text-white transition flex items-center gap-1">
+                    <i class="fa-solid fa-folder-open"></i> OpenList
                 </a>
-                <a href="https://pan.quark.cn" target="_blank" class="px-3 py-1.5 rounded text-sm font-medium bg-amber-600 hover:bg-amber-500 text-white transition flex items-center gap-1">
-                    <i class="fa-solid fa-cloud text-xs"></i> 夸克端
+                <a href="https://pan.quark.cn" target="_blank" class="px-2.5 py-1.5 rounded text-xs font-medium bg-amber-600 hover:bg-amber-500 text-white transition flex items-center gap-1">
+                    <i class="fa-solid fa-cloud"></i> 夸克端
                 </a>
             </div>
 
-            <div class="flex-1 max-w-xs md:max-w-md mx-2 relative">
+            <!-- 🎯 中间搜索框：设定 min-width 避免被压缩 -->
+            <div class="flex-1 min-w-[220px] max-w-md mx-2 relative">
                 <input type="text" id="search-input" placeholder="搜索豆瓣影视资源..." 
                        class="w-full bg-slate-950 border border-slate-700 rounded px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-blue-500"
                        onkeydown="if(event.key==='Enter') doSearch()">
@@ -64,28 +66,29 @@
                 </button>
             </div>
 
-            <!-- 右侧动作按钮组与健康度看板 -->
-            <div class="flex items-center space-x-2">
-                <!-- 🎯 状态指示看板 -->
-                <div id="cookie-status-badge" class="px-2.5 py-1 text-xs rounded bg-slate-800 text-slate-400 border border-slate-700 flex items-center gap-1.5">
+            <!-- 右侧状态看板与批量操作组 -->
+            <div class="flex items-center space-x-2 shrink-0">
+                <!-- Cookie 状态指示灯 -->
+                <div id="cookie-status-badge" class="px-2 py-1 text-xs rounded bg-slate-800 text-slate-400 border border-slate-700 flex items-center gap-1">
                     <span class="w-2 h-2 rounded-full bg-slate-500 animate-pulse"></span>
-                    <span>Cookie 检测中</span>
+                    <span>检测中</span>
                 </div>
-                <div id="channel-status-badge" class="px-2.5 py-1 text-xs rounded bg-slate-800 text-slate-400 border border-slate-700 flex items-center gap-1">
+                <!-- 频道健康度指示 -->
+                <div id="channel-status-badge" class="px-2 py-1 text-xs rounded bg-slate-800 text-slate-400 border border-slate-700 flex items-center gap-1">
                     <i class="fa-brands fa-telegram text-sky-400"></i>
                     <span id="channel-count-text">频道 --/--</span>
                 </div>
 
-                <span class="text-xs text-slate-400 pl-1">已选 <b id="selected-count" class="text-blue-400">0</b> 部</span>
-                <button onclick="selectAll(true)" class="px-2.5 py-1 text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 rounded">全选</button>
-                <button onclick="selectAll(false)" class="px-2.5 py-1 text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 rounded">取消</button>
-                <button onclick="batchTransfer()" class="px-3 py-1.5 text-xs bg-emerald-600 hover:bg-emerald-500 text-white rounded font-medium flex items-center gap-1">
+                <span class="text-xs text-slate-400">已选 <b id="selected-count" class="text-blue-400">0</b> 部</span>
+                <button onclick="selectAll(true)" class="px-2 py-1 text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 rounded">全选</button>
+                <button onclick="selectAll(false)" class="px-2 py-1 text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 rounded">取消</button>
+                <button onclick="batchTransfer()" class="px-2.5 py-1.5 text-xs bg-emerald-600 hover:bg-emerald-500 text-white rounded font-medium flex items-center gap-1">
                     <i class="fa-solid fa-cloud-arrow-down"></i> 批量转存
                 </button>
-                <button onclick="toggleLogBox()" class="px-3 py-1.5 text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 rounded flex items-center gap-1">
+                <button onclick="toggleLogBox()" class="px-2.5 py-1.5 text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 rounded flex items-center gap-1">
                     <i class="fa-solid fa-terminal"></i> 运行日志
                 </button>
-                <a href="/admin" class="px-3 py-1.5 text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 rounded flex items-center gap-1">
+                <a href="/admin" class="px-2.5 py-1.5 text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 rounded flex items-center gap-1">
                     <i class="fa-solid fa-gear"></i> 设置
                 </a>
             </div>
@@ -190,25 +193,23 @@
             checkSystemHealth();
         });
 
-        // 🎯 恢复：检测夸克 Cookie 与 TG 频道健康度
+        // 🎯 异步检测系统健康度（Cookie + 频道连通性）
         async function checkSystemHealth() {
-            // 1. 检查 Cookie
             try {
                 const resp = await fetch('/api/check-cookie', { method: 'POST' });
                 const res = await resp.json();
                 const badge = document.getElementById('cookie-status-badge');
                 if (res.valid) {
-                    badge.className = "px-2.5 py-1 text-xs rounded bg-emerald-950/80 text-emerald-400 border border-emerald-800 flex items-center gap-1.5";
+                    badge.className = "px-2 py-1 text-xs rounded bg-emerald-950/80 text-emerald-400 border border-emerald-800 flex items-center gap-1";
                     badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-500"></span><span>Cookie 有效</span>`;
                 } else {
-                    badge.className = "px-2.5 py-1 text-xs rounded bg-rose-950/80 text-rose-400 border border-rose-800 flex items-center gap-1.5";
+                    badge.className = "px-2 py-1 text-xs rounded bg-rose-950/80 text-rose-400 border border-rose-800 flex items-center gap-1";
                     badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-rose-500"></span><span>Cookie 失效</span>`;
                 }
             } catch (err) {
-                console.error("Cookie 状态检查异常:", err);
+                console.error("Cookie 检测异常", err);
             }
 
-            // 2. 检查 TG 频道连通数
             try {
                 const resp = await fetch('/api/check-channels');
                 const res = await resp.json();
@@ -216,7 +217,7 @@
                     document.getElementById('channel-count-text').innerText = `频道 ${res.valid_count}/${res.total}`;
                 }
             } catch (err) {
-                console.error("频道检测异常:", err);
+                console.error("频道检测异常", err);
             }
         }
 
@@ -245,8 +246,8 @@
             currentTag = tag;
             document.querySelectorAll('.nav-tag').forEach(btn => {
                 btn.className = btn.dataset.tag === tag 
-                    ? 'nav-tag px-3.5 py-1.5 rounded text-sm font-medium transition bg-blue-600 text-white'
-                    : 'nav-tag px-3.5 py-1.5 rounded text-sm font-medium transition bg-slate-800 text-slate-300 hover:bg-slate-700';
+                    ? 'nav-tag px-3 py-1.5 rounded text-sm font-medium transition bg-blue-600 text-white'
+                    : 'nav-tag px-3 py-1.5 rounded text-sm font-medium transition bg-slate-800 text-slate-300 hover:bg-slate-700';
             });
             fetchMovies();
         }
@@ -389,6 +390,29 @@
                 }
             });
             logBox.scrollTop = logBox.scrollHeight;
+        }
+
+        function openChaseModal() { document.getElementById('chase-modal').classList.remove('hidden'); }
+        function closeChaseModal() { document.getElementById('chase-modal').classList.add('hidden'); }
+
+        async function submitChase() {
+            const name = document.getElementById('chase-title').value.trim();
+            if (!name) return alert('请输入追剧名称');
+            try {
+                const resp = await fetch('/api/subscriptions', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ 
+                        title: name, 
+                        interval_hours: parseInt(document.getElementById('chase-interval').value) || 6
+                    })
+                });
+                const res = await resp.json();
+                alert(res.message || '添加追剧成功');
+                closeChaseModal();
+            } catch (err) {
+                alert('添加追剧任务失败');
+            }
         }
 
         async function batchTransfer() {
