@@ -287,7 +287,6 @@ def handle_subscriptions():
         return jsonify({'success': True, 'subscriptions': sub_manager.get_subscriptions()})
     if request.method == 'POST':
         data = request.json or {}
-        # 🎯 升级：接收智能追剧提交的详细配置（频道、短码、勾选的文件列表及轮询周期）
         sub = sub_manager.add_subscription(
             title=data.get('title'),
             pwd_id=data.get('pwd_id'),
@@ -303,8 +302,20 @@ def handle_subscriptions():
     sub_id = request.args.get('id') or (request.json or {}).get('id')
     if sub_id:
         sub_manager.delete_subscription(sub_id)
-        log_system(f"已删除追剧任务 ID: {sub_id}")
+        log_system(f"已删除订阅任务 ID: {sub_id}")
     return jsonify({'success': True, 'message': '已删除订阅'})
+
+# 🎯 已集成：手动立即执行追剧任务路由
+@app.route('/api/subscriptions/run-now', methods=['POST'])
+def api_run_subscription_now():
+    data = request.json or {}
+    sub_id = data.get('id')
+    if not sub_id:
+        return jsonify({'success': False, 'message': '未提供订阅 ID'})
+    
+    success, msg = sub_manager.check_subscription_now(sub_id)
+    log_system(f"手动触发追剧: {msg}")
+    return jsonify({'success': success, 'message': msg})
 
 @app.route('/api/proxy-img')
 def proxy_img():
