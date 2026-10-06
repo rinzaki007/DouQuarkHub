@@ -5,7 +5,7 @@ from routes.auth import load_auth
 app = Flask(__name__)
 app.secret_key = 'moviesync-secret-key-change-it'  # 建议换成随机密钥
 
-# 注册三大蓝图模块
+#  注册三大蓝图模块
 app.register_blueprint(auth_bp)
 app.register_blueprint(views_bp)
 app.register_blueprint(api_bp)
