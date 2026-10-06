@@ -43,13 +43,13 @@ class SubscriptionManager:
             "id": sub_id,
             "title": title,
             "pwd_id": pwd_id,
-            "target_fid": target_fid,
+            "target_fid": target_fid or '0',
             "interval_hours": int(interval_hours),
-            "start_ep": start_ep,  # 起始集数（如设为13，则自动忽略<=13集）
-            "channel": channel,    # 🎯 记录锁定的 TG 频道名称
-            "stoken": stoken,      # 🎯 记录分享口令
-            "files": files or [],  # 🎯 记录用户勾选监控的具体文件/版本白名单
-            "saved_episodes": [],  # 已转存的历史文件ID或集数记录
+            "start_ep": start_ep,
+            "channel": channel,
+            "stoken": stoken,
+            "files": files or [],
+            "saved_episodes": [],
             "last_check": "从未检测"
         }
         self.subscriptions.append(new_sub)
@@ -70,7 +70,8 @@ class SubscriptionManager:
             return False, "缺少夸克 Cookie"
 
         engine = QuarkEngine(cookie)
-        files, fetched_stoken, err = engine.get_share_files(sub['pwd_id'])
+        pwd_id = sub.get('pwd_id')
+        files, fetched_stoken, err = engine.get_share_files(pwd_id)
         if not files:
             sub['last_check'] = time.strftime("%Y-%m-%d %H:%M") + " (解析失败)"
             self.save_subscriptions()
@@ -81,9 +82,6 @@ class SubscriptionManager:
         files_to_save = []
         new_eps_found = []
 
-        # 🎯 核心逻辑判断：
-        # 如果任务配置了精细化文件白名单（新版智能追剧），则按白名单精确监控；
-        # 否则回退兼容旧版的按剧集名清洗（clean_tv_filename）逻辑。
         if target_files:
             target_fids = {f.get('fid') for f in target_files}
             for f in files:
@@ -96,10 +94,9 @@ class SubscriptionManager:
             for f in files:
                 raw_name = f.get('file_name', '')
                 ep_num, _ = clean_tv_filename(raw_name, sub['title'])
-                
                 if ep_num is not None:
                     if ep_num <= start_ep:
-                        continue  # 已看或已设为起始之前的集数，跳过
+                        continue
                     if ep_num not in saved_eps:
                         files_to_save.append({'fid': f.get('fid')})
                         new_eps_found.append(ep_num)
@@ -109,16 +106,20 @@ class SubscriptionManager:
             self.save_subscriptions()
             return True, f"《{sub['title']}》暂无新更新"
 
-        # 执行增量转存
-        target_fid = sub.get('target_fid') or '0'
+        # 自动在目标父目录下创建/获取以剧集名命名的专属文件夹
+        parent_fid = sub.get('target_fid') or '0'
+        title = sub.get('title')
+        folder_fid, err_msg = engine.get_or_create_subfolder(title, parent_fid)
+        final_target_fid = folder_fid if folder_fid else parent_fid
+
         stoken_to_use = sub.get('stoken') or fetched_stoken
-        ok, msg = engine.save_files(sub['pwd_id'], files_to_save, stoken_to_use, target_fid)
+        ok, msg = engine.save_files(pwd_id, files_to_save, stoken_to_use, final_target_fid)
         
         if ok:
             sub['saved_episodes'] = sorted(list(saved_eps.union(new_eps_found)))
             sub['last_check'] = time.strftime("%Y-%m-%d %H:%M") + f" (成功转存{len(new_eps_found)}项)"
             self.save_subscriptions()
-            return True, f"🎉 成功追更 {len(new_eps_found)} 项！"
+            return True, f"🎉 成功追更 {len(new_eps_found)} 项，已存入专属文件夹【{title}】！"
         else:
             sub['last_check'] = time.strftime("%Y-%m-%d %H:%M") + " (转存失败)"
             self.save_subscriptions()
@@ -130,7 +131,6 @@ class SubscriptionManager:
             time.sleep(60)
 
     def start_scheduler(self):
-        # 默认每小时触发一次扫描循环，内部可根据需要扩展
         schedule.every(1).hours.do(self._auto_check_all)
         t = threading.Thread(target=self._run_scheduler_loop, daemon=True)
         t.start()
