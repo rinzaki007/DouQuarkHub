@@ -19,30 +19,30 @@ class SearchService:
 
         for idx, movie in enumerate(movies, 1):
             target_year = ''
+            title = ''
+            tag = '电影'
+
             if isinstance(movie, dict):
                 title = movie.get('title', movie.get('name', '')).strip()
                 tag = movie.get('tag', '电影')
                 
-                # 尝试从多个常见年份字段中提取
-                raw_year = str(
-                    movie.get('year') or 
-                    movie.get('release_date') or 
-                    movie.get('release_year') or 
-                    movie.get('date') or ''
-                )
-                year_match = re.search(r'(20\d{2}|19\d{2})', raw_year)
-                if year_match:
-                    target_year = year_match.group(1)
+                # 【全字段盲扫】遍历电影字典所有属性值，只要发现 4 位年份直接提取
+                for k, v in movie.items():
+                    if v:
+                        v_str = str(v)
+                        m_y = re.search(r'\b(19\d{2}|20\d{2})\b', v_str)
+                        if m_y:
+                            target_year = m_y.group(1)
+                            break
                 
-                # 如果字段没找到，尝试从标题中提取年份（如 "给阿嬷的情书 (2026)"）
+                # 如果还没找到，尝试从标题括号中提取（如 "给阿嬷的情书 (2026)"）
                 if not target_year:
                     title_year_match = re.search(r'[\(\（]\s*(19\d{2}|20\d{2})\s*[\)\）]', title)
                     if title_year_match:
                         target_year = title_year_match.group(1)
             else:
                 title = str(movie).strip()
-                tag = '电影'
-                title_year_match = re.search(r'[\(\（]\s*(19\d{2}|20\d{2})\s*[\)\）]', title)
+                title_year_match = re.search(r'[\(\–\(]\s*(19\d{2}|20\d{2})\s*[\)\）]', title)
                 if title_year_match:
                     target_year = title_year_match.group(1)
 
@@ -52,7 +52,7 @@ class SearchService:
 
             yield f"\n----------------------------------------\n"
             yield f"[调试] 收到影片原始数据: {movie}\n"
-            yield f"[进度 {idx}/{len(movies)}] 🎬 目标影片: 《{title}》 | 成功识别目标年份: 【{target_year or '未识别到年份'}】\n"
+            yield f"[进度 {idx}/{len(movies)}] 🎬 目标影片: 《{title}》 | 锁定目标年份: 【{target_year or '未识别到年份'}】\n"
             yield f"[分类] 🏷 目标分类: [{tag}] (父级网盘 FID: {parent_fid})\n"
             yield f"[检索] 🔍 正在 TG 频道中进行严格标题与年份甄别...\n"
 
@@ -62,7 +62,6 @@ class SearchService:
             found_channel = ""
 
             clean_title = title
-            # 清理标题里的年份括号，防止搜不到
             clean_title = re.sub(r'[\(\（]\s*(19\d{2}|20\d{2})\s*[\)\）]', '', clean_title).strip()
             
             simple_target = re.sub(r'[^\w\u4e00-\u9fa5]', '', clean_title)
@@ -108,13 +107,13 @@ class SearchService:
                                         
                                         yield f"   * 扫描文件: {fname} (文件自带年份: {file_year or '无'})\n"
                                         
-                                        # 年份硬过滤逻辑
+                                        # 【严格年份校验】
                                         if target_year:
                                             if file_year and file_year != target_year:
-                                                yield f"     ❌ 【年份拦截】目标年份是 [{target_year}]，而该文件是 [{file_year}]，已安全过滤！\n"
+                                                yield f"     ❌ 【年份拦截】目标年份是 [{target_year}]，而该文件是 [{file_year}]，已安全拦截！\n"
                                                 continue
                                             elif not file_year:
-                                                yield f"     ⚠️ 【年份警告】文件名为识别到年份，暂不拦截但请留意\n"
+                                                yield f"     ⚠️ 【年份警告】文件未检测到明确年份标识\n"
                                         
                                         matched_video_files.append(vf)
 
@@ -123,7 +122,7 @@ class SearchService:
                                         valid_files = matched_video_files
                                         valid_stoken = stoken
                                         found_channel = ch_name
-                                        yield f"[检索] ✅ 校验通过！在频道 [{ch_name}] 精准锁定符合要求的视频源（共 {len(matched_video_files)} 个文件）\n"
+                                        yield f"[检索] ✅ 校验通过！在频道 [{ch_name}] 锁定符合年份要求的视频源（共 {len(matched_video_files)} 个文件）\n"
                                         break
                         if valid_pwd_id:
                             break
