@@ -224,15 +224,8 @@ def handle_channels():
         return jsonify({'success': True})
     return jsonify({'success': True, 'channels': config.get('channels', [])})
 
-# ==========================================
-# 🎯 核心改动：两阶段交互转存接口
-# ==========================================
-
 @app.route('/api/search-candidates', methods=['POST'])
 def api_search_candidates():
-    """
-    【阶段一】搜刮候选资源
-    """
     data = request.json or {}
     movies = data.get('movies', [])
     config = load_full_config()
@@ -257,9 +250,6 @@ def api_search_candidates():
 
 @app.route('/api/transfer-selected', methods=['POST'])
 def api_transfer_selected():
-    """
-    【阶段二】执行指定转存
-    """
     data = request.json or {}
     movie = data.get('movie')
     candidate = data.get('candidate')
@@ -291,16 +281,30 @@ def api_transfer_selected():
     else:
         return jsonify({'success': False, 'message': msg})
 
-# ==========================================
-
 @app.route('/api/subscriptions', methods=['GET', 'POST', 'DELETE'])
 def handle_subscriptions():
-    if request.method == 'GET': return jsonify({'success': True, 'subscriptions': sub_manager.get_subscriptions()})
+    if request.method == 'GET':
+        return jsonify({'success': True, 'subscriptions': sub_manager.get_subscriptions()})
     if request.method == 'POST':
         data = request.json or {}
-        return jsonify({'success': True, 'subscription': sub_manager.add_subscription(title=data.get('title'), pwd_id=data.get('pwd_id'), target_fid=data.get('target_fid', '0'), interval_hours=data.get('interval_hours', 6))})
-    sub_manager.delete_subscription(request.args.get('id'))
-    return jsonify({'success': True})
+        # 🎯 升级：接收智能追剧提交的详细配置（频道、短码、勾选的文件列表及轮询周期）
+        sub = sub_manager.add_subscription(
+            title=data.get('title'),
+            pwd_id=data.get('pwd_id'),
+            target_fid=load_full_config().get('default_fid', '0'),
+            interval_hours=int(data.get('interval_hours', 6)),
+            channel=data.get('channel', ''),
+            stoken=data.get('stoken', ''),
+            files=data.get('files', [])
+        )
+        log_system(f"成功添加智能追剧任务: 《{data.get('title')}》 (频道: {data.get('channel')})")
+        return jsonify({'success': True, 'subscription': sub, 'message': '智能追剧任务添加成功！'})
+    
+    sub_id = request.args.get('id') or (request.json or {}).get('id')
+    if sub_id:
+        sub_manager.delete_subscription(sub_id)
+        log_system(f"已删除追剧任务 ID: {sub_id}")
+    return jsonify({'success': True, 'message': '已删除订阅'})
 
 @app.route('/api/proxy-img')
 def proxy_img():
