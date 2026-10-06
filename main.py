@@ -1,12 +1,12 @@
 import os
 import json
+import datetime
 import requests
 import re
 from flask import Flask, render_template, request, jsonify, Response, stream_with_context, session, redirect, url_for
 from werkzeug.security import generate_password_hash, check_password_hash
-from concurrent.futures import ThreadPoolExecutor
 
-from quark_engine import QuarkEngine, clean_tv_filename
+from quark_engine import QuarkEngine
 from subscription_manager import SubscriptionManager
 from search_service import SearchService
 from utils import load_channels, save_channels, DOUBAN_HEADERS
@@ -15,13 +15,19 @@ app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'moviesync_secret_key_2026_secure')
 
 AUTH_FILE = 'auth.json'
+CONFIG_FILE = 'config.json'
 
-CATEGORY_FIDS = {
-    "电影": "3ef79d1b370a4b27bd334b7bbba7e6e1",
-    "电视剧": "fe24e17d8d254997b21710c73b22b6e7",
-    "综艺": "6999ba53a9384525881f785976bd09f1",
-    "动漫": "55a44b99fac641679e1ebf55dcb38be9"
-}
+# 系统实时运行日志缓存
+SYSTEM_LOGS = []
+
+def log_system(msg):
+    now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    log_line = f"[{now}] {msg}"
+    SYSTEM_LOGS.append(log_line)
+    if len(SYSTEM_LOGS) > 300:
+        SYSTEM_LOGS.pop(0)
+
+log_system("MovieSync 服务启动成功")
 
 def load_auth():
     if os.path.exists(AUTH_FILE):
@@ -36,10 +42,43 @@ def save_auth(data):
     with open(AUTH_FILE, 'w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
-sub_manager = SubscriptionManager(get_cookie_func=lambda: app.config.get('QUARK_COOKIE', ''))
+def load_full_config():
+    default_config = {
+        "quark_cookie": "",
+        "default_fid": "0",
+        "openlist_url": "https://openlist.88888807.xyz:8807/",
+        "category_fids": {
+            "电影": "3ef79d1b370a4b27bd334b7bbba7e6e1",
+            "电视剧": "fe24e17d8d254997b21710c73b22b6e7",
+            "综艺": "6999ba53a9384525881f785976bd09f1",
+            "动漫": "55a44b99fac641679e1ebf55dcb38be9"
+        },
+        "channels": load_channels()
+    }
+    if os.path.exists(CONFIG_FILE):
+        try:
+            with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+                saved = json.load(f)
+                default_config.update(saved)
+        except Exception as e:
+            log_system(f"读取 config.json 失败: {e}")
+    return default_config
+
+def save_full_config(config_data):
+    try:
+        with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
+            json.dump(config_data, f, ensure_ascii=False, indent=2)
+        if 'channels' in config_data:
+            save_channels(config_data['channels'])
+        log_system("配置已成功持久化至 config.json")
+        return True
+    except Exception as e:
+        log_system(f"保存 config.json 失败: {e}")
+        return False
+
+sub_manager = SubscriptionManager(get_cookie_func=lambda: load_full_config().get('quark_cookie', ''))
 sub_manager.start_scheduler()
 
-# 🎯 全局登录与鉴权拦截器
 @app.before_request
 def require_login():
     if request.path.startswith('/static'):
@@ -47,17 +86,14 @@ def require_login():
 
     auth_data = load_auth()
 
-    # 系统未初始化时跳转至 /setup
     if not auth_data or not auth_data.get('initialized'):
         if request.path not in ['/setup', '/api/setup']:
             return redirect('/setup')
         return
 
-    # 已初始化时禁止访问 /setup
     if request.path in ['/setup', '/api/setup']:
         return redirect('/login')
 
-    # 未登录拦截
     allowed_paths = ['/login', '/api/login']
     if request.path not in allowed_paths and not session.get('logged_in'):
         if request.path.startswith('/api/'):
@@ -90,6 +126,7 @@ def api_setup():
 
     session['logged_in'] = True
     session['username'] = username
+    log_system(f"管理员 [{username}] 初始化创建成功")
     return jsonify({'success': True, 'message': '管理员账号创建成功！'})
 
 @app.route('/login')
@@ -108,12 +145,15 @@ def api_login():
     if auth_data and username == auth_data.get('username') and check_password_hash(auth_data.get('password_hash'), password):
         session['logged_in'] = True
         session['username'] = username
+        log_system(f"管理员 [{username}] 成功登录后台")
         return jsonify({'success': True, 'message': '登录成功'})
     return jsonify({'success': False, 'message': '用户名或密码错误'})
 
 @app.route('/logout')
 def logout():
+    user = session.get('username', '未知')
     session.clear()
+    log_system(f"用户 [{user}] 退出登录")
     return redirect('/login')
 
 @app.route('/')
@@ -123,6 +163,20 @@ def index():
 @app.route('/admin')
 def admin():
     return render_template('admin.html')
+
+@app.route('/api/config', methods=['GET', 'POST'])
+def handle_config():
+    if request.method == 'GET':
+        return jsonify({'success': True, 'config': load_full_config()})
+    
+    data = request.json or {}
+    if save_full_config(data):
+        return jsonify({'success': True, 'message': '配置已全部保存'})
+    return jsonify({'success': False, 'message': '保存失败'})
+
+@app.route('/api/admin/logs', methods=['GET'])
+def get_admin_logs():
+    return jsonify({'success': True, 'logs': SYSTEM_LOGS})
 
 @app.route('/api/get-movies', methods=['GET'])
 def get_movies():
@@ -163,7 +217,7 @@ def get_movies():
                 movies.append({'title': title, 'cover': cover, 'rate': rate, 'url': f"https://movie.douban.com/subject/{target_id}/" if target_id else '#'})
             return jsonify({'success': True, 'movies': movies})
     except Exception as e:
-        print(f"请求异常: {e}")
+        log_system(f"抓取豆瓣列表失败: {e}")
     return jsonify({'success': False, 'movies': []})
 
 @app.route('/api/search-douban', methods=['GET'])
@@ -187,75 +241,39 @@ def search_douban():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e), 'movies': []})
 
-@app.route('/api/check-cookie', methods=['POST'])
-def check_cookie():
-    try:
-        data = request.json or {}
-        cookie = data.get('cookie', '')
-        if not cookie:
-            return jsonify({'valid': False, 'message': '未配置 Cookie'})
-        engine = QuarkEngine(cookie)
-        valid = engine.check_cookie_valid()
-        if valid:
-            app.config['QUARK_COOKIE'] = cookie
-        return jsonify({'valid': valid, 'message': 'Cookie 有效' if valid else 'Cookie 已失效'})
-    except Exception as e:
-        return jsonify({'valid': False, 'message': f'校验出错: {str(e)}'})
-
 @app.route('/api/channels', methods=['GET', 'POST'])
 def handle_channels():
+    config = load_full_config()
     if request.method == 'POST':
         channels = request.json.get('channels', [])
-        save_channels(channels)
+        config['channels'] = channels
+        save_full_config(config)
         return jsonify({'success': True})
-    return jsonify({'success': True, 'channels': load_channels()})
+    return jsonify({'success': True, 'channels': config.get('channels', [])})
 
 @app.route('/api/transfer', methods=['POST'])
 def transfer():
     data = request.json or {}
     movies = data.get('movies', [])
-    cookie = data.get('cookie', '').strip() or app.config.get('QUARK_COOKIE', '')
+    config = load_full_config()
+    
+    cookie = data.get('cookie', '').strip() or config.get('quark_cookie', '')
 
     if not movies:
         return Response("[系统] ❌ 未选择任何影片\n", mimetype='text/plain; charset=utf-8')
     if not cookie:
-        return Response("[系统] ❌ 未配置夸克 Cookie！请先在后台保存夸克 Cookie。\n", mimetype='text/plain; charset=utf-8')
+        return Response("[系统] ❌ 未配置夸克 Cookie！请先在后台设置并保存夸克 Cookie。\n", mimetype='text/plain; charset=utf-8')
 
     service = SearchService(cookie)
-    channels = load_channels()
+    channels = config.get('channels', [])
+    category_fids = config.get('category_fids', {})
+    default_fid = config.get('default_fid', '0')
 
     def generate_logs():
-        yield f"[系统] 🚀 开始处理批量转存，共 {len(movies)} 个目标...\n"
-        for idx, movie in enumerate(movies, 1):
-            title = movie.get('title', '').strip()
-            tag = movie.get('tag', '电影')
-            target_parent_fid = CATEGORY_FIDS.get(tag, '0')
-
-            yield f"\n[系统] 🔍 [{idx}/{len(movies)}] 正在检索：《{title}》（分类: {tag}）...\n"
-
-            pwd_id, ch_name = service.search_single_movie(title, channels)
-            if not pwd_id:
-                yield f"[系统] ❌ 未能在已配置频道中找到《{title}》的有效资源\n"
-                continue
-
-            yield f"[系统] 📢 [来源频道: {ch_name}] 精确命中《{title}》 | 夸克代码: {pwd_id}\n"
-            yield f"[系统] 🔎 正在穿透解析资源内容...\n"
-
-            files, stoken, err = service.engine.get_share_files(pwd_id, only_video=True)
-            if not files:
-                yield f"[系统] ⚠️ 资源解析失败: {err}\n"
-                continue
-
-            yield f"[系统] 📁 正在专属存储目录下新建/定位文件夹：《{title}》...\n"
-            movie_folder_fid = service.engine.get_or_create_subfolder(title, target_parent_fid)
-
-            files_to_save = [{'fid': f['fid']} for f in files]
-            ok, msg = service.engine.save_files(pwd_id, files_to_save, stoken, movie_folder_fid)
-
-            if ok:
-                yield f"[系统] ✅ 《{title}》已成功转存至专属文件夹《{title}》中！(共 {len(files)} 个视频文件)\n"
-            else:
-                yield f"[系统] ❌ 转存失败: {msg}\n"
+        log_system(f"触发批量转存，共 {len(movies)} 项")
+        for line in service.batch_search_and_transfer_stream(movies, channels, target_fid=default_fid, category_fids=category_fids):
+            log_system(line.strip())
+            yield line
 
     return Response(stream_with_context(generate_logs()), mimetype='text/plain; charset=utf-8')
 
@@ -266,10 +284,6 @@ def handle_subscriptions():
 
     if request.method == 'POST':
         data = request.json or {}
-        cookie = data.get('cookie', '')
-        if cookie:
-            app.config['QUARK_COOKIE'] = cookie
-
         new_sub = sub_manager.add_subscription(
             title=data.get('title'),
             pwd_id=data.get('pwd_id'),
@@ -277,22 +291,21 @@ def handle_subscriptions():
             interval_hours=data.get('interval_hours', 6),
             start_ep=data.get('start_ep', 0)
         )
+        log_system(f"新增自动化追剧: {data.get('title')}")
         return jsonify({'success': True, 'subscription': new_sub})
 
     if request.method == 'DELETE':
         sub_id = request.args.get('id')
         sub_manager.delete_subscription(sub_id)
+        log_system(f"删除追剧任务 ID: {sub_id}")
         return jsonify({'success': True})
 
 @app.route('/api/subscriptions/run-now', methods=['POST'])
 def run_sub_now():
     data = request.json or {}
     sub_id = data.get('id')
-    cookie = data.get('cookie', '')
-    if cookie:
-        app.config['QUARK_COOKIE'] = cookie
-
     ok, msg = sub_manager.check_subscription_now(sub_id)
+    log_system(f"手动触发追剧检测: {sub_id} -> {msg}")
     return jsonify({'success': ok, 'message': msg})
 
 @app.route('/api/proxy-img')
