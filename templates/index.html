@@ -45,7 +45,7 @@
                 <button onclick="changeTag('动漫')" class="nav-tag px-3 py-1.5 rounded text-sm font-medium transition bg-slate-800 text-slate-300 hover:bg-slate-700" data-tag="动漫">动漫</button>
                 
                 <button onclick="openChaseModal()" class="px-2.5 py-1.5 rounded text-xs font-medium bg-purple-600 hover:bg-purple-500 text-white transition flex items-center gap-1">
-                    <i class="fa-solid fa-heart"></i> 一键追剧
+                    <i class="fa-solid fa-heart"></i> 智能追剧管理
                 </button>
                 <a href="/openlist" target="_blank" class="px-2.5 py-1.5 rounded text-xs font-medium bg-emerald-600 hover:bg-emerald-500 text-white transition flex items-center gap-1">
                     <i class="fa-solid fa-folder-open"></i> OpenList
@@ -125,32 +125,56 @@
         <div id="movie-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 hidden"></div>
     </main>
 
-    <!-- 追剧弹窗 -->
-    <div id="chase-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center hidden">
-        <div class="bg-slate-900 border border-slate-800 rounded-lg w-full max-w-md p-5 shadow-2xl space-y-4">
+    <!-- 🚀 智能追剧高级配置弹窗 (z-[100] 确保不被日志遮挡) -->
+    <div id="chase-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-[100] flex items-center justify-center hidden">
+        <div class="bg-slate-900 border border-slate-800 rounded-lg w-full max-w-3xl p-5 shadow-2xl space-y-4 max-h-[85vh] flex flex-col">
             <div class="flex items-center justify-between border-b border-slate-800 pb-3">
                 <h3 class="text-base font-medium text-white flex items-center gap-2">
-                    <i class="fa-solid fa-heart text-purple-500"></i> 一键添加自动化追剧
+                    <i class="fa-solid fa-heart text-purple-500"></i> 智能自动化追剧配置中心
                 </h3>
                 <button onclick="closeChaseModal()" class="text-slate-400 hover:text-white">✕</button>
             </div>
-            <div class="space-y-3">
-                <div>
-                    <label class="block text-xs text-slate-400 mb-1">剧集名称 / 豆瓣链接</label>
-                    <input type="text" id="chase-title" placeholder="例如: 庆余年 第二季" class="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-purple-500">
+
+            <!-- 向导步骤内容区 -->
+            <div class="flex-1 overflow-y-auto space-y-4 pr-1">
+                
+                <!-- 第一步：输入名称与检索源 -->
+                <div class="bg-slate-950 border border-slate-800 rounded p-3 space-y-3">
+                    <div class="text-xs font-semibold text-purple-400">第一步：填写剧名并检索全网频道</div>
+                    <div class="flex gap-2">
+                        <input type="text" id="chase-title-input" placeholder="例如: 庆余年 第二季" class="flex-1 bg-slate-900 border border-slate-700 rounded px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-purple-500">
+                        <button onclick="searchChaseCandidates()" class="px-4 py-1.5 bg-purple-600 hover:bg-purple-500 text-white rounded text-xs font-medium transition shadow">
+                            🔍 检索频道资源
+                        </button>
+                    </div>
                 </div>
-                <div>
-                    <label class="block text-xs text-slate-400 mb-1">监控更新频率</label>
-                    <select id="chase-interval" class="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm text-slate-200 focus:outline-none">
-                        <option value="1h">每 1 小时</option>
-                        <option value="6h" selected>每 6 小时</option>
-                        <option value="24h">每天</option>
+
+                <!-- 第二步：选定频道与过滤集数/版本 -->
+                <div id="chase-candidates-container" class="space-y-3 hidden">
+                    <div class="text-xs font-semibold text-blue-400">第二步：选择要监控的 TG 频道及指定集数/版本</div>
+                    <div id="chase-candidates-list" class="space-y-2">
+                        <!-- 动态填充 -->
+                    </div>
+                </div>
+
+                <!-- 第三步：设置轮询周期 -->
+                <div class="bg-slate-950 border border-slate-800 rounded p-3 space-y-2">
+                    <div class="text-xs font-semibold text-emerald-400">第三步：设定自动检测更新频率</div>
+                    <select id="chase-interval-select" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-sm text-slate-200 focus:outline-none">
+                        <option value="3">每 3 小时检测一次</option>
+                        <option value="6" selected>每 6 小时检测一次</option>
+                        <option value="9">每 9 小时检测一次</option>
+                        <option value="12">每 12 小时检测一次</option>
                     </select>
                 </div>
+
             </div>
-            <div class="flex justify-end space-x-2 pt-2">
-                <button onclick="closeChaseModal()" class="px-4 py-1.5 text-xs bg-slate-800 text-slate-300 rounded hover:bg-slate-700">取消</button>
-                <button onclick="submitChase()" class="px-4 py-1.5 text-xs bg-purple-600 text-white rounded hover:bg-purple-500 font-medium">确认追剧</button>
+
+            <div class="flex justify-end space-x-2 pt-2 border-t border-slate-800">
+                <button onclick="closeChaseModal()" class="px-4 py-1.5 text-xs bg-slate-800 text-slate-300 rounded hover:bg-slate-700">关闭</button>
+                <button id="btn-submit-chase" onclick="submitSmartChase()" class="px-4 py-1.5 text-xs bg-purple-600 text-white rounded hover:bg-purple-500 font-medium hidden">
+                    🚀 保存并开启自动化追剧
+                </button>
             </div>
         </div>
     </div>
@@ -201,6 +225,7 @@
 
         let moviesData = [];
         let selectedIndices = new Set();
+        let currentChaseSelectedCandidate = null;
 
         document.addEventListener("DOMContentLoaded", () => {
             initFilterOptions();
@@ -416,26 +441,135 @@
             logBox.scrollTop = logBox.scrollHeight;
         }
 
-        function openChaseModal() { document.getElementById('chase-modal').classList.remove('hidden'); }
-        function closeChaseModal() { document.getElementById('chase-modal').classList.add('hidden'); }
+        // ==========================================
+        // 🚀 智能追剧向导交互逻辑
+        // ==========================================
+        function openChaseModal() { 
+            toggleLogBox(false);
+            document.getElementById('chase-modal').classList.remove('hidden');
+            document.getElementById('chase-candidates-container').classList.add('hidden');
+            document.getElementById('btn-submit-chase').classList.add('hidden');
+            document.getElementById('chase-candidates-list').innerHTML = '';
+            currentChaseSelectedCandidate = null;
+        }
 
-        async function submitChase() {
-            const name = document.getElementById('chase-title').value.trim();
-            if (!name) return alert('请输入追剧名称');
+        function closeChaseModal() { 
+            document.getElementById('chase-modal').classList.add('hidden'); 
+        }
+
+        async function searchChaseCandidates() {
+            const title = document.getElementById('chase-title-input').value.trim();
+            if (!title) return alert('请输入要追剧的名称');
+
+            const cookie = localStorage.getItem('quark_cookie') || '';
+            const listContainer = document.getElementById('chase-candidates-list');
+            listContainer.innerHTML = `<div class="text-xs text-slate-400 py-3 text-center"><i class="fa-solid fa-spinner fa-spin"></i> 正在全网并发检索频道...</div>`;
+            document.getElementById('chase-candidates-container').classList.remove('hidden');
+
+            try {
+                const resp = await fetch('/api/search-candidates', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        movies: [{ title: title, tag: '电视剧' }],
+                        cookie: cookie
+                    })
+                });
+                const res = await resp.json();
+                if (!res.success) {
+                    listContainer.innerHTML = `<div class="text-xs text-rose-400 py-2">检索失败: ${res.message}</div>`;
+                    return;
+                }
+
+                const candidatesMap = res.candidates_map || {};
+                const candidates = candidatesMap[title] || [];
+
+                if (candidates.length === 0) {
+                    listContainer.innerHTML = `<div class="text-xs text-amber-400 py-2">未在任何配置频道中找到匹配资源，请检查片名是否正确。</div>`;
+                    return;
+                }
+
+                listContainer.innerHTML = '';
+                candidates.forEach((cand, idx) => {
+                    const fileNames = cand.files.map((f) => `
+                        <label class="flex items-center gap-2 py-0.5 text-[11px] text-slate-300 hover:text-white cursor-pointer">
+                            <input type="checkbox" name="chase-file-item" value="${f.fid}" checked class="chase-file-cb rounded bg-slate-900 border-slate-700 text-purple-600">
+                            <span class="font-mono">${f.file_name}</span>
+                        </label>
+                    `).join('');
+
+                    const itemDiv = document.createElement('div');
+                    itemDiv.className = 'bg-slate-900 border border-slate-800 rounded p-3 space-y-2';
+                    itemDiv.innerHTML = `
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-semibold text-emerald-400"><i class="fa-brands fa-telegram"></i> 频道: ${cand.channel}</span>
+                            <button onclick='selectThisChaseCandidate(${JSON.stringify(cand)}, this)' class="px-3 py-1 bg-purple-600 hover:bg-purple-500 text-white rounded text-xs font-medium transition">
+                                👈 锁定此源并追剧
+                            </button>
+                        </div>
+                        <div class="text-[11px] text-slate-400">夸克短码: <span class="font-mono text-slate-200">${cand.pwd_id}</span> | 包含文件数: ${cand.files.length}</div>
+                        <div class="bg-slate-950 p-2 rounded max-h-32 overflow-y-auto space-y-1 border border-slate-800">
+                            <div class="text-[10px] text-slate-500 mb-1">勾选您需要监控/下载的具体集数或版本（不勾选的集数将跳过）：</div>
+                            ${fileNames}
+                        </div>
+                    `;
+                    listContainer.appendChild(itemDiv);
+                });
+
+            } catch (err) {
+                listContainer.innerHTML = `<div class="text-xs text-rose-400 py-2">请求发生异常: ${err.message}</div>`;
+            }
+        }
+
+        function selectThisChaseCandidate(candidate, btnElement) {
+            currentChaseSelectedCandidate = candidate;
+            document.querySelectorAll('#chase-candidates-list button').forEach(btn => {
+                btn.className = "px-3 py-1 bg-purple-600 hover:bg-purple-500 text-white rounded text-xs font-medium transition";
+                btn.innerText = "👈 锁定此源并追剧";
+            });
+            btnElement.className = "px-3 py-1 bg-emerald-600 text-white rounded text-xs font-medium";
+            btnElement.innerText = "✅ 已锁定此源";
+            
+            document.getElementById('btn-submit-chase').classList.remove('hidden');
+            alert(`已成功锁定频道 [${candidate.channel}] 的分享源！请在下方设置检测频率并点击保存。`);
+        }
+
+        async function submitSmartChase() {
+            const title = document.getElementById('chase-title-input').value.trim();
+            const intervalHours = parseInt(document.getElementById('chase-interval-select').value) || 6;
+
+            if (!title || !currentChaseSelectedCandidate) {
+                return alert('请先输入名称并锁定一个有效的频道分享源！');
+            }
+
+            const checkboxes = document.querySelectorAll('input[name="chase-file-item"]:checked');
+            const selectedFids = Array.from(checkboxes).map(cb => cb.value);
+
+            if (selectedFids.length === 0) {
+                return alert('请至少勾选一个需要监控的文件/集数！');
+            }
+
+            const filteredFiles = currentChaseSelectedCandidate.files.filter(f => selectedFids.includes(f.fid));
+            const payload = {
+                title: title,
+                channel: currentChaseSelectedCandidate.channel,
+                pwd_id: currentChaseSelectedCandidate.pwd_id,
+                stoken: currentChaseSelectedCandidate.stoken,
+                files: filteredFiles,
+                interval_hours: intervalHours
+            };
+
             try {
                 const resp = await fetch('/api/subscriptions', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ 
-                        title: name, 
-                        interval_hours: parseInt(document.getElementById('chase-interval').value) || 6
-                    })
+                    body: JSON.stringify(payload)
                 });
                 const res = await resp.json();
-                alert(res.message || '添加追剧成功');
+                alert(res.message || '自动化追剧规则保存成功！');
                 closeChaseModal();
             } catch (err) {
-                alert('添加追剧任务失败');
+                alert('保存追剧任务失败');
             }
         }
 
@@ -505,7 +639,6 @@
         }
 
         function openCandidateModal(movies, candidatesMap) {
-            // 🎯 核心优化：打开候选弹窗时，自动收起底部日志面板，防止遮挡！
             toggleLogBox(false);
 
             const container = document.getElementById('candidate-content');
@@ -562,9 +695,6 @@
             document.getElementById('candidate-modal').classList.add('hidden');
         }
 
-        // ==========================================
-        // 🎯 核心交互改造：第二阶段（人工确认后执行指定转存）
-        // ==========================================
         async function confirmTransferAndSave(movie, candidate) {
             closeCandidateModal();
             const cookie = localStorage.getItem('quark_cookie') || '';
