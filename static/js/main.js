@@ -9,7 +9,6 @@ window.onload = () => {
     initScrollCollapseFilter();
 };
 
-// 🎯 刷新首页顶栏的夸克 Cookie 与 TG 频道连通状态
 async function refreshHomeStatus() {
     const cookie = localStorage.getItem('quark_cookie') || '';
     const badge = document.getElementById('quark-status-badge');
@@ -50,7 +49,6 @@ async function refreshHomeStatus() {
     }
 }
 
-// 🎯 监听海报网格滚动：向下滚动自动收起筛选栏，回顶自动展开
 function initScrollCollapseFilter() {
     const gridContainer = document.getElementById('movie-grid-container');
     const filterPanel = document.getElementById('filter-panel');
@@ -68,19 +66,14 @@ function initScrollCollapseFilter() {
     });
 }
 
-// 🎯 首页日志抽屉控制
 function toggleLogDrawer() {
     const drawer = document.getElementById('log-drawer');
-    if (drawer) {
-        drawer.classList.toggle('open');
-    }
+    if (drawer) drawer.classList.toggle('open');
 }
 
 function clearHomeLog() {
     const logBody = document.getElementById('log-body');
-    if (logBody) {
-        logBody.textContent = '日志已清空...';
-    }
+    if (logBody) logBody.textContent = '日志已清空...';
 }
 
 function appendLog(text) {
@@ -91,7 +84,6 @@ function appendLog(text) {
     }
 }
 
-// 🎯 切换分类与筛选条件
 function switchCategory(cat) {
     currentCategory = cat;
     ['电影', '电视剧', '综艺', '动漫'].forEach(c => {
@@ -108,7 +100,6 @@ function setFilter(type, value, el) {
     fetchMovies();
 }
 
-// 🎯 获取与渲染豆瓣影视海报网格
 async function fetchMovies() {
     const params = new URLSearchParams({ tag: currentCategory, ...activeFilters });
     try {
@@ -134,10 +125,17 @@ async function searchMovies() {
     } catch (err) { console.error(err); }
 }
 
+// 🎯 修复：增加 🔗 详情 链接，支持一键调转至豆瓣详情页
 function renderGrid() {
     const grid = document.getElementById('movie-grid');
     if (!grid) return;
     grid.innerHTML = '';
+
+    if (movieList.length === 0) {
+        grid.innerHTML = `<div style="grid-column: 1 / -1; text-align:center; color:#64748b; padding:40px;">暂无满足条件的影视资源</div>`;
+        return;
+    }
+
     movieList.forEach(m => {
         const isSelected = selectedMovies.has(m.title);
         const card = document.createElement('div');
@@ -145,6 +143,8 @@ function renderGrid() {
         card.onclick = () => toggleSelect(m.title, card);
 
         const coverSrc = m.cover ? `/api/proxy-img?url=${encodeURIComponent(m.cover)}` : '';
+        const detailUrl = m.url || '#';
+
         card.innerHTML = `
             <div class="cover-box">
                 <img src="${coverSrc}" alt="${m.title}" loading="lazy">
@@ -152,7 +152,8 @@ function renderGrid() {
                 <div class="check-box">${isSelected ? '✓' : ''}</div>
             </div>
             <div class="card-info">
-                <div class="movie-title">${m.title}</div>
+                <div class="movie-title" title="${m.title}">${m.title}</div>
+                <a href="${detailUrl}" target="_blank" class="douban-link" onclick="event.stopPropagation()">🔗 详情</a>
             </div>
         `;
         grid.appendChild(card);
@@ -188,7 +189,6 @@ function openQuarkApp() {
     window.open(localStorage.getItem('quark_app_url') || 'quark://', '_blank');
 }
 
-// 🎯 动态组装追剧弹窗里的目录下拉列表（包含电影、电视剧、综艺、动漫四大专属目录与默认全局目录）
 function populateFolderSelectOptions() {
     const select = document.getElementById('sub-folder-select');
     if (!select) return;
@@ -217,12 +217,10 @@ function populateFolderSelectOptions() {
     });
 }
 
-// 🎯 触发一键追剧弹窗
 function subscribeSelected() {
     if (selectedMovies.size === 0) { alert('请先勾选影视！'); return; }
     const title = Array.from(selectedMovies)[0];
     
-    // 打开弹窗前重新组装下拉框，解决下拉框空白问题
     populateFolderSelectOptions();
     
     const modal = document.getElementById('sub-modal');
@@ -296,7 +294,6 @@ async function addSubscriptionFromModal() {
     }
 }
 
-// 🎯 根据分类查找对应的专属存储目录 (电影/电视剧/综艺/动漫)，未配置则自动使用全局默认 FID
 function getTargetFolderId() {
     const defaultFid = localStorage.getItem('target_folder_id') || '0';
     const catFidMap = {
@@ -312,13 +309,11 @@ function getTargetFolderId() {
     return defaultFid;
 }
 
-// 🎯 点击批量转存：自动展开首页底部日志抽屉，并实时输出流式过程
 async function startBatchTransfer() {
     if (selectedMovies.size === 0) { alert('请先勾选需要转存的影视！'); return; }
     const cookie = localStorage.getItem('quark_cookie') || '';
     if (!cookie) { alert('请先在后台填入夸克 Cookie！'); return; }
 
-    // 自动打开底部日志抽屉
     const drawer = document.getElementById('log-drawer');
     if (drawer) drawer.classList.add('open');
     
