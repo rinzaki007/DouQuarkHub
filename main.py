@@ -184,77 +184,28 @@ def check_channels_health():
 def get_movies():
     main_tag = request.args.get('tag', '电影')
     sort_type = request.args.get('sort', 'U')
-    genre = request.args.get('genre', '全部')
-    region = request.args.get('region', '全部')
-    year = request.args.get('year', '全部')
-    
-    headers = {
-        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148",
-        "Referer": "https://movie.douban.com/"
-    }
-    
+    url = "https://m.douban.com/rexxar/api/v2/tv/recommend" if main_tag != '电影' else "https://m.douban.com/rexxar/api/v2/subject/recent_hot/movie"
+    headers = {"User-Agent": "Mozilla/5.0", "Referer": "https://movie.douban.com/"}
     try:
         if main_tag == '电影':
-            url = "https://m.douban.com/rexxar/api/v2/subject/recent_hot/movie"
-            category_val = "最新" if sort_type in ['T', 'R'] else "热门"
-            if genre and genre != '全部':
-                category_val = genre
-            params = {
-                "start": "0",
-                "limit": "100",
-                "category": category_val,
-                "type": "全部"
-            }
+            params = {"start": "0", "limit": "100", "category": "最新" if sort_type in ['T', 'R'] else "热门", "type": "全部"}
         else:
-            url = "https://m.douban.com/rexxar/api/v2/tv/recommend"
-            cat_map = {
-                "动漫": {"类型": "动画", "形式": "电视剧"},
-                "综艺": {"类型": "", "形式": "综艺"},
-                "电视剧": {"类型": "", "形式": "电视剧"}
-            }
-            cats = cat_map.get(main_tag, {"类型": "", "形式": "电视剧"})
-            if genre and genre != '全部':
-                cats["类型"] = genre
-            if region and region != '全部':
-                cats["地区"] = region
-            if year and year != '全部':
-                cats["年代"] = year
-                
+            cat_map = {"动漫": {"类型": "动画", "形式": "电视剧"}, "综艺": {"类型": "", "形式": "综艺"}, "电视剧": {"类型": "", "形式": "电视剧"}}
             params = {
-                "refresh": "0",
-                "start": "0",
-                "count": "100",
-                "selected_categories": json.dumps(cats, ensure_ascii=False),
-                "tags": genre if genre and genre != '全部' else main_tag,
+                "refresh": "0", 
+                "start": "0", 
+                "count": "100", 
+                "selected_categories": json.dumps(cat_map.get(main_tag, {"类型": "", "形式": "电视剧"}), ensure_ascii=False), 
+                "tags": main_tag, 
                 "sort": "R" if sort_type in ['T', 'R'] else "U"
             }
-            
         resp = requests.get(url, headers=headers, params=params, timeout=10)
         if resp.status_code == 200:
-            data = resp.json()
-            items = data.get('subjects', []) or data.get('items', [])
-            movies = []
-            for item in items:
-                subject = item.get('subject', item)
-                title = subject.get('title', item.get('title'))
-                if not title:
-                    continue
-                cover = (subject.get('pic') or {}).get('normal', subject.get('cover', item.get('cover', '')))
-                rate_val = (subject.get('rating') or {}).get('value', (item.get('rating') or {}).get('value', '暂无'))
-                rate = str(rate_val)
-                subject_id = subject.get('id', item.get('id', (item.get('target') or {}).get('id')))
-                url_link = f"https://movie.douban.com/subject/{subject_id}/" if subject_id else "#"
-                
-                movies.append({
-                    'title': title,
-                    'cover': cover,
-                    'rate': rate,
-                    'url': url_link
-                })
+            items = resp.json().get('subjects', []) or resp.json().get('items', [])
+            movies = [{'title': item.get('title'), 'cover': (item.get('pic') or {}).get('normal', item.get('cover', '')), 'rate': str((item.get('rating') or {}).get('value', '暂无')), 'url': f"https://movie.douban.com/subject/{item.get('id') or (item.get('target') or {}).get('id')}/"} for item in items if item.get('title')]
             return jsonify({'success': True, 'movies': movies})
     except Exception as e:
         log_system(f"获取豆瓣失败: {e}")
-        
     return jsonify({'success': False, 'movies': []})
 
 @app.route('/api/search-douban', methods=['GET'])
@@ -308,7 +259,7 @@ def api_transfer_selected():
     data = request.json or {}
     movie = data.get('movie')
     candidate = data.get('candidate')
-    target_fid_override = data.get('target_fid')  # 🎯 接收前端传过来的自定义目录 FID
+    target_fid_override = data.get('target_fid')  
     config = load_full_config()
     cookie = data.get('cookie', '').strip() or config.get('quark_cookie', '')
     
@@ -318,8 +269,6 @@ def api_transfer_selected():
         return jsonify({'success': False, 'message': '未配置夸克 Cookie'})
 
     service = SearchService(cookie)
-    
-    # 🎯 核心逻辑：若前端指定了目标目录，则直接使用；否则走默认或分类映射
     if target_fid_override:
         target_fid = target_fid_override
         category_fids = {}
