@@ -8,23 +8,35 @@
 </head>
 <body>
     <div class="app-container">
-        <!-- 顶栏 -->
+        <!-- 顶栏：大搜索框 + 状态监控徽章 -->
         <header class="app-header">
             <div class="logo-area">
                 <span class="logo-icon">🎬</span>
-                <h1>MovieSync 云影同步</h1>
+                <h1>MovieSync</h1>
             </div>
+
+            <!-- 🎯 居中大气搜索框 -->
             <div class="search-bar">
-                <input type="text" id="search-input" placeholder="输入你想找的电影、热播剧集、综艺、动漫..." onkeydown="if(event.key==='Enter') searchMovies()">
-                <button onclick="searchMovies()">搜索</button>
+                <input type="text" id="search-input" placeholder="搜索电影、热播剧集、动漫、综艺..." onkeydown="if(event.key==='Enter') searchMovies()">
+                <button onclick="searchMovies()">🔍 搜索</button>
             </div>
-            <div class="header-actions">
-                <a href="/admin"><button class="action-btn btn-primary">⚙️ 进入后台管理</button></a>
+
+            <!-- 🎯 状态监控直接嵌入首页顶栏 -->
+            <div class="header-status-area">
+                <div class="status-badge-item">
+                    <span class="status-label">夸克:</span>
+                    <span id="quark-status-badge" class="badge badge-warning">检测中...</span>
+                </div>
+                <div class="status-badge-item">
+                    <span class="status-label">TG 频道:</span>
+                    <span id="channel-status-badge" class="badge badge-warning">检测中...</span>
+                </div>
+                <a href="/admin"><button class="action-btn btn-primary">⚙️ 后台管理</button></a>
                 <a href="/logout"><button class="action-btn btn-secondary">退出</button></a>
             </div>
         </header>
 
-        <!-- 内容区 -->
+        <!-- 主体区域 -->
         <div class="main-layout" style="padding: 12px; flex-direction: column; gap: 8px;">
             <div class="toolbar">
                 <div class="category-tabs">
@@ -43,10 +55,11 @@
                     <button class="action-btn" onclick="clearSelection()">取消</button>
                     <button class="action-btn btn-primary" onclick="subscribeSelected()">🎯 一键追剧</button>
                     <button class="action-btn btn-success" onclick="startBatchTransfer()">🚀 批量转存</button>
+                    <button class="action-btn btn-secondary" onclick="toggleLogDrawer()">📋 运行日志</button>
                 </div>
             </div>
 
-            <!-- 筛选面板 (向下滚动海报区时自动向上滑动隐藏，向上滚自动展开) -->
+            <!-- 筛选面板 (下滚海报区时自动向上隐藏) -->
             <div id="filter-panel" class="filter-panel">
                 <div class="filter-row">
                     <span class="filter-label">排序:</span>
@@ -99,14 +112,26 @@
                 </div>
             </div>
 
-            <!-- 海报展示区 -->
+            <!-- 海报网格展示区 -->
             <div id="movie-grid-container" class="movie-grid-container">
                 <div id="movie-grid" class="movie-grid"></div>
+            </div>
+
+            <!-- 🎯 首页实时转存日志底部面板 (触发批量转存时自动弹出) -->
+            <div id="log-drawer" class="log-drawer">
+                <div class="drawer-header">
+                    <span>🟢 实时转存运行日志</span>
+                    <div>
+                        <button class="btn-sm" onclick="clearHomeLog()">清空</button>
+                        <button class="btn-sm" onclick="toggleLogDrawer()">收起 ✕</button>
+                    </div>
+                </div>
+                <div id="log-body" class="log-body" style="height: 160px;">MovieSync 就绪，等待触发转存任务...</div>
             </div>
         </div>
     </div>
 
-    <!-- 追剧弹窗 -->
+    <!-- 追剧订阅弹窗 -->
     <div id="sub-modal" class="modal">
         <div class="modal-content medium">
             <h2>🎯 添加追剧订阅任务</h2>
