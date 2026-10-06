@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>登录 - MovieSync 云影同步</title>
+    <title>{{ '首次初始化设置' if is_setup else '登录' }} - MovieSync 云影同步</title>
     <link rel="stylesheet" href="/static/css/style.css">
     <style>
         .login-wrapper {
@@ -21,78 +21,74 @@
             width: 380px;
             box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
         }
-        .tab-header {
-            display: flex;
+        .title-header {
+            text-align: center;
             margin-bottom: 24px;
-            border-bottom: 1px solid #1f2937;
         }
-        .tab-btn {
-            flex: 1;
-            background: none;
-            border: none;
-            color: #94a3b8;
-            padding: 10px;
-            border-radius: 0;
-            cursor: pointer;
-            font-size: 13px;
-        }
-        .tab-btn.active {
+        .title-header h2 {
             color: #38bdf8;
-            border-bottom: 2px solid #38bdf8;
-            font-weight: bold;
+            font-size: 20px;
+            margin-bottom: 6px;
+        }
+        .title-header p {
+            color: #94a3b8;
+            font-size: 12px;
         }
     </style>
 </head>
 <body>
 <div class="login-wrapper">
     <div class="login-card">
-        <h2 style="text-align: center; margin-bottom: 20px; color: #38bdf8; font-size: 20px;">🎬 MovieSync</h2>
-        
-        <div class="tab-header">
-            <button class="tab-btn active" id="tab-login-btn" onclick="switchTab('login')">账号登录</button>
-            <button class="tab-btn" id="tab-reset-btn" onclick="switchTab('reset')">重置密码</button>
+        <div class="title-header">
+            <h2>🎬 MovieSync</h2>
+            <p>{{ '首次部署请设置你的专属管理员账号' if is_setup else '请登录以继续使用服务' }}</p>
         </div>
 
-        <!-- 账号登录 -->
-        <form id="form-login" onsubmit="handleLogin(event)">
+        {% if is_setup %}
+        <!-- 首次初始化表单 -->
+        <form onsubmit="handleSetup(event)">
             <div class="form-group" style="margin-bottom: 14px;">
-                <label>管理员账号</label>
-                <input type="text" id="login-username" value="admin" required>
+                <label>自定义管理员账号</label>
+                <input type="text" id="setup-username" placeholder="请输入你的用户名" required>
+            </div>
+            <div class="form-group" style="margin-bottom: 18px;">
+                <label>设置密码</label>
+                <input type="password" id="setup-password" placeholder="请输入安全密码" required>
+            </div>
+            <button type="submit" class="btn-primary" style="width: 100%; height: 38px;">创建账号并登录</button>
+        </form>
+        {% else %}
+        <!-- 正常登录表单 -->
+        <form onsubmit="handleLogin(event)">
+            <div class="form-group" style="margin-bottom: 14px;">
+                <label>账号</label>
+                <input type="text" id="login-username" required>
             </div>
             <div class="form-group" style="margin-bottom: 18px;">
                 <label>密码</label>
-                <input type="password" id="login-password" placeholder="默认密码: admin123" required>
+                <input type="password" id="login-password" required>
             </div>
             <button type="submit" class="btn-primary" style="width: 100%; height: 38px;">登 录</button>
         </form>
-
-        <!-- 重置密码 -->
-        <form id="form-reset" onsubmit="handleReset(event)" style="display: none;">
-            <div class="form-group" style="margin-bottom: 14px;">
-                <label>凭证密钥 (RESET_TOKEN)</label>
-                <input type="text" id="reset-token" placeholder="默认 Token: moviesync2026" required>
-            </div>
-            <div class="form-group" style="margin-bottom: 18px;">
-                <label>设置新密码</label>
-                <input type="password" id="reset-new-password" placeholder="请输入新密码" required>
-            </div>
-            <button type="submit" class="btn-secondary" style="width: 100%; height: 38px;">确认重置密码</button>
-        </form>
+        {% endif %}
     </div>
 </div>
 
 <script>
-function switchTab(tab) {
-    if(tab === 'login') {
-        document.getElementById('form-login').style.display = 'block';
-        document.getElementById('form-reset').style.display = 'none';
-        document.getElementById('tab-login-btn').classList.add('active');
-        document.getElementById('tab-reset-btn').classList.remove('active');
+async function handleSetup(e) {
+    e.preventDefault();
+    const username = document.getElementById('setup-username').value;
+    const password = document.getElementById('setup-password').value;
+    const res = await fetch('/api/setup', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({username, password})
+    });
+    const data = await res.json();
+    if(data.success) {
+        window.location.href = '/';
     } else {
-        document.getElementById('form-login').style.display = 'none';
-        document.getElementById('form-reset').style.display = 'block';
-        document.getElementById('tab-reset-btn').classList.add('active');
-        document.getElementById('tab-login-btn').classList.remove('active');
+        alert(data.message);
     }
 }
 
@@ -111,20 +107,6 @@ async function handleLogin(e) {
     } else {
         alert(data.message);
     }
-}
-
-async function handleReset(e) {
-    e.preventDefault();
-    const token = document.getElementById('reset-token').value;
-    const new_password = document.getElementById('reset-new-password').value;
-    const res = await fetch('/api/reset-password', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({token, new_password})
-    });
-    const data = await res.json();
-    alert(data.message);
-    if(data.success) switchTab('login');
 }
 </script>
 </body>
