@@ -1,5 +1,6 @@
 import os
 import json
+import datetime
 import requests
 from flask import Flask, render_template, request, jsonify, Response, stream_with_context, session, redirect, url_for
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -16,7 +17,6 @@ app.secret_key = os.environ.get('SECRET_KEY', 'moviesync_secret_key_2026_secure'
 AUTH_FILE = 'auth.json'
 
 def load_auth():
-    """读取配置，若文件不存在则返回 None (未初始化)"""
     if os.path.exists(AUTH_FILE):
         try:
             with open(AUTH_FILE, 'r', encoding='utf-8') as f:
@@ -29,11 +29,9 @@ def save_auth(data):
     with open(AUTH_FILE, 'w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
-# 初始化追剧订阅管理器
 sub_manager = SubscriptionManager(get_cookie_func=lambda: app.config.get('QUARK_COOKIE', ''))
 sub_manager.start_scheduler()
 
-# 🎯 全局智能拦截器
 @app.before_request
 def require_login():
     if request.path.startswith('/static'):
@@ -41,17 +39,14 @@ def require_login():
 
     auth_data = load_auth()
 
-    # 1. 状态：系统未初始化 -> 强制跳转到首次设置页面
     if not auth_data or not auth_data.get('initialized'):
         if request.path not in ['/setup', '/api/setup']:
             return redirect('/setup')
         return
 
-    # 2. 状态：已初始化 -> 禁止再次访问 setup
     if request.path in ['/setup', '/api/setup']:
         return redirect('/login')
 
-    # 3. 状态：正常访问 -> 未登录拦截
     allowed_paths = ['/login', '/api/login']
     if request.path not in allowed_paths and not session.get('logged_in'):
         if request.path.startswith('/api/'):
@@ -66,7 +61,7 @@ def setup_page():
 def api_setup():
     auth_data = load_auth()
     if auth_data and auth_data.get('initialized'):
-        return jsonify({'success': False, 'message': '系统已完成过初始化，禁止重复设定'})
+        return jsonify({'success': False, 'message': '系统已完成初始化'})
 
     data = request.json or {}
     username = data.get('username', '').strip()
@@ -118,7 +113,6 @@ def index():
 def admin():
     return render_template('admin.html')
 
-
 # ==================== 影视与转存 API ====================
 
 @app.route('/api/get-movies', methods=['GET'])
@@ -131,6 +125,12 @@ def get_movies():
 
     if main_tag == '动漫':
         main_tag = '动画'
+
+    # 🎯 修复问题 1：当选择“最新”排序时，若未指定年份，豆瓣默认按标注时间返回，混入经典高分老片。
+    # 此处自动锁定近年年份范围，精准获取真正的最新影片！
+    if sort_type == 'T' and not year_range:
+        current_year = datetime.datetime.now().year
+        year_range = f"{current_year-1},{current_year}"
 
     url = "https://movie.douban.com/j/new_search_subjects"
     params = {
@@ -258,9 +258,10 @@ def parse_share_detail():
         return jsonify({'success': False, 'message': '参数缺失'})
 
     engine = QuarkEngine(cookie)
-    files, stoken, err = engine.get_share_files(pwd_id)
+    # 🎯 仅保留视频文件
+    files, stoken, err = engine.get_share_files(pwd_id, only_video=True)
     if not files:
-        return jsonify({'success': False, 'message': f'解析失败: {err}'})
+        return jsonify({'success': False, 'message': f'未包含有效视频文件: {err}'})
 
     parsed_files = []
     for f in files:
@@ -294,11 +295,17 @@ def save_selected_files():
     selected_fids = data.get('fids', [])
     target_fid = data.get('target_fid', '0')
     cookie = data.get('cookie', '')
+    title = data.get('title', '')
 
     if not selected_fids or not cookie:
         return jsonify({'success': False, 'message': '未选择文件或缺失 Cookie'})
 
     engine = QuarkEngine(cookie)
+    
+    # 🎯 自动建文件夹转存
+    if title:
+        target_fid = engine.get_or_create_subfolder(title, target_fid)
+
     files_to_save = [{'fid': fid} for fid in selected_fids]
     
     ok, msg = engine.save_files(pwd_id, files_to_save, stoken, target_fid)
@@ -322,7 +329,7 @@ def search_link_for_sub():
         
         if pwd_id:
             return jsonify({'success': True, 'pwd_id': pwd_id})
-        return jsonify({'success': False, 'message': f'未在所设频道中找到 [{title}] 的夸克链接'})
+        return jsonify({'success': False, 'message': f'未在频道中找到含有视频的 [{title}] 链接'})
     except Exception as e:
         return jsonify({'success': False, 'message': f'后台检索异常: {str(e)}'})
 
