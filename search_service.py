@@ -1,63 +1,58 @@
-import re
 import requests
-from quark_engine import QuarkEngine
+import re
+from quark_engine import QuarkEngine, sanitize_pwd_id, is_video_file
 
 class SearchService:
     def __init__(self, cookie):
         self.cookie = cookie
-        self.headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-        }
+        self.engine = QuarkEngine(cookie)
 
     def search_single_movie_pwd_id(self, title, channels):
-        """在已配置的 TG 频道中检索指定剧名，，提取第一个有效的夸克链接 pwd_id"""
-        if not title or not channels:
-            return None
-
-        # 匹配夸克分享链接中的 pwd_id (如 pan.quark.cn/s/ef7951063756)
-        quark_pattern = re.compile(r'(?:pan\.)?quark\.cn/s/([a-zA-Z0-9]+)')
-
+        """在 TG 检索频道搜索链接，并校验链接内是否真的包含视频文件"""
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+        
         for ch in channels:
             ch_id = ch.get('id', '').strip()
             if not ch_id:
                 continue
-
-            # 请求 Telegram 频道网页预览版的搜索接口
-            search_url = f"https://t.me/s/{ch_id}?q={requests.utils.quote(title)}"
+            
+            url = f"https://t.me/s/{ch_id}?q={requests.utils.quote(title)}"
             try:
-                resp = requests.get(search_url, headers=self.headers, timeout=6)
+                resp = requests.get(url, headers=headers, timeout=5)
                 if resp.status_code == 200:
-                    matches = quark_pattern.findall(resp.text)
-                    if matches:
-                        return matches[0]
+                    matches = re.findall(r'pan\.quark\.cn/s/([a-zA-Z0-9]+)', resp.text)
+                    for pwd_id in matches:
+                        # 🎯 解析链接内容，确保至少包含一个视频文件（排除音轨/文稿链接）
+                        files, stoken, err = self.engine.get_share_files(pwd_id, only_video=True)
+                        if files and len(files) > 0:
+                            return pwd_id
             except Exception:
                 continue
-
         return None
 
-    def batch_search_and_transfer_stream(self, movies, channels, target_fid='0'):
-        """批量检索并转存流式日志输出"""
-        engine = QuarkEngine(self.cookie)
-        for title in movies:
-            yield f"🔍 正在检索: [{title}]..."
+    def batch_search_and_transfer_stream(self, movie_titles, channels, target_fid='0'):
+        """批量检索并转存到对应影视的专属子文件夹中"""
+        for title in movie_titles:
+            yield f"\n🔍 正在检索: [{title}]..."
+            
             pwd_id = self.search_single_movie_pwd_id(title, channels)
             if not pwd_id:
-                yield f"❌ 未在配置频道中找到 [{title}] 的夸克资源"
+                yield f"❌ 未能找到包含有效视频文件的夸克链接: [{title}]"
                 continue
 
-            yield f"🟢 找到资源链接 ID: {pwd_id}，正在解析内容..."
-            files, stoken, err = engine.get_share_files(pwd_id)
+            yield f"🟢 找到视频资源链接 ID: {pwd_id}，正在穿透解析内容..."
+            files, stoken, err = self.engine.get_share_files(pwd_id, only_video=True)
+            
             if not files:
-                yield f"❌ 解析分享链接失败: {err}"
+                yield f"⚠️ 链接解析失败或未发现有效视频文件: {err}"
                 continue
 
-            files_to_save = [{'fid': f.get('fid')} for f in files if f.get('fid')]
-            if not files_to_save:
-                yield f"⚠️ [{title}] 链接内未发现可转存的文件"
-                continue
+            # 🎯 自动获取或在网盘中创建以影视名称命名的专属文件夹
+            show_folder_fid = self.engine.get_or_create_subfolder(title, target_fid)
+            yield f"📁 已建立/定位专属目录: [{title}] (FID: {show_folder_fid})"
 
-            ok, msg = engine.save_files(pwd_id, files_to_save, stoken, target_fid)
+            ok, msg = self.engine.save_files(pwd_id, files, stoken, show_folder_fid)
             if ok:
-                yield f"✅ [{title}] 成功转存至目标目录 (共 {len(files_to_save)} 个文件)"
+                yield f"✅ [{title}] 成功转存至专属目录 (共 {len(files)} 个视频文件)"
             else:
                 yield f"❌ [{title}] 转存失败: {msg}"
