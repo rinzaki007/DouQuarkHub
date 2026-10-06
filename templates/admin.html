@@ -34,13 +34,13 @@
             <ul class="sidebar-menu">
                 <li class="active" onclick="switchSection('config')">⚙️ 全局设置与配置迁移</li>
                 <li onclick="switchSection('sub')">📊 自动化追剧任务</li>
-                <li onclick="switchSection('status')">⚡ 服务监控与日志</li>
+                <li onclick="switchSection('status')">📋 系统运行日志</li>
             </ul>
         </div>
 
         <!-- 主内容区 -->
         <div class="admin-main">
-            <!-- 🎯 模块 1: 全局设置 (取消狭窄限制，铺满页面宽度) -->
+            <!-- 🎯 模块 1: 全局设置 (补全四大分类目录 FID) -->
             <div id="sec-config" class="admin-section active">
                 <div class="admin-card-full">
                     <h2>⚙️ 全局系统参数设置</h2>
@@ -51,14 +51,18 @@
                     </div>
                     
                     <div class="form-row">
-                        <div class="form-group"><label>默认全局 FID:</label><input type="text" id="folder-id-input"></div>
-                        <div class="form-group"><label>OpenList 地址:</label><input type="text" id="openlist-url-input"></div>
+                        <div class="form-group"><label>默认全局存储目录 FID:</label><input type="text" id="folder-id-input" placeholder="默认为 0 (根目录)"></div>
+                        <div class="form-group"><label>OpenList 访问地址:</label><input type="text" id="openlist-url-input"></div>
                     </div>
 
-                    <h3 style="margin-top:12px; font-size:13px; color:#38bdf8;">📁 各分类目录 FID (可选)</h3>
+                    <h3 style="margin-top:12px; font-size:13px; color:#38bdf8;">📁 各分类专属存储目录 FID (未设定则自动使用默认全局 FID)</h3>
                     <div class="form-row">
-                        <div class="form-group"><label>电影目录 FID:</label><input type="text" id="folder-movie-input"></div>
-                        <div class="form-group"><label>电视剧目录 FID:</label><input type="text" id="folder-tv-input"></div>
+                        <div class="form-group"><label>🎬 电影目录 FID:</label><input type="text" id="folder-movie-input" placeholder="留空使用默认 FID"></div>
+                        <div class="form-group"><label>📺 电视剧目录 FID:</label><input type="text" id="folder-tv-input" placeholder="留空使用默认 FID"></div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group"><label>🎤 综艺目录 FID:</label><input type="text" id="folder-show-input" placeholder="留空使用默认 FID"></div>
+                        <div class="form-group"><label>🎨 动漫目录 FID:</label><input type="text" id="folder-anime-input" placeholder="留空使用默认 FID"></div>
                     </div>
 
                     <div class="form-group" style="margin-top: 10px;">
@@ -73,7 +77,7 @@
                         </div>
                     </div>
 
-                    <!-- 🎯 配置导入/导出按钮栏 -->
+                    <!-- 配置导入/导出 -->
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-top:20px; padding-top:16px; border-top:1px solid #1f2937;">
                         <div style="display:flex; gap:10px;">
                             <button class="btn-secondary" onclick="exportConfig()">📤 导出配置 JSON</button>
@@ -91,25 +95,21 @@
                 <div id="sub-list-box" class="sub-list-scroll" style="max-height:550px;"></div>
             </div>
 
-            <!-- 模块 3: 系统监控与日志 -->
+            <!-- 🎯 模块 3: 系统运行控制台日志 (移除多余状态监控，增加彩色日志分级过滤) -->
             <div id="sec-status" class="admin-section">
-                <div class="panel">
+                <div class="panel" style="width: 100%;">
                     <div class="panel-header">
-                        <h3>⚡ 运行状态服务监控</h3>
-                        <button class="btn-sm" onclick="refreshAdminStatus()">🔄 刷新检测</button>
+                        <h3>📋 详细控制台运行日志</h3>
+                        <div style="display:flex; gap:6px;">
+                            <button class="btn-sm" onclick="filterLogs('ALL')">全部</button>
+                            <button class="btn-sm" style="color:#38bdf8;" onclick="filterLogs('INFO')">普通</button>
+                            <button class="btn-sm" style="color:#34d399;" onclick="filterLogs('SUCCESS')">成功</button>
+                            <button class="btn-sm" style="color:#fbbf24;" onclick="filterLogs('WARN')">警告</button>
+                            <button class="btn-sm" style="color:#f87171;" onclick="filterLogs('ERROR')">错误</button>
+                            <button class="btn-sm" onclick="clearAdminLog()">清空</button>
+                        </div>
                     </div>
-                    <div class="status-items">
-                        <div class="status-row"><span>夸克 Cookie:</span><span id="quark-status-badge" class="badge badge-warning">检测中...</span></div>
-                        <div class="status-row"><span>TG 检索频道:</span><span id="channel-status-badge" class="badge badge-warning">检测中...</span></div>
-                    </div>
-                </div>
-
-                <div class="panel">
-                    <div class="panel-header">
-                        <h3>🟢 运行控制台日志</h3>
-                        <button class="btn-sm" onclick="clearAdminLog()">清空日志</button>
-                    </div>
-                    <div id="log-body" class="log-body" style="height: 300px;">MovieSync 服务就绪...</div>
+                    <div id="admin-log-body" class="log-body" style="height: 520px;"></div>
                 </div>
             </div>
         </div>
