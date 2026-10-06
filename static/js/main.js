@@ -184,7 +184,7 @@ function renderGrid() {
         const card = document.createElement('div');
         card.className = `relative group bg-slate-900 border ${isSelected ? 'border-blue-500' : 'border-slate-800'} rounded-lg overflow-hidden card-shadow cursor-pointer transition`;
         card.onclick = (e) => {
-            if (e.target.tagName !== 'A') {
+            if (!e.target.closest('a')) {
                 toggleSelect(idx);
             }
         };
@@ -193,7 +193,7 @@ function renderGrid() {
             <div class="aspect-[2/3] w-full bg-slate-950 relative overflow-hidden">
                 <img src="${coverUrl}" alt="${movie.title}" class="w-full h-full object-cover group-hover:scale-105 transition duration-300" loading="lazy">
                 <div class="absolute top-2 left-2 z-10">
-                    <input type="checkbox" ${isSelected ? 'checked' : ''} class="w-4 h-4 rounded border-slate-600 bg-slate-900/80 text-blue-600 focus:ring-0">
+                    <input type="checkbox" ${isSelected ? 'checked' : ''} class="w-4 h-4 rounded border-slate-600 bg-slate-900/80 text-blue-600 focus:ring-0 pointer-events-none">
                 </div>
                 <div class="absolute top-2 right-2 bg-slate-900/90 backdrop-blur text-amber-400 text-[11px] font-bold px-1.5 py-0.5 rounded border border-slate-700/50">
                     ${movie.rate || '暂无'}
@@ -201,8 +201,12 @@ function renderGrid() {
             </div>
             <div class="p-2.5">
                 <div class="font-medium text-xs text-slate-200 line-clamp-1 group-hover:text-blue-400 transition" title="${movie.title}">${movie.title}</div>
-                <div class="mt-1 flex items-center justify-between text-[11px]">
-                    <a href="${movie.url}" target="_blank" class="text-blue-400 hover:underline">详情</a>
+                <div class="mt-1.5 flex items-center justify-between text-[11px]">
+                    <span class="text-slate-400 text-[10px]">豆瓣影视</span>
+                    <a href="${movie.url}" target="_blank" class="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 bg-blue-950/60 px-2 py-0.5 rounded border border-blue-900/50 transition">
+                        <span>详情</span>
+                        <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
+                    </a>
                 </div>
             </div>
         `;
