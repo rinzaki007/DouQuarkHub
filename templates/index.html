@@ -32,7 +32,7 @@
                 </a>
             </div>
 
-            <!-- 中间：搜索框（移至正上方） -->
+            <!-- 中间：搜索框 -->
             <div class="flex-1 max-w-md mx-4 relative">
                 <input type="text" id="search-input" placeholder="搜索豆瓣影视资源..." 
                        class="w-full bg-slate-950/80 border border-slate-700/80 rounded-lg px-3.5 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-blue-500 shadow-inner"
@@ -66,7 +66,7 @@
     <div class="bg-slate-900/80 backdrop-blur-md border-b border-slate-800/80 px-4 py-2.5 sticky top-[57px] z-30 shadow-md">
         <div class="max-w-7xl mx-auto flex items-center justify-between gap-4">
             
-            <!-- 左侧：排序方式 + 已选统计 + 影片名称预览区 + 转存按钮 -->
+            <!-- 左侧：排序方式 + 已选统计 + 影片名称预览区 -->
             <div class="flex items-center space-x-4 flex-1 overflow-hidden">
                 <div class="flex items-center space-x-2 shrink-0">
                     <span class="text-xs text-slate-400 font-medium">排序方式：</span>
@@ -89,12 +89,12 @@
                         <button onclick="selectAll(false)" class="px-2 py-1 text-xs bg-slate-800/80 hover:bg-slate-700 text-slate-300 rounded">取消</button>
                     </div>
                     
-                    <!-- 资源名称预览显示区（空间更宽敞） -->
+                    <!-- 资源名称预览显示区 -->
                     <div id="selected-titles-preview" class="flex items-center gap-1.5 overflow-hidden text-xs flex-1"></div>
                 </div>
             </div>
 
-            <!-- 右侧：放大版转存资源按钮 -->
+            <!-- 右侧：转存资源按钮 -->
             <div class="shrink-0">
                 <button onclick="batchTransfer()" class="px-4 py-2 text-xs bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-medium flex items-center gap-1.5 shadow-lg shadow-emerald-600/20 transition">
                     <i class="fa-solid fa-cloud-arrow-down text-sm"></i> 转存资源
@@ -222,20 +222,20 @@
         </div>
     </div>
 
-    <!-- 底部固定实时日志面板（毛玻璃效果） -->
-    <div id="log-panel" class="fixed bottom-0 left-0 right-0 z-50 bg-slate-950/85 backdrop-blur-md border-t border-slate-800 shadow-2xl transition-all duration-300 hidden">
-        <div class="flex items-center justify-between px-4 py-2 bg-slate-900/90 border-b border-slate-800">
+    <!-- 底部固定实时日志面板（完整毛玻璃效果：透明背景 + backdrop-blur） -->
+    <div id="log-panel" class="fixed bottom-0 left-0 right-0 z-50 bg-slate-950/75 backdrop-blur-xl border-t border-slate-800/80 shadow-2xl transition-all duration-300 hidden">
+        <div class="flex items-center justify-between px-4 py-2 bg-slate-900/60 backdrop-blur-md border-b border-slate-800/80">
             <div class="flex items-center gap-2 text-xs text-slate-300 font-medium">
                 <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
                 <span>实时转存运行日志</span>
-                <span id="log-timer-badge" class="ml-2 px-2 py-0.5 rounded bg-blue-950 text-blue-400 font-mono text-[11px] hidden">耗时: 0 秒</span>
+                <span id="log-timer-badge" class="ml-2 px-2 py-0.5 rounded bg-blue-950/80 text-blue-400 font-mono text-[11px] hidden">耗时: 0 秒</span>
             </div>
             <div class="flex items-center gap-2">
-                <button onclick="clearLog()" class="px-2 py-0.5 text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 rounded">清空</button>
-                <button onclick="toggleLogBox(false)" class="px-2 py-0.5 text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 rounded">收起 ×</button>
+                <button onclick="clearLog()" class="px-2 py-0.5 text-xs bg-slate-800/80 hover:bg-slate-700 text-slate-300 rounded">清空</button>
+                <button onclick="toggleLogBox(false)" class="px-2 py-0.5 text-xs bg-slate-800/80 hover:bg-slate-700 text-slate-300 rounded">收起 ×</button>
             </div>
         </div>
-        <div id="log-box" class="h-48 overflow-y-auto p-3"></div>
+        <div id="log-box" class="h-48 overflow-y-auto p-3 bg-transparent backdrop-blur-md"></div>
     </div>
 
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
