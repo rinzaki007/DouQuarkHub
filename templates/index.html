@@ -2,46 +2,144 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>MovieSync 云影同步 - 首页</title>
-    <link rel="stylesheet" href="/static/style.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MovieSync 云影同步</title>
+    <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
-    <!-- 顶部导航栏 -->
-    <header class="navbar">
-        <div class="logo">🎬 MovieSync 云影同步</div>
-        
-        <!-- 搜索框 -->
-        <div style="display: flex; gap: 8px; width: 400px;">
-            <input type="text" placeholder="输入搜索的电影、电视剧、动漫..." style="flex: 1;">
-            <button>搜索</button>
-        </div>
+    <div class="app-container">
+        <!-- 顶栏 -->
+        <header class="app-header">
+            <div class="logo-area">
+                <span class="logo-icon">🎬</span>
+                <h1>MovieSync 云影同步</h1>
+            </div>
+            <div class="search-bar">
+                <input type="text" id="search-input" placeholder="输入你想找的电影、热播剧集、综艺、动漫..." onkeydown="if(event.key==='Enter') searchMovies()">
+                <button onclick="searchMovies()">搜索</button>
+            </div>
+            <div class="header-actions">
+                <a href="/admin"><button class="action-btn btn-primary">⚙️ 进入后台管理</button></a>
+                <a href="/logout"><button class="action-btn btn-secondary">退出</button></a>
+            </div>
+        </header>
 
-        <div class="navbar-actions">
-            <a href="/admin"><button class="btn-secondary">⚙️ 后台管理</button></a>
-            <a href="/logout"><button class="btn-secondary" style="color: var(--danger-color);">退出</button></a>
-        </div>
-    </header>
+        <!-- 内容区 -->
+        <div class="main-layout" style="padding: 12px; flex-direction: column; gap: 8px;">
+            <div class="toolbar">
+                <div class="category-tabs">
+                    <button class="tab-btn active" id="tab-电影" onclick="switchCategory('电影')">电影</button>
+                    <button class="tab-btn" id="tab-电视剧" onclick="switchCategory('电视剧')">电视剧</button>
+                    <button class="tab-btn" id="tab-综艺" onclick="switchCategory('综艺')">综艺</button>
+                    <button class="tab-btn" id="tab-动漫" onclick="switchCategory('动漫')">动漫</button>
+                </div>
 
-    <!-- 分类筛选栏 -->
-    <div style="padding: 16px 24px 0 24px; display: flex; gap: 10px;">
-        <button>全部</button>
-        <button class="btn-secondary">电影</button>
-        <button class="btn-secondary">电视剧</button>
-        <button class="btn-secondary">综艺</button>
-        <button class="btn-secondary">动漫</button>
+                <div class="action-buttons">
+                    <button class="action-btn btn-openlist" onclick="openOpenList()">▶️ OpenList</button>
+                    <button class="action-btn btn-quark" onclick="openQuarkApp()">🌐 夸克端</button>
+                    <div class="divider"></div>
+                    <span class="sel-info">已选 <b id="selected-count">0</b> 部</span>
+                    <button class="action-btn" onclick="selectAll()">全选</button>
+                    <button class="action-btn" onclick="clearSelection()">取消</button>
+                    <button class="action-btn btn-primary" onclick="subscribeSelected()">🎯 一键追剧</button>
+                    <button class="action-btn btn-success" onclick="startBatchTransfer()">🚀 批量转存</button>
+                </div>
+            </div>
+
+            <!-- 筛选面板 (向下滚动海报区时自动向上滑动隐藏，向上滚自动展开) -->
+            <div id="filter-panel" class="filter-panel">
+                <div class="filter-row">
+                    <span class="filter-label">排序:</span>
+                    <div class="filter-items">
+                        <span class="filter-item active" onclick="setFilter('sort', 'U', this)">热门</span>
+                        <span class="filter-item" onclick="setFilter('sort', 'T', this)">最新</span>
+                        <span class="filter-item" onclick="setFilter('sort', 'S', this)">高分</span>
+                        <span class="filter-item" onclick="setFilter('sort', 'R', this)">最多评价</span>
+                    </div>
+                </div>
+                <div class="filter-row">
+                    <span class="filter-label">类型:</span>
+                    <div class="filter-items">
+                        <span class="filter-item active" onclick="setFilter('genre', '', this)">全部</span>
+                        <span class="filter-item" onclick="setFilter('genre', '剧情', this)">剧情</span>
+                        <span class="filter-item" onclick="setFilter('genre', '喜剧', this)">喜剧</span>
+                        <span class="filter-item" onclick="setFilter('genre', '动作', this)">动作</span>
+                        <span class="filter-item" onclick="setFilter('genre', '爱情', this)">爱情</span>
+                        <span class="filter-item" onclick="setFilter('genre', '科幻', this)">科幻</span>
+                        <span class="filter-item" onclick="setFilter('genre', '悬疑', this)">悬疑</span>
+                        <span class="filter-item" onclick="setFilter('genre', '犯罪', this)">犯罪</span>
+                        <span class="filter-item" onclick="setFilter('genre', '动画', this)">动画</span>
+                        <span class="filter-item" onclick="setFilter('genre', '惊悚', this)">惊悚</span>
+                    </div>
+                </div>
+                <div class="filter-row">
+                    <span class="filter-label">地区:</span>
+                    <div class="filter-items">
+                        <span class="filter-item active" onclick="setFilter('country', '', this)">全部</span>
+                        <span class="filter-item" onclick="setFilter('country', '中国大陆', this)">中国大陆</span>
+                        <span class="filter-item" onclick="setFilter('country', '美国', this)">美国</span>
+                        <span class="filter-item" onclick="setFilter('country', '中国香港', this)">中国香港</span>
+                        <span class="filter-item" onclick="setFilter('country', '中国台湾', this)">中国台湾</span>
+                        <span class="filter-item" onclick="setFilter('country', '日本', this)">日本</span>
+                        <span class="filter-item" onclick="setFilter('country', '韩国', this)">韩国</span>
+                        <span class="filter-item" onclick="setFilter('country', '英国', this)">英国</span>
+                    </div>
+                </div>
+                <div class="filter-row">
+                    <span class="filter-label">年份:</span>
+                    <div class="filter-items">
+                        <span class="filter-item active" onclick="setFilter('year', '', this)">全部</span>
+                        <span class="filter-item" onclick="setFilter('year', '2026', this)">2026</span>
+                        <span class="filter-item" onclick="setFilter('year', '2025', this)">2025</span>
+                        <span class="filter-item" onclick="setFilter('year', '2024', this)">2024</span>
+                        <span class="filter-item" onclick="setFilter('year', '2023', this)">2023</span>
+                        <span class="filter-item" onclick="setFilter('year', '2020年代', this)">2020年代</span>
+                        <span class="filter-item" onclick="setFilter('year', '2010年代', this)">2010年代</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 海报展示区 -->
+            <div id="movie-grid-container" class="movie-grid-container">
+                <div id="movie-grid" class="movie-grid"></div>
+            </div>
+        </div>
     </div>
 
-    <!-- 影视海报展示区 -->
-    <main class="poster-grid">
-        <div class="poster-card">
-            <img src="https://via.placeholder.com/160x230/1e293b/ffffff?text=Movie+1" alt="封面">
-            <div class="title">示例电影名称 1</div>
+    <!-- 追剧弹窗 -->
+    <div id="sub-modal" class="modal">
+        <div class="modal-content medium">
+            <h2>🎯 添加追剧订阅任务</h2>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>剧集名称:</label>
+                    <div style="display:flex; gap:8px;">
+                        <input type="text" id="sub-title-input">
+                        <button type="button" class="btn-primary" onclick="autoSearchSubLink()">🔍 检索链接</button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>夸克链接 ID:</label>
+                    <input type="text" id="sub-pwd-input">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>存储目录:</label>
+                        <select id="sub-folder-select"></select>
+                    </div>
+                    <div class="form-group">
+                        <label>跳过前 X 集:</label>
+                        <input type="number" id="sub-start-ep-input" value="0" min="0">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeSubModal()">取消</button>
+                <button class="btn-primary" onclick="addSubscriptionFromModal()">确认订阅</button>
+            </div>
         </div>
-        <div class="poster-card">
-            <img src="https://via.placeholder.com/160x230/1e293b/ffffff?text=Movie+2" alt="封面">
-            <div class="title">示例电视剧 2</div>
-        </div>
-        <!-- 动态读取海报填充... -->
-    </main>
+    </div>
+
+    <script src="/static/js/main.js"></script>
 </body>
 </html>
