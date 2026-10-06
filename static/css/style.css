@@ -225,3 +225,19 @@ button:hover { background-color: #1d4ed8; }
 .channel-manage-box { background: #0f172a; border: 1px solid #1f2937; border-radius: 6px; padding: 6px; display: flex; flex-direction: column; gap: 6px; }
 .channel-list-scroll { max-height: 100px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
 .channel-item { display: flex; justify-content: space-between; background: #1e293b; padding: 5px 8px; border-radius: 4px; font-size: 11px; }
+
+/* 🎯 彩色分级日志样式 */
+.log-line {
+    margin-bottom: 3px;
+    line-height: 1.5;
+    font-family: Consolas, Monaco, monospace;
+}
+.log-tag-info { color: #38bdf8; }
+.log-tag-success { color: #34d399; font-weight: 600; }
+.log-tag-warn { color: #fbbf24; font-weight: 600; }
+.log-tag-error { color: #f87171; font-weight: 700; }
+
+select option {
+    background-color: #1f2937;
+    color: #f8fafc;
+}
