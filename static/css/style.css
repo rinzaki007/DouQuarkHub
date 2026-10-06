@@ -14,10 +14,10 @@ body {
 }
 #log-box {
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-    background-color: #020617;
+    background-color: transparent !important;
     font-size: 13px;
 }
 ::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: #0f172a; }
-::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #475569; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(51, 65, 85, 0.6); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(71, 85, 105, 0.8); }
