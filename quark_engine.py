@@ -69,7 +69,7 @@ class QuarkEngine:
             return False
 
     def get_or_create_subfolder(self, folder_name, parent_fid='0'):
-        """在指定的父级目录 FID 下检索或新建对应名字的文件夹"""
+        """在指定的父级目录 FID 下精准创建或获取专属文件夹"""
         if not parent_fid:
             parent_fid = '0'
 
@@ -86,7 +86,7 @@ class QuarkEngine:
         except Exception:
             pass
 
-        # 2. 不存在则发起新建文件夹请求
+        # 2. 发起新建文件夹请求
         mkdir_url = "https://drive.quark.cn/1/clouddrive/file/mkdir?pr=ucpro&fr=pc"
         payload = {
             "pdir_fid": str(parent_fid),
@@ -97,9 +97,15 @@ class QuarkEngine:
             resp = requests.post(mkdir_url, json=payload, headers=self.headers, timeout=6)
             d = resp.json()
             if d.get('code') == 0:
-                return d.get('data', {}).get('fid')
-            
-            # 如果因为并发或其他原因已存在，再次拉取确认
+                data_obj = d.get('data', {})
+                new_fid = data_obj.get('fid') or data_obj.get('file_id') or d.get('fid')
+                if new_fid:
+                    return new_fid
+        except Exception as e:
+            print(f"创建文件夹异常: {e}")
+
+        # 3. 再次拉取确认（防止并发创建时漏掉）
+        try:
             list_url = f"https://drive.quark.cn/1/clouddrive/file/sort?pr=ucpro&fr=pc&pdir_fid={parent_fid}&num=100"
             resp = requests.get(list_url, headers=self.headers, timeout=6)
             if resp.status_code == 200:
@@ -111,7 +117,7 @@ class QuarkEngine:
         except Exception:
             pass
 
-        return parent_fid
+        return None
 
     def get_share_files(self, pwd_id, max_depth=3):
         pwd_id = sanitize_pwd_id(pwd_id)
