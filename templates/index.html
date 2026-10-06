@@ -80,7 +80,7 @@
                 <button onclick="selectAll(true)" class="px-2 py-1 text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 rounded">全选</button>
                 <button onclick="selectAll(false)" class="px-2 py-1 text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 rounded">取消</button>
                 <button onclick="batchTransfer()" class="px-2.5 py-1.5 text-xs bg-emerald-600 hover:bg-emerald-500 text-white rounded font-medium flex items-center gap-1">
-                    <i class="fa-solid fa-cloud-arrow-down"></i> 批量转存
+                    <i class="fa-solid fa-cloud-arrow-down"></i> 转存资源
                 </button>
                 <button onclick="toggleLogBox()" class="px-2.5 py-1.5 text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 rounded flex items-center gap-1">
                     <i class="fa-solid fa-terminal"></i> 运行日志
@@ -155,6 +155,24 @@
         </div>
     </div>
 
+    <!-- 🎬 交互式候选资源选择弹窗 -->
+    <div id="candidate-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+        <div class="bg-slate-900 border border-slate-800 rounded-lg w-full max-w-2xl p-5 shadow-2xl space-y-4 max-h-[85vh] flex flex-col">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                <h3 class="text-base font-medium text-white flex items-center gap-2">
+                    <i class="fa-solid fa-list-check text-blue-500"></i> 选择要转存的资源版本
+                </h3>
+                <button onclick="closeCandidateModal()" class="text-slate-400 hover:text-white">✕</button>
+            </div>
+            <div id="candidate-content" class="flex-1 overflow-y-auto space-y-4 pr-1">
+                <!-- 动态填充候选列表 -->
+            </div>
+            <div class="flex justify-end pt-2 border-t border-slate-800">
+                <button onclick="closeCandidateModal()" class="px-4 py-1.5 text-xs bg-slate-800 text-slate-300 rounded hover:bg-slate-700">关闭</button>
+            </div>
+        </div>
+    </div>
+
     <!-- 底部固定实时日志面板 -->
     <div id="log-panel" class="fixed bottom-0 left-0 right-0 z-50 bg-slate-950 border-t border-slate-800 shadow-2xl transition-all duration-300 hidden">
         <div class="flex items-center justify-between px-4 py-2 bg-slate-900 border-b border-slate-800">
@@ -190,7 +208,6 @@
             checkSystemHealth();
         });
 
-        // 🎯 修复：主动携带本地 Cookie 传递给后端校验
         async function checkSystemHealth() {
             try {
                 const localCookie = localStorage.getItem('quark_cookie') || '';
@@ -417,6 +434,9 @@
             }
         }
 
+        // ==========================================
+        // 🎯 核心交互改造：第一阶段（搜刮候选）与弹窗展示
+        // ==========================================
         async function batchTransfer() {
             if (selectedIndices.size === 0) return alert('请先选择至少一部影片');
 
@@ -433,9 +453,10 @@
             
             toggleLogBox(true);
             clearLog();
+            appendLogLine("[系统] 🔍 正在各大 TG 频道中深度搜刮候选资源，请稍候...");
             
             try {
-                const response = await fetch('/api/transfer', {
+                const response = await fetch('/api/search-candidates', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -444,22 +465,109 @@
                     })
                 });
 
-                if (!response.ok) {
-                    appendLogLine(`[系统] ❌ 请求失败，HTTP 状态码: ${response.status}`);
+                const res = await response.json();
+                if (!res.success) {
+                    appendLogLine(`[系统] ❌ 搜刮失败: ${res.message || '未知错误'}`);
                     return;
                 }
 
-                const reader = response.body.getReader();
-                const decoder = new TextDecoder('utf-8');
+                appendLogLine(`[系统] ✅ 搜刮完成，正在渲染候选资源供您选择...`);
+                openCandidateModal(selectedMovies, res.candidates_map || {});
+            } catch (err) {
+                appendLogLine(`[系统] ❌ 请求异常: ${err.message}`);
+            }
+        }
 
-                while (true) {
-                    const { done, value } = await reader.read();
-                    if (done) break;
-                    const chunk = decoder.decode(value, { stream: true });
-                    appendLogLine(chunk);
+        function openCandidateModal(movies, candidatesMap) {
+            const container = document.getElementById('candidate-content');
+            container.innerHTML = '';
+            
+            let totalCandidates = 0;
+
+            movies.forEach(movie => {
+                const title = movie.title;
+                const candidates = candidatesMap[title] || [];
+                totalCandidates += candidates.length;
+
+                const movieSection = document.createElement('div');
+                movieSection.className = 'bg-slate-950 border border-slate-800 rounded p-3 space-y-2';
+                
+                let html = `<div class="font-medium text-sm text-blue-400 flex items-center justify-between">
+                    <span>🎬 《${title}》</span>
+                    <span class="text-xs text-slate-400">找到 ${candidates.length} 个候选源</span>
+                </div>`;
+
+                if (candidates.length === 0) {
+                    html += `<div class="text-xs text-rose-400 py-1">未能在配置的频道中找到匹配资源</div>`;
+                } else {
+                    html += `<div class="space-y-2 mt-2">`;
+                    candidates.forEach((cand) => {
+                        const fileNames = cand.files.map(f => f.file_name).join('<br>');
+                        html += `
+                            <div class="bg-slate-900 border border-slate-800/80 rounded p-2.5 text-xs space-y-2">
+                                <div class="flex items-center justify-between text-slate-300">
+                                    <span class="font-semibold text-emerald-400"><i class="fa-brands fa-telegram"></i> 频道: ${cand.channel}</span>
+                                    <span class="text-slate-400">包含 ${cand.files.length} 个视频文件</span>
+                                </div>
+                                <div class="bg-slate-950 p-2 rounded text-slate-400 max-h-28 overflow-y-auto font-mono text-[11px] leading-relaxed">
+                                    ${fileNames}
+                                </div>
+                                <div class="text-right">
+                                    <button onclick='confirmTransferAndSave(${JSON.stringify(movie)}, ${JSON.stringify(cand)})' class="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-xs font-medium transition shadow">
+                                        🚀 确认转存此版本
+                                    </button>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    html += `</div>`;
+                }
+                movieSection.innerHTML = html;
+                container.appendChild(movieSection);
+            });
+
+            if (totalCandidates === 0) {
+                appendLogLine("[系统] ⚠️ 所有选中影片均未搜刮到有效候选资源。");
+            } else {
+                appendLogLine(`[系统] 🎯 已成功弹出候选资源列表窗口，请在弹窗中点选确认。`);
+            }
+
+            document.getElementById('candidate-modal').classList.remove('hidden');
+        }
+
+        function closeCandidateModal() {
+            document.getElementById('candidate-modal').classList.add('hidden');
+        }
+
+        // ==========================================
+        // 🎯 核心交互改造：第二阶段（人工确认后执行指定转存）
+        // ==========================================
+        async function confirmTransferAndSave(movie, candidate) {
+            closeCandidateModal();
+            const cookie = localStorage.getItem('quark_cookie') || '';
+            
+            toggleLogBox(true);
+            appendLogLine(`[系统] 📥 正在为《${movie.title}》创建专属文件夹并转存选中版本...`);
+
+            try {
+                const response = await fetch('/api/transfer-selected', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        movie: movie,
+                        candidate: candidate,
+                        cookie: cookie
+                    })
+                });
+
+                const res = await response.json();
+                if (res.success) {
+                    appendLogLine(`[完成] 🎉 ${res.message}`);
+                } else {
+                    appendLogLine(`[完成] ❌ 转存失败: ${res.message}`);
                 }
             } catch (err) {
-                appendLogLine(`[系统] ❌ 传输发生网络异常: ${err.message}`);
+                appendLogLine(`[系统] ❌ 转存请求异常: ${err.message}`);
             }
         }
     </script>
