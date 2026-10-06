@@ -33,7 +33,7 @@ def save_auth(data):
 sub_manager = SubscriptionManager(get_cookie_func=lambda: app.config.get('QUARK_COOKIE', ''))
 sub_manager.start_scheduler()
 
-# 🎯 登录与初始化守卫
+# 🎯 全局登录与初始化拦截器
 @app.before_request
 def require_login():
     if request.path.startswith('/static'):
@@ -115,107 +115,19 @@ def index():
 def admin():
     return render_template('admin.html')
 
-# ==================== 🎯 核心：对接抓包 API (`m.douban.com/reccar/api/v2/tv/recommend`) ====================
-
-def fetch_reccar_tv_movies(tv_category, sort_type='U', genre=''):
-    """直接调用你抓包的豆瓣剧集 API 接口，彻底解决动漫/剧集混入电影的问题"""
-    url = "https://m.douban.com/reccar/api/v2/tv/recommend"
-    
-    selected_categories = json.dumps({"TV": tv_category}, ensure_ascii=False)
-    
-    params = {
-        "refresh": "0",
-        "start": "0",
-        "count": "100",
-        "selected_categories": selected_categories,
-        "score_range": "0,10",
-        "tags": genre if genre else "",
-        "sort": sort_type
-    }
-    
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Referer": "https://movie.douban.com/tv/",
-        "Accept": "application/json, text/plain, */*"
-    }
-    
-    try:
-        resp = requests.get(url, headers=headers, params=params, timeout=10)
-        if resp.status_code == 200:
-            data = resp.json()
-            items = data.get('items', [])
-            movies = []
-            for item in items:
-                title = item.get('title', '')
-                
-                # 解析封面图
-                cover = ''
-                if 'pic' in item and isinstance(item['pic'], dict):
-                    cover = item['pic'].get('normal') or item['pic'].get('large') or ''
-                elif 'cover' in item and isinstance(item['cover'], str):
-                    cover = item['cover']
-                
-                # 解析评分
-                rate = '暂无'
-                if 'rating' in item and isinstance(item['rating'], dict):
-                    val = item['rating'].get('value')
-                    if val and val > 0:
-                        rate = str(val)
-                elif item.get('rate'):
-                    rate = str(item.get('rate'))
-
-                # 解析条目 ID 与跳转链接
-                target_id = item.get('id')
-                target_url = item.get('url')
-                if not target_id and 'target' in item and isinstance(item['target'], dict):
-                    target_id = item['target'].get('id')
-                    target_url = item['target'].get('url')
-                if not target_id and 'uri' in item:
-                    m_id = re.search(r'/(\d+)', str(item.get('uri')))
-                    if m_id:
-                        target_id = m_id.group(1)
-
-                if not target_url and target_id:
-                    target_url = f"https://movie.douban.com/subject/{target_id}/"
-
-                if title:
-                    movies.append({
-                        'title': title,
-                        'cover': cover,
-                        'rate': rate,
-                        'url': target_url or '#'
-                    })
-            return movies
-    except Exception as e:
-        print(f"请求抓包接口异常: {str(e)}")
-    return None
+# ==================== 🎯 核心影视查询 API (修正检索分类与排序) ====================
 
 @app.route('/api/get-movies', methods=['GET'])
 def get_movies():
     main_tag = request.args.get('tag', '电影')
-    sort_type = request.args.get('sort', 'U')  # U: 热门/近期热度, T: 最新/首播时间, S: 高分, R: 最多评价
+    sort_type = request.args.get('sort', 'U')  # U: 热门, T: 最新, S: 高分, R: 最多评价
     genre = request.args.get('genre', '')
     country = request.args.get('country', '')
     year_range = request.args.get('year', '')
 
-    # 1. 针对“电视剧”、“动漫/动画”、“综艺”，统一使用抓包的 reccar API 接口
-    if main_tag in ['电视剧', '动漫', '动画', '综艺']:
-        tv_cat_map = {
-            '电视剧': '电视剧',
-            '动漫': '动画',
-            '动画': '动画',
-            '综艺': '综艺'
-        }
-        target_tv_cat = tv_cat_map.get(main_tag, '电视剧')
-        
-        # 优先通过抓包 API 获取
-        reccar_results = fetch_reccar_tv_movies(target_tv_cat, sort_type=sort_type, genre=genre)
-        if reccar_results is not None and len(reccar_results) > 0:
-            return jsonify({'success': True, 'movies': reccar_results})
-
-    # 2. 电影分类或降级备用逻辑：调用经典接口 new_search_subjects
+    # 规范化豆瓣分类标签名称
     search_tag = main_tag
-    if main_tag == '动漫':
+    if main_tag in ['动漫', '动画']:
         search_tag = '动画'
 
     url = "https://movie.douban.com/j/new_search_subjects"
@@ -232,9 +144,6 @@ def get_movies():
         params["countries"] = country
     if year_range:
         params["year_range"] = year_range
-
-    if sort_type == 'T':
-        params["playable"] = "1"
 
     try:
         resp = requests.get(url, headers=DOUBAN_HEADERS, params=params, timeout=10)
