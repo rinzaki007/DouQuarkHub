@@ -411,8 +411,9 @@
             logBox.scrollTop = logBox.scrollHeight;
         }
 
-        function openChaseModal() { document.getElementById('chase-modal').classList.remove('hidden'); }
+        function openChaseModal() { document.getElementById('chase-modal').classList.add('hidden'); } // 修正防止错误
         function closeChaseModal() { document.getElementById('chase-modal').classList.add('hidden'); }
+        function openChaseModal() { document.getElementById('chase-modal').classList.remove('hidden'); }
 
         async function submitChase() {
             const name = document.getElementById('chase-title').value.trim();
@@ -435,7 +436,7 @@
         }
 
         // ==========================================
-        // 🎯 核心交互改造：第一阶段（搜刮候选）与弹窗展示
+        // 🎯 核心交互改造：第一阶段（搜刮候选）
         // ==========================================
         async function batchTransfer() {
             if (selectedIndices.size === 0) return alert('请先选择至少一部影片');
@@ -456,6 +457,7 @@
             appendLogLine("[系统] 🔍 正在各大 TG 频道中深度搜刮候选资源，请稍候...");
             
             try {
+                // 🎯 正确调用新接口 /api/search-candidates
                 const response = await fetch('/api/search-candidates', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -550,6 +552,7 @@
             appendLogLine(`[系统] 📥 正在为《${movie.title}》创建专属文件夹并转存选中版本...`);
 
             try {
+                // 🎯 正确调用新接口 /api/transfer-selected
                 const response = await fetch('/api/transfer-selected', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
