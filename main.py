@@ -114,7 +114,7 @@ def index():
 def admin():
     return render_template('admin.html')
 
-# ==================== 影视 API (完美修复电影/电视剧/综艺/动漫“最新”分类) ====================
+# ==================== 影视 API (彻底修正动漫“最新”分类逻辑) ====================
 
 @app.route('/api/get-movies', methods=['GET'])
 def get_movies():
@@ -124,7 +124,7 @@ def get_movies():
     country = request.args.get('country', '')
     year_range = request.args.get('year', '')
 
-    # 🎯 解决方案：点击“最新”且无其他子筛选条件时，精准对接 Douban 官方【最新时间倒序】API
+    # 🎯 方案 1：无子筛选且选择“最新”时，根据分类调用专属的“已上市/开播”列表接口
     if sort_type == 'T' and not genre and not country and not year_range:
         url = "https://movie.douban.com/j/search_subjects"
         if main_tag == '电影':
@@ -134,6 +134,7 @@ def get_movies():
         elif main_tag == '综艺':
             params = {"type": "tv", "tag": "综艺", "sort": "time", "page_limit": 100, "page_start": 0}
         elif main_tag in ['动漫', '动画']:
+            # 专选“动漫”剧集倒序，防止未上映电影掺杂
             params = {"type": "tv", "tag": "动漫", "sort": "time", "page_limit": 100, "page_start": 0}
         else:
             params = {"type": "tv", "tag": "热门", "sort": "time", "page_limit": 100, "page_start": 0}
@@ -152,17 +153,12 @@ def get_movies():
                     } for item in raw_list]
                     return jsonify({'success': True, 'movies': movies})
         except Exception:
-            pass  # 若极小概率异常则降级使用 new_search_subjects
+            pass
 
-    # 🎯 通用筛选接口 new_search_subjects
+    # 🎯 方案 2：带子筛选条件时的通用接口逻辑，强制约束年份与可播放标记
     search_tag = main_tag
-    if main_tag == '动漫':
+    if main_tag in ['动漫', '动画']:
         search_tag = '动画'
-
-    # 若选择了“最新”并搭配了类型/地区等子筛选，自动锁定近期年份，防止老片混入
-    if sort_type == 'T' and not year_range:
-        now_year = datetime.datetime.now().year
-        year_range = f"{now_year-1},{now_year}"
 
     url = "https://movie.douban.com/j/new_search_subjects"
     params = {
@@ -178,6 +174,13 @@ def get_movies():
         params["countries"] = country
     if year_range:
         params["year_range"] = year_range
+
+    # 点击“最新”时，限制只取近期已上映/发行的影片，排掉未来未上映作品
+    if sort_type == 'T':
+        params["playable"] = "1"
+        if not year_range:
+            now_year = datetime.datetime.now().year
+            params["year_range"] = f"{now_year-2},{now_year}"
 
     try:
         resp = requests.get(url, headers=DOUBAN_HEADERS, params=params, timeout=10)
