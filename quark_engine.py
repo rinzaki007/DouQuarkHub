@@ -97,13 +97,19 @@ class QuarkEngine:
         err_msg = "未知网络或接口错误"
         try:
             resp = requests.post(mkdir_url, json=payload, headers=self.headers, timeout=6)
-            d = resp.json()
-            if d.get('code') == 0:
-                data_obj = d.get('data', {})
-                new_fid = data_obj.get('fid') or data_obj.get('file_id') or d.get('fid')
-                if new_fid:
-                    return new_fid, None
-            err_msg = f"API返回错误 (code: {d.get('code')}, msg: {d.get('message', '无详情')})"
+            raw_text = resp.text
+            try:
+                d = resp.json()
+                code = d.get('code')
+                if code == 0:
+                    data_obj = d.get('data', {})
+                    new_fid = data_obj.get('fid') or data_obj.get('file_id') or d.get('fid')
+                    if new_fid:
+                        return new_fid, None
+            except Exception:
+                d = {}
+            
+            err_msg = f"HTTP状态码: {resp.status_code}, 原始响应内容: {raw_text}"
         except Exception as e:
             err_msg = f"请求异常: {str(e)}"
 
