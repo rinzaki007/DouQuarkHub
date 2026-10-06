@@ -2,90 +2,81 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>登录 - MovieSync 云影同步</title>
-    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/css/style.css">
     <style>
         .login-wrapper {
             display: flex;
             justify-content: center;
             align-items: center;
             min-height: 100vh;
+            background: #0b0f19;
         }
         .login-card {
-            background: var(--bg-card);
-            border: 1px solid var(--border-color);
+            background: #111827;
+            border: 1px solid #1f2937;
             border-radius: 12px;
             padding: 32px;
             width: 380px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
         }
         .tab-header {
             display: flex;
             margin-bottom: 24px;
-            border-bottom: 1px solid var(--border-color);
+            border-bottom: 1px solid #1f2937;
         }
         .tab-btn {
             flex: 1;
             background: none;
             border: none;
-            color: var(--text-muted);
+            color: #94a3b8;
             padding: 10px;
             border-radius: 0;
             cursor: pointer;
+            font-size: 13px;
         }
         .tab-btn.active {
-            color: var(--primary-color);
-            border-bottom: 2px solid var(--primary-color);
+            color: #38bdf8;
+            border-bottom: 2px solid #38bdf8;
             font-weight: bold;
-        }
-        .form-group {
-            margin-bottom: 16px;
-        }
-        .form-group label {
-            display: block;
-            margin-bottom: 6px;
-            font-size: 13px;
-            color: var(--text-muted);
-        }
-        .form-group input {
-            width: 100%;
         }
     </style>
 </head>
 <body>
 <div class="login-wrapper">
     <div class="login-card">
-        <h2 style="text-align: center; margin-bottom: 20px; color: #60a5fa;">🎬 MovieSync</h2>
+        <h2 style="text-align: center; margin-bottom: 20px; color: #38bdf8; font-size: 20px;">🎬 MovieSync</h2>
         
         <div class="tab-header">
             <button class="tab-btn active" id="tab-login-btn" onclick="switchTab('login')">账号登录</button>
             <button class="tab-btn" id="tab-reset-btn" onclick="switchTab('reset')">重置密码</button>
         </div>
 
-        <!-- 登录表单 -->
-        <form id="form-login" action="/login" method="POST">
-            <div class="form-group">
-                <label>用户名</label>
-                <input type="text" name="username" placeholder="请输入管理员账号" required>
+        <!-- 账号登录 -->
+        <form id="form-login" onsubmit="handleLogin(event)">
+            <div class="form-group" style="margin-bottom: 14px;">
+                <label>管理员账号</label>
+                <input type="text" id="login-username" value="admin" required>
             </div>
-            <div class="form-group">
+            <div class="form-group" style="margin-bottom: 18px;">
                 <label>密码</label>
-                <input type="password" name="password" placeholder="请输入密码" required>
+                <input type="password" id="login-password" placeholder="默认密码: admin123" required>
             </div>
-            <button type="submit" style="width: 100%; margin-top: 10px;">登 录</button>
+            <button type="submit" class="btn-primary" style="width: 100%; height: 38px;">登 录</button>
         </form>
 
-        <!-- 重置密码表单 -->
-        <form id="form-reset" action="/reset-password" method="POST" style="display: none;">
-            <div class="form-group">
-                <label>管理员凭证密钥 (RESET_TOKEN)</label>
-                <input type="text" name="token" placeholder="请输入环境变量中的重置Token" required>
+        <!-- 重置密码 -->
+        <form id="form-reset" onsubmit="handleReset(event)" style="display: none;">
+            <div class="form-group" style="margin-bottom: 14px;">
+                <label>凭证密钥 (RESET_TOKEN)</label>
+                <input type="text" id="reset-token" placeholder="默认 Token: moviesync2026" required>
             </div>
-            <div class="form-group">
-                <label>新密码</label>
-                <input type="password" name="new_password" placeholder="设置新密码" required>
+            <div class="form-group" style="margin-bottom: 18px;">
+                <label>设置新密码</label>
+                <input type="password" id="reset-new-password" placeholder="请输入新密码" required>
             </div>
-            <button type="submit" class="btn-secondary" style="width: 100%; margin-top: 10px;">确认重置密码</button>
+            <button type="submit" class="btn-secondary" style="width: 100%; height: 38px;">确认重置密码</button>
         </form>
     </div>
 </div>
@@ -103,6 +94,37 @@ function switchTab(tab) {
         document.getElementById('tab-reset-btn').classList.add('active');
         document.getElementById('tab-login-btn').classList.remove('active');
     }
+}
+
+async function handleLogin(e) {
+    e.preventDefault();
+    const username = document.getElementById('login-username').value;
+    const password = document.getElementById('login-password').value;
+    const res = await fetch('/api/login', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({username, password})
+    });
+    const data = await res.json();
+    if(data.success) {
+        window.location.href = '/';
+    } else {
+        alert(data.message);
+    }
+}
+
+async function handleReset(e) {
+    e.preventDefault();
+    const token = document.getElementById('reset-token').value;
+    const new_password = document.getElementById('reset-new-password').value;
+    const res = await fetch('/api/reset-password', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({token, new_password})
+    });
+    const data = await res.json();
+    alert(data.message);
+    if(data.success) switchTab('login');
 }
 </script>
 </body>
