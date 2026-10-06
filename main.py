@@ -485,18 +485,22 @@ def run_sub_now():
 def transfer():
     data = request.json or {}
     movies = data.get('movies', [])
-    cookie = data.get('cookie', '')
+    # 🎯 关键兼容：如果请求体未带 cookie，自动获取后端全局配置的 QUARK_COOKIE
+    cookie = data.get('cookie', '').strip() or app.config.get('QUARK_COOKIE', '')
     folder_id = data.get('folderId', '0')
 
-    if not movies or not cookie:
-        return Response("❌ 参数不完整\n", mimetype='text/plain; charset=utf-8')
+    if not movies:
+        return Response("❌ 未选择任何需要转存的影片\n", mimetype='text/plain; charset=utf-8')
+        
+    if not cookie:
+        return Response("❌ 未配置夸克网盘 Cookie！请先点击右上角 [设置] 保存 Cookie。\n", mimetype='text/plain; charset=utf-8')
 
     service = SearchService(cookie)
     channels = load_channels()
 
     def generate_logs():
         for line in service.batch_search_and_transfer_stream(movies, channels, target_fid=folder_id):
-            yield line + "\n"
+            yield line
 
     return Response(stream_with_context(generate_logs()), mimetype='text/plain; charset=utf-8')
 
