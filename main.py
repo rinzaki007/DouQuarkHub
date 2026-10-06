@@ -32,7 +32,7 @@ def save_auth(data):
 sub_manager = SubscriptionManager(get_cookie_func=lambda: app.config.get('QUARK_COOKIE', ''))
 sub_manager.start_scheduler()
 
-# 🎯 登录与初始化守卫
+# 🎯 登录与初始化拦截器
 @app.before_request
 def require_login():
     if request.path.startswith('/static'):
@@ -114,7 +114,7 @@ def index():
 def admin():
     return render_template('admin.html')
 
-# ==================== 影视与转存 API ====================
+# ==================== 影视 API (修复电视剧“最新”分类) ====================
 
 @app.route('/api/get-movies', methods=['GET'])
 def get_movies():
@@ -124,21 +124,12 @@ def get_movies():
     country = request.args.get('country', '')
     year_range = request.args.get('year', '')
 
-    category_type = 'movie' if main_tag == '电影' else 'tv'
-
-    # 🎯 解决方案：当点击“最新”且无其他子筛选条件时，优先调用 Douban 官方【最新上架/上映】标签 API
-    # 彻底解决未上映的未来预告片和老片混入的问题
-    if sort_type == 'T' and not genre and not country and not year_range:
+    # 1. 只有“电影”分类且点击“最新”、且无子筛选时，使用专用的电影最新接口
+    if main_tag == '电影' and sort_type == 'T' and not genre and not country and not year_range:
         url = "https://movie.douban.com/j/search_subjects"
-        sub_tag = '最新'
-        if main_tag == '综艺':
-            sub_tag = '综艺'
-        elif main_tag in ['动漫', '动画']:
-            sub_tag = '动漫'
-
         params = {
-            "type": category_type,
-            "tag": sub_tag,
+            "type": "movie",
+            "tag": "最新",
             "page_limit": 100,
             "page_start": 0
         }
@@ -155,9 +146,9 @@ def get_movies():
                 } for item in raw_list]
                 return jsonify({'success': True, 'movies': movies})
         except Exception:
-            pass  # 降级处理
+            pass
 
-    # 🎯 带子类筛选的通用查询：附加 playable=1 过滤掉未上映电影
+    # 2. 电视剧、动漫、综艺或带子筛选条件时，统一使用 new_search_subjects 接口
     search_tag = main_tag
     if main_tag == '动漫':
         search_tag = '动画'
@@ -176,9 +167,6 @@ def get_movies():
         params["countries"] = country
     if year_range:
         params["year_range"] = year_range
-
-    if sort_type == 'T':
-        params["playable"] = "1"  # 过滤未上映预告片
 
     try:
         resp = requests.get(url, headers=DOUBAN_HEADERS, params=params, timeout=10)
@@ -334,7 +322,6 @@ def save_selected_files():
 
     engine = QuarkEngine(cookie)
     
-    # 自动创建专属子目录
     if title:
         target_fid = engine.get_or_create_subfolder(title, target_fid)
 
