@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>登录 - MovieSync 云影同步</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        .login-wrapper {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .login-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 32px;
+            width: 380px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+        }
+        .tab-header {
+            display: flex;
+            margin-bottom: 24px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .tab-btn {
+            flex: 1;
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            padding: 10px;
+            border-radius: 0;
+            cursor: pointer;
+        }
+        .tab-btn.active {
+            color: var(--primary-color);
+            border-bottom: 2px solid var(--primary-color);
+            font-weight: bold;
+        }
+        .form-group {
+            margin-bottom: 16px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+        .form-group input {
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+<div class="login-wrapper">
+    <div class="login-card">
+        <h2 style="text-align: center; margin-bottom: 20px; color: #60a5fa;">🎬 MovieSync</h2>
+        
+        <div class="tab-header">
+            <button class="tab-btn active" id="tab-login-btn" onclick="switchTab('login')">账号登录</button>
+            <button class="tab-btn" id="tab-reset-btn" onclick="switchTab('reset')">重置密码</button>
+        </div>
+
+        <!-- 登录表单 -->
+        <form id="form-login" action="/login" method="POST">
+            <div class="form-group">
+                <label>用户名</label>
+                <input type="text" name="username" placeholder="请输入管理员账号" required>
+            </div>
+            <div class="form-group">
+                <label>密码</label>
+                <input type="password" name="password" placeholder="请输入密码" required>
+            </div>
+            <button type="submit" style="width: 100%; margin-top: 10px;">登 录</button>
+        </form>
+
+        <!-- 重置密码表单 -->
+        <form id="form-reset" action="/reset-password" method="POST" style="display: none;">
+            <div class="form-group">
+                <label>管理员凭证密钥 (RESET_TOKEN)</label>
+                <input type="text" name="token" placeholder="请输入环境变量中的重置Token" required>
+            </div>
+            <div class="form-group">
+                <label>新密码</label>
+                <input type="password" name="new_password" placeholder="设置新密码" required>
+            </div>
+            <button type="submit" class="btn-secondary" style="width: 100%; margin-top: 10px;">确认重置密码</button>
+        </form>
+    </div>
+</div>
+
+<script>
+function switchTab(tab) {
+    if(tab === 'login') {
+        document.getElementById('form-login').style.display = 'block';
+        document.getElementById('form-reset').style.display = 'none';
+        document.getElementById('tab-login-btn').classList.add('active');
+        document.getElementById('tab-reset-btn').classList.remove('active');
+    } else {
+        document.getElementById('form-login').style.display = 'none';
+        document.getElementById('form-reset').style.display = 'block';
+        document.getElementById('tab-reset-btn').classList.add('active');
+        document.getElementById('tab-login-btn').classList.remove('active');
+    }
+}
+</script>
+</body>
+</html>
