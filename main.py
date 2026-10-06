@@ -290,13 +290,13 @@ def handle_subscriptions():
         sub = sub_manager.add_subscription(
             title=data.get('title'),
             pwd_id=data.get('pwd_id'),
-            target_fid=load_full_config().get('default_fid', '0'),
+            target_fid=data.get('target_fid') or load_full_config().get('default_fid', '0'),
             interval_hours=int(data.get('interval_hours', 6)),
             channel=data.get('channel', ''),
             stoken=data.get('stoken', ''),
             files=data.get('files', [])
         )
-        log_system(f"成功添加智能追剧任务: 《{data.get('title')}》 (频道: {data.get('channel')})")
+        log_system(f"成功添加智能追剧任务: 《{data.get('title')}》 (存储FID: {sub.get('target_fid')}, 频道: {data.get('channel')})")
         return jsonify({'success': True, 'subscription': sub, 'message': '智能追剧任务添加成功！'})
     
     sub_id = request.args.get('id') or (request.json or {}).get('id')
@@ -305,7 +305,6 @@ def handle_subscriptions():
         log_system(f"已删除订阅任务 ID: {sub_id}")
     return jsonify({'success': True, 'message': '已删除订阅'})
 
-# 🎯 已集成：手动立即执行追剧任务路由
 @app.route('/api/subscriptions/run-now', methods=['POST'])
 def api_run_subscription_now():
     data = request.json or {}
