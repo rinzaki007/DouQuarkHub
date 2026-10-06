@@ -32,7 +32,7 @@ def save_auth(data):
 sub_manager = SubscriptionManager(get_cookie_func=lambda: app.config.get('QUARK_COOKIE', ''))
 sub_manager.start_scheduler()
 
-# 🎯 登录与初始化拦截器
+# 🎯 登录与初始化守卫
 @app.before_request
 def require_login():
     if request.path.startswith('/static'):
@@ -114,7 +114,7 @@ def index():
 def admin():
     return render_template('admin.html')
 
-# ==================== 影视 API (修复电视剧“最新”分类) ====================
+# ==================== 影视 API (完美修复电影/电视剧/综艺/动漫“最新”分类) ====================
 
 @app.route('/api/get-movies', methods=['GET'])
 def get_movies():
@@ -124,34 +124,45 @@ def get_movies():
     country = request.args.get('country', '')
     year_range = request.args.get('year', '')
 
-    # 1. 只有“电影”分类且点击“最新”、且无子筛选时，使用专用的电影最新接口
-    if main_tag == '电影' and sort_type == 'T' and not genre and not country and not year_range:
+    # 🎯 解决方案：点击“最新”且无其他子筛选条件时，精准对接 Douban 官方【最新时间倒序】API
+    if sort_type == 'T' and not genre and not country and not year_range:
         url = "https://movie.douban.com/j/search_subjects"
-        params = {
-            "type": "movie",
-            "tag": "最新",
-            "page_limit": 100,
-            "page_start": 0
-        }
+        if main_tag == '电影':
+            params = {"type": "movie", "tag": "最新", "page_limit": 100, "page_start": 0}
+        elif main_tag == '电视剧':
+            params = {"type": "tv", "tag": "热门", "sort": "time", "page_limit": 100, "page_start": 0}
+        elif main_tag == '综艺':
+            params = {"type": "tv", "tag": "综艺", "sort": "time", "page_limit": 100, "page_start": 0}
+        elif main_tag in ['动漫', '动画']:
+            params = {"type": "tv", "tag": "动漫", "sort": "time", "page_limit": 100, "page_start": 0}
+        else:
+            params = {"type": "tv", "tag": "热门", "sort": "time", "page_limit": 100, "page_start": 0}
+
         try:
             resp = requests.get(url, headers=DOUBAN_HEADERS, params=params, timeout=10)
             if resp.status_code == 200 and 'json' in resp.headers.get('Content-Type', '').lower():
                 data = resp.json()
                 raw_list = data.get('subjects', [])
-                movies = [{
-                    'title': item.get('title'),
-                    'cover': item.get('cover'),
-                    'rate': item.get('rate') if item.get('rate') else '暂无',
-                    'url': item.get('url', f"https://movie.douban.com/subject/{item.get('id')}/")
-                } for item in raw_list]
-                return jsonify({'success': True, 'movies': movies})
+                if raw_list:
+                    movies = [{
+                        'title': item.get('title'),
+                        'cover': item.get('cover'),
+                        'rate': item.get('rate') if item.get('rate') else '暂无',
+                        'url': item.get('url', f"https://movie.douban.com/subject/{item.get('id')}/")
+                    } for item in raw_list]
+                    return jsonify({'success': True, 'movies': movies})
         except Exception:
-            pass
+            pass  # 若极小概率异常则降级使用 new_search_subjects
 
-    # 2. 电视剧、动漫、综艺或带子筛选条件时，统一使用 new_search_subjects 接口
+    # 🎯 通用筛选接口 new_search_subjects
     search_tag = main_tag
     if main_tag == '动漫':
         search_tag = '动画'
+
+    # 若选择了“最新”并搭配了类型/地区等子筛选，自动锁定近期年份，防止老片混入
+    if sort_type == 'T' and not year_range:
+        now_year = datetime.datetime.now().year
+        year_range = f"{now_year-1},{now_year}"
 
     url = "https://movie.douban.com/j/new_search_subjects"
     params = {
