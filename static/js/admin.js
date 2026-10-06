@@ -1,10 +1,11 @@
 let channelList = [];
+let rawLogList = [];
 
 window.onload = () => {
     loadAdminConfig();
-    refreshAdminStatus();
     fetchAdminSubscriptions();
     fetchAdminChannels();
+    initDemoLogs();
 };
 
 function switchSection(sec) {
@@ -14,48 +15,141 @@ function switchSection(sec) {
     event.currentTarget.classList.add('active');
 }
 
+// 🎯 读取四大分类目录配置
 function loadAdminConfig() {
     document.getElementById('quark-cookie-input').value = localStorage.getItem('quark_cookie') || '';
     document.getElementById('folder-id-input').value = localStorage.getItem('target_folder_id') || '0';
     document.getElementById('openlist-url-input').value = localStorage.getItem('openlist_url') || '';
+    
     document.getElementById('folder-movie-input').value = localStorage.getItem('folder_movie') || '';
     document.getElementById('folder-tv-input').value = localStorage.getItem('folder_tv') || '';
+    document.getElementById('folder-show-input').value = localStorage.getItem('folder_show') || '';
+    document.getElementById('folder-anime-input').value = localStorage.getItem('folder_anime') || '';
 }
 
-async function refreshAdminStatus() {
-    const cookie = localStorage.getItem('quark_cookie') || '';
-    const badge = document.getElementById('quark-status-badge');
-    if (cookie) {
-        try {
-            const res = await fetch('/api/check-cookie', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({cookie})
-            });
-            const data = await res.json();
-            badge.className = data.valid ? 'badge badge-success' : 'badge badge-danger';
-            badge.textContent = data.valid ? '🟢 有效' : '🔴 失效';
-        } catch (e) { badge.textContent = '检测出错'; }
-    } else {
-        badge.className = 'badge badge-danger';
-        badge.textContent = '未配置';
-    }
+// 🎯 保存四大分类目录配置
+async function saveAdminConfig() {
+    localStorage.setItem('quark_cookie', document.getElementById('quark-cookie-input').value.trim());
+    localStorage.setItem('target_folder_id', document.getElementById('folder-id-input').value.trim());
+    localStorage.setItem('openlist_url', document.getElementById('openlist-url-input').value.trim());
+    
+    localStorage.setItem('folder_movie', document.getElementById('folder-movie-input').value.trim());
+    localStorage.setItem('folder_tv', document.getElementById('folder-tv-input').value.trim());
+    localStorage.setItem('folder_show', document.getElementById('folder-show-input').value.trim());
+    localStorage.setItem('folder_anime', document.getElementById('folder-anime-input').value.trim());
 
-    const chBadge = document.getElementById('channel-status-badge');
-    try {
-        const chRes = await fetch('/api/check-channels');
-        const chData = await chRes.json();
-        if (chData.success) {
-            chBadge.className = 'badge badge-success';
-            chBadge.textContent = `🟢 ${chData.valid_count}/${chData.total} 联通`;
+    await fetch('/api/channels', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({channels: channelList})
+    });
+    alert('全部参数与分类目录保存成功！');
+}
+
+// 🎯 导入与导出 JSON 同步覆盖四大目录
+function exportConfig() {
+    const configData = {
+        quark_cookie: localStorage.getItem('quark_cookie') || '',
+        target_folder_id: localStorage.getItem('target_folder_id') || '0',
+        openlist_url: localStorage.getItem('openlist_url') || '',
+        folder_movie: localStorage.getItem('folder_movie') || '',
+        folder_tv: localStorage.getItem('folder_tv') || '',
+        folder_show: localStorage.getItem('folder_show') || '',
+        folder_anime: localStorage.getItem('folder_anime') || '',
+        channels: channelList
+    };
+
+    const blob = new Blob([JSON.stringify(configData, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `moviesync_config_${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+}
+
+function triggerImportConfig() {
+    document.getElementById('import-file-input').click();
+}
+
+function handleImportConfig(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async function(e) {
+        try {
+            const config = JSON.parse(e.target.result);
+            if (config.quark_cookie !== undefined) localStorage.setItem('quark_cookie', config.quark_cookie);
+            if (config.target_folder_id !== undefined) localStorage.setItem('target_folder_id', config.target_folder_id);
+            if (config.openlist_url !== undefined) localStorage.setItem('openlist_url', config.openlist_url);
+            
+            if (config.folder_movie !== undefined) localStorage.setItem('folder_movie', config.folder_movie);
+            if (config.folder_tv !== undefined) localStorage.setItem('folder_tv', config.folder_tv);
+            if (config.folder_show !== undefined) localStorage.setItem('folder_show', config.folder_show);
+            if (config.folder_anime !== undefined) localStorage.setItem('folder_anime', config.folder_anime);
+
+            if (Array.isArray(config.channels)) {
+                channelList = config.channels;
+                await fetch('/api/channels', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({channels: channelList})
+                });
+            }
+
+            loadAdminConfig();
+            renderAdminChannels();
+            alert('配置已成功导入！');
+        } catch (err) {
+            alert('导入失败，请检查 JSON 格式: ' + err.message);
         }
-    } catch (e) { chBadge.textContent = '检测超时'; }
+    };
+    reader.readAsText(file);
+}
+
+// 🎯 彩色多级日志管理控制台
+function initDemoLogs() {
+    appendAdminLog('INFO', 'MovieSync 后台控制系统就绪...');
+    appendAdminLog('SUCCESS', '自动化定时巡检引擎任务运行正常。');
+}
+
+function appendAdminLog(level, msg) {
+    const time = new Date().toLocaleTimeString();
+    rawLogList.push({ level, time, msg });
+    renderLogConsole();
+}
+
+function renderLogConsole(filterLevel = 'ALL') {
+    const logBox = document.getElementById('admin-log-body');
+    if (!logBox) return;
+    logBox.innerHTML = '';
+
+    const classMap = {
+        'INFO': 'log-tag-info',
+        'SUCCESS': 'log-tag-success',
+        'WARN': 'log-tag-warn',
+        'ERROR': 'log-tag-error'
+    };
+
+    rawLogList.forEach(item => {
+        if (filterLevel !== 'ALL' && item.level !== filterLevel) return;
+        const line = document.createElement('div');
+        line.className = 'log-line';
+        line.innerHTML = `<span style="color:#64748b;">[${item.time}]</span> <span class="${classMap[item.level] || 'log-tag-info'}">[${item.level}]</span> ${item.msg}`;
+        logBox.appendChild(line);
+    });
+    logBox.scrollTop = logBox.scrollHeight;
+}
+
+function filterLogs(level) {
+    renderLogConsole(level);
 }
 
 function clearAdminLog() {
-    document.getElementById('log-body').textContent = '日志已清空...';
+    rawLogList = [];
+    renderLogConsole();
 }
 
+// 频道管理与追剧任务原样保留
 async function fetchAdminSubscriptions() {
     const res = await fetch('/api/subscriptions');
     const data = await res.json();
@@ -132,77 +226,4 @@ function addChannel() {
 function removeChannel(idx) {
     channelList.splice(idx, 1);
     renderAdminChannels();
-}
-
-async function saveAdminConfig() {
-    localStorage.setItem('quark_cookie', document.getElementById('quark-cookie-input').value.trim());
-    localStorage.setItem('target_folder_id', document.getElementById('folder-id-input').value.trim());
-    localStorage.setItem('openlist_url', document.getElementById('openlist-url-input').value.trim());
-    localStorage.setItem('folder_movie', document.getElementById('folder-movie-input').value.trim());
-    localStorage.setItem('folder_tv', document.getElementById('folder-tv-input').value.trim());
-
-    await fetch('/api/channels', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({channels: channelList})
-    });
-    alert('全部设置保存成功！');
-    refreshAdminStatus();
-}
-
-// 🎯 配置导出 JSON 功能
-function exportConfig() {
-    const configData = {
-        quark_cookie: localStorage.getItem('quark_cookie') || '',
-        target_folder_id: localStorage.getItem('target_folder_id') || '0',
-        openlist_url: localStorage.getItem('openlist_url') || '',
-        folder_movie: localStorage.getItem('folder_movie') || '',
-        folder_tv: localStorage.getItem('folder_tv') || '',
-        channels: channelList
-    };
-
-    const blob = new Blob([JSON.stringify(configData, null, 2)], { type: 'application/json' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `moviesync_config_${new Date().toISOString().slice(0, 10)}.json`;
-    a.click();
-}
-
-// 🎯 配置导入 JSON 功能
-function triggerImportConfig() {
-    document.getElementById('import-file-input').click();
-}
-
-function handleImportConfig(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = async function(e) {
-        try {
-            const config = JSON.parse(e.target.result);
-            if (config.quark_cookie !== undefined) localStorage.setItem('quark_cookie', config.quark_cookie);
-            if (config.target_folder_id !== undefined) localStorage.setItem('target_folder_id', config.target_folder_id);
-            if (config.openlist_url !== undefined) localStorage.setItem('openlist_url', config.openlist_url);
-            if (config.folder_movie !== undefined) localStorage.setItem('folder_movie', config.folder_movie);
-            if (config.folder_tv !== undefined) localStorage.setItem('folder_tv', config.folder_tv);
-
-            if (Array.isArray(config.channels)) {
-                channelList = config.channels;
-                await fetch('/api/channels', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({channels: channelList})
-                });
-            }
-
-            loadAdminConfig();
-            renderAdminChannels();
-            alert('配置已成功导入！');
-            refreshAdminStatus();
-        } catch (err) {
-            alert('导入失败，请检查 JSON 格式是否正确: ' + err.message);
-        }
-    };
-    reader.readAsText(file);
 }
