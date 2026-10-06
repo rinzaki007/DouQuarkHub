@@ -155,8 +155,8 @@
         </div>
     </div>
 
-    <!-- 🎬 交互式候选资源选择弹窗 -->
-    <div id="candidate-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+    <!-- 🎬 交互式候选资源选择弹窗（提升 z-index 至 z-[100]，确保永不被日志遮挡） -->
+    <div id="candidate-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-[100] flex items-center justify-center hidden">
         <div class="bg-slate-900 border border-slate-800 rounded-lg w-full max-w-2xl p-5 shadow-2xl space-y-4 max-h-[85vh] flex flex-col">
             <div class="flex items-center justify-between border-b border-slate-800 pb-3">
                 <h3 class="text-base font-medium text-white flex items-center gap-2">
@@ -396,14 +396,19 @@
             document.getElementById('log-box').innerHTML = '';
         }
 
-        function appendLogLine(text) {
+        function appendLogLine(text, type = 'info') {
             const logBox = document.getElementById('log-box');
             if (!text) return;
             const lines = text.split('\n');
             lines.forEach(line => {
                 if (line.trim().length > 0) {
                     const div = document.createElement('div');
-                    div.className = 'py-0.5 font-mono leading-relaxed text-sky-400 border-b border-slate-900/40';
+                    let colorClass = 'text-sky-400';
+                    if (type === 'success') colorClass = 'text-emerald-400 font-semibold';
+                    else if (type === 'warn') colorClass = 'text-amber-400';
+                    else if (type === 'error') colorClass = 'text-rose-400 font-bold';
+
+                    div.className = `py-0.5 font-mono leading-relaxed ${colorClass} border-b border-slate-900/40`;
                     div.textContent = line;
                     logBox.appendChild(div);
                 }
@@ -411,9 +416,8 @@
             logBox.scrollTop = logBox.scrollHeight;
         }
 
-        function openChaseModal() { document.getElementById('chase-modal').classList.add('hidden'); } // 修正防止错误
-        function closeChaseModal() { document.getElementById('chase-modal').classList.add('hidden'); }
         function openChaseModal() { document.getElementById('chase-modal').classList.remove('hidden'); }
+        function closeChaseModal() { document.getElementById('chase-modal').classList.add('hidden'); }
 
         async function submitChase() {
             const name = document.getElementById('chase-title').value.trim();
@@ -436,7 +440,7 @@
         }
 
         // ==========================================
-        // 🎯 核心交互改造：第一阶段（搜刮候选）
+        // 🎯 核心交互改造：第一阶段（搜刮候选与详细日志）
         // ==========================================
         async function batchTransfer() {
             if (selectedIndices.size === 0) return alert('请先选择至少一部影片');
@@ -454,10 +458,10 @@
             
             toggleLogBox(true);
             clearLog();
-            appendLogLine("[系统] 🔍 正在各大 TG 频道中深度搜刮候选资源，请稍候...");
+            appendLogLine(`[任务发起] 🚀 准备开始并发搜刮，共选中 ${selectedMovies.length} 部目标影片...`, 'info');
+            selectedMovies.forEach(m => appendLogLine(`  -> 目标: 《${m.title}》 (${m.tag})`, 'info'));
             
             try {
-                // 🎯 正确调用新接口 /api/search-candidates
                 const response = await fetch('/api/search-candidates', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -469,18 +473,41 @@
 
                 const res = await response.json();
                 if (!res.success) {
-                    appendLogLine(`[系统] ❌ 搜刮失败: ${res.message || '未知错误'}`);
+                    appendLogLine(`[系统错误] ❌ 搜刮失败: ${res.message || '未知错误'}`, 'error');
                     return;
                 }
 
-                appendLogLine(`[系统] ✅ 搜刮完成，正在渲染候选资源供您选择...`);
-                openCandidateModal(selectedMovies, res.candidates_map || {});
+                appendLogLine(`[并发搜刮] ✅ 后端多线程检索已顺利完成！`, 'success');
+
+                const candidatesMap = res.candidates_map || {};
+                let totalFound = 0;
+
+                for (const movie of selectedMovies) {
+                    const title = movie.title;
+                    const candidates = candidatesMap[title] || [];
+                    totalFound += candidates.length;
+
+                    if (candidates.length === 0) {
+                        appendLogLine(`[结果统计] ⚠️ 《${title}》：未在任何配置频道中检索到有效候选资源。`, 'warn');
+                    } else {
+                        appendLogLine(`[结果统计] 🎯 《${title}》：成功检索到 ${candidates.length} 个可用版本。`, 'success');
+                        candidates.forEach((cand, idx) => {
+                            appendLogLine(`    [${idx + 1}] 频道名称: "${cand.channel}" | 夸克短码(pwd_id): ${cand.pwd_id} | 包含视频: ${cand.files.length} 个`, 'info');
+                        });
+                    }
+                }
+
+                appendLogLine(`[系统完成] 📦 全网检索汇总完毕：共找到 ${totalFound} 个候选资源，正在为您弹出交互选择窗口...`, 'success');
+                openCandidateModal(selectedMovies, candidatesMap);
             } catch (err) {
-                appendLogLine(`[系统] ❌ 请求异常: ${err.message}`);
+                appendLogLine(`[异常捕获] ❌ 请求过程发生异常: ${err.message}`, 'error');
             }
         }
 
         function openCandidateModal(movies, candidatesMap) {
+            // 🎯 核心优化：打开候选弹窗时，自动收起底部日志面板，防止遮挡！
+            toggleLogBox(false);
+
             const container = document.getElementById('candidate-content');
             container.innerHTML = '';
             
@@ -528,12 +555,6 @@
                 container.appendChild(movieSection);
             });
 
-            if (totalCandidates === 0) {
-                appendLogLine("[系统] ⚠️ 所有选中影片均未搜刮到有效候选资源。");
-            } else {
-                appendLogLine(`[系统] 🎯 已成功弹出候选资源列表窗口，请在弹窗中点选确认。`);
-            }
-
             document.getElementById('candidate-modal').classList.remove('hidden');
         }
 
@@ -549,10 +570,12 @@
             const cookie = localStorage.getItem('quark_cookie') || '';
             
             toggleLogBox(true);
-            appendLogLine(`[系统] 📥 正在为《${movie.title}》创建专属文件夹并转存选中版本...`);
+            clearLog();
+            appendLogLine(`[转存启动] 📥 正在为《${movie.title}》创建专属文件夹并转存选中版本...`, 'info');
+            appendLogLine(`  -> 目标频道: ${candidate.channel}`, 'info');
+            appendLogLine(`  -> 提取短码: ${candidate.pwd_id}`, 'info');
 
             try {
-                // 🎯 正确调用新接口 /api/transfer-selected
                 const response = await fetch('/api/transfer-selected', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -565,12 +588,12 @@
 
                 const res = await response.json();
                 if (res.success) {
-                    appendLogLine(`[完成] 🎉 ${res.message}`);
+                    appendLogLine(`[转存成功] 🎉 ${res.message}`, 'success');
                 } else {
-                    appendLogLine(`[完成] ❌ 转存失败: ${res.message}`);
+                    appendLogLine(`[转存失败] ❌ ${res.message}`, 'error');
                 }
             } catch (err) {
-                appendLogLine(`[系统] ❌ 转存请求异常: ${err.message}`);
+                appendLogLine(`[系统异常] ❌ 转存请求发生异常: ${err.message}`, 'error');
             }
         }
     </script>
