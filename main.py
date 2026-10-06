@@ -184,22 +184,79 @@ def check_channels_health():
 def get_movies():
     main_tag = request.args.get('tag', '电影')
     sort_type = request.args.get('sort', 'U')
-    genre = request.args.get('genre', '')
-    url = "https://m.douban.com/rexxar/api/v2/tv/recommend" if main_tag != '电影' else "https://m.douban.com/rexxar/api/v2/subject/recent_hot/movie"
-    headers = {"User-Agent": "Mozilla/5.0", "Referer": "https://movie.douban.com/"}
+    genre = request.args.get('genre', '全部')
+    region = request.args.get('region', '全部')
+    year = request.args.get('year', '全部')
+    
+    # 豆瓣官方 Rexxar 统一推荐与筛选接口
+    url = "https://m.douban.com/rexxar/api/v2/subject/recommend"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148",
+        "Referer": "https://movie.douban.com/"
+    }
+    
+    # 构造豆瓣多维筛选字典
+    categories = {}
+    if main_tag == '电影':
+        categories["形式"] = "电影"
+    elif main_tag == '电视剧':
+        categories["形式"] = "电视剧"
+    elif main_tag == '综艺':
+        categories["形式"] = "综艺"
+    elif main_tag == '动漫':
+        categories["类型"] = "动画"
+        categories["形式"] = "电视剧"
+        
+    if genre and genre != '全部':
+        categories["类型"] = genre
+    if region and region != '全部':
+        categories["地区"] = region
+    if year and year != '全部':
+        categories["年代"] = year
+        
+    sort_map = {"U": "U", "R": "R", "S": "S"}
+    
+    params = {
+        "refresh": "0",
+        "start": "0",
+        "count": "50",
+        "selected_categories": json.dumps(categories, ensure_ascii=False),
+        "uncollect": "false",
+        "score_range": "0,10",
+        "sort": sort_map.get(sort_type, "U")
+    }
+    
+    if genre and genre != '全部':
+        params["tags"] = genre
+    elif main_tag != '电影':
+        params["tags"] = main_tag
+        
     try:
-        if main_tag == '电影':
-            params = {"start": "0", "limit": "100", "category": "最新" if sort_type in ['T', 'R'] else "热门", "type": "全部"}
-        else:
-            cat_map = {"动漫": {"类型": "动画", "形式": "电视剧"}, "综艺": {"类型": "", "形式": "综艺"}, "电视剧": {"类型": "", "形式": "电视剧"}}
-            params = {"refresh": "0", "start": "0", "count": "100", "selected_categories": json.dumps(cat_map.get(main_tag, {"类型": "", "形式": "电视剧"}), ensure_ascii=False), "tags": genre if genre and genre != '全部' else main_tag, "sort": "R" if sort_type in ['T', 'R'] else "U"}
         resp = requests.get(url, headers=headers, params=params, timeout=10)
         if resp.status_code == 200:
-            items = resp.json().get('subjects', []) or resp.json().get('items', [])
-            movies = [{'title': item.get('title'), 'cover': (item.get('pic') or {}).get('normal', item.get('cover', '')), 'rate': str((item.get('rating') or {}).get('value', '暂无')), 'url': f"https://movie.douban.com/subject/{item.get('id') or (item.get('target') or {}).get('id')}/"} for item in items if item.get('title')]
+            data = resp.json()
+            items = data.get('items', []) or data.get('subjects', [])
+            movies = []
+            for item in items:
+                subject = item.get('subject', item)
+                title = subject.get('title')
+                if not title:
+                    continue
+                cover = (subject.get('pic') or {}).get('normal', subject.get('cover', ''))
+                rate = str((subject.get('rating') or {}).get('value', '暂无'))
+                subject_id = subject.get('id')
+                url_link = f"https://movie.douban.com/subject/{subject_id}/" if subject_id else "#"
+                
+                movies.append({
+                    'title': title,
+                    'cover': cover,
+                    'rate': rate,
+                    'url': url_link
+                })
             return jsonify({'success': True, 'movies': movies})
     except Exception as e:
-        log_system(f"获取豆瓣失败: {e}")
+        log_system(f"获取豆瓣筛选数据失败: {e}")
+        
     return jsonify({'success': False, 'movies': []})
 
 @app.route('/api/search-douban', methods=['GET'])
