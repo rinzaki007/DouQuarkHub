@@ -7,6 +7,11 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
+        /* 解决日志不换行问题：强制解析 \n 换行符 */
+        #log-box, #logContainer, .log-content, [id*="log"] {
+            white-space: pre-wrap !important;
+            word-break: break-all !important;
+        }
         body {
             background-color: #0f172a;
             color: #f8fafc;
