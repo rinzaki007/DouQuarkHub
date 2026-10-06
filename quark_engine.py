@@ -69,7 +69,7 @@ class QuarkEngine:
             return False
 
     def get_or_create_subfolder(self, folder_name, parent_fid='0'):
-        """在指定的父级目录 FID 下精准创建或获取专属文件夹（含强力容错兜底）"""
+        """在指定的父级目录 FID 下精准创建或获取专属文件夹，返回 (fid, error_message)"""
         if not parent_fid:
             parent_fid = '0'
 
@@ -82,7 +82,7 @@ class QuarkEngine:
                 if d.get('code') == 0:
                     for item in d.get('data', {}).get('list', []):
                         if item.get('file_name') == folder_name:
-                            return item.get('fid')
+                            return item.get('fid'), None
         except Exception:
             pass
 
@@ -93,6 +93,8 @@ class QuarkEngine:
             "file_name": folder_name,
             "dir_init_lock": False
         }
+        
+        err_msg = "未知网络或接口错误"
         try:
             resp = requests.post(mkdir_url, json=payload, headers=self.headers, timeout=6)
             d = resp.json()
@@ -100,11 +102,12 @@ class QuarkEngine:
                 data_obj = d.get('data', {})
                 new_fid = data_obj.get('fid') or data_obj.get('file_id') or d.get('fid')
                 if new_fid:
-                    return new_fid
-        except Exception:
-            pass
+                    return new_fid, None
+            err_msg = f"API返回错误 (code: {d.get('code')}, msg: {d.get('message', '无详情')})"
+        except Exception as e:
+            err_msg = f"请求异常: {str(e)}"
 
-        # 3. 兜底保障：无论创建成功与否、或是因为重名报错，再次拉取目录直接定位该文件夹 FID
+        # 3. 兜底保障：再次拉取目录确认
         try:
             list_url = f"https://drive.quark.cn/1/clouddrive/file/sort?pr=ucpro&fr=pc&pdir_fid={parent_fid}&num=200"
             resp = requests.get(list_url, headers=self.headers, timeout=6)
@@ -113,11 +116,11 @@ class QuarkEngine:
                 if d.get('code') == 0:
                     for item in d.get('data', {}).get('list', []):
                         if item.get('file_name') == folder_name:
-                            return item.get('fid')
+                            return item.get('fid'), None
         except Exception:
             pass
 
-        return None
+        return None, err_msg
 
     def get_share_files(self, pwd_id, max_depth=3):
         pwd_id = sanitize_pwd_id(pwd_id)
