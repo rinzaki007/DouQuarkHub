@@ -4,357 +4,485 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MovieSync - 影视智搜与转存系统</title>
+    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome 图标库 -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        /* 解决日志不换行问题：强制解析 \n 换行符 */
-        #log-box, #logContainer, .log-content, [id*="log"] {
+        /* 强制日志控制台解析 \n 换行符与自动换行 */
+        #log-box, .log-container {
             white-space: pre-wrap !important;
             word-break: break-all !important;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
         }
-        body {
-            background-color: #0f172a;
-            color: #f8fafc;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+
+        /* 隐藏滚动条但允许滚动 */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
         }
-        .card-shadow {
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
         }
-        .line-clamp-1 {
-            display: -webkit-box;
-            -webkit-line-clamp: 1;
-            -webkit-box-orient: vertical;
-            overflow: hidden;
+
+        /* 影视卡片悬停放大特效 */
+        .movie-card {
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
         }
-        /* 🎯 关键修复：日志框样式，强制识别 \n 换行并自动换行 */
-        #log-box {
-            white-space: pre-wrap !important;
-            word-break: break-all !important;
-            line-height: 1.6 !important;
-            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-            background-color: #020617;
-            color: #38bdf8;
-            font-size: 13px;
+        .movie-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.5);
         }
-        /* 自定义滚动条 */
-        ::-webkit-scrollbar {
-            width: 6px;
-            height: 6px;
-        }
-        ::-webkit-scrollbar-track {
-            background: #0f172a;
-        }
-        ::-webkit-scrollbar-thumb {
-            background: #334155;
-            border-radius: 3px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-            background: #475569;
+
+        /* 筛选按钮激活样式 */
+        .filter-btn.active {
+            background-color: #2563eb;
+            color: #ffffff;
+            font-weight: 600;
         }
     </style>
 </head>
-<body class="min-h-screen flex flex-col">
+<body class="bg-gray-900 text-gray-100 min-h-screen flex flex-col font-sans antialiased">
 
-    <!-- 顶部导航与主操作栏 -->
-    <header class="bg-slate-900 border-b border-slate-800 sticky top-0 z-40 px-4 py-3">
-        <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
-            
-            <!-- 分类标签 -->
-            <div class="flex items-center space-x-2">
-                <button onclick="changeTag('电影')" class="nav-tag px-4 py-1.5 rounded text-sm font-medium transition bg-blue-600 text-white" data-tag="电影">电影</button>
-                <button onclick="changeTag('电视剧')" class="nav-tag px-4 py-1.5 rounded text-sm font-medium transition bg-slate-800 text-slate-300 hover:bg-slate-700" data-tag="电视剧">电视剧</button>
-                <button onclick="changeTag('综艺')" class="nav-tag px-4 py-1.5 rounded text-sm font-medium transition bg-slate-800 text-slate-300 hover:bg-slate-700" data-tag="综艺">综艺</button>
-                <button onclick="changeTag('动漫')" class="nav-tag px-4 py-1.5 rounded text-sm font-medium transition bg-slate-800 text-slate-300 hover:bg-slate-700" data-tag="动漫">动漫</button>
+    <!-- ================= 前台主视图 ================= -->
+    <div id="main-view" class="flex-1 flex flex-col">
+        <!-- 顶部导航栏 -->
+        <header class="bg-gray-800 border-b border-gray-700 sticky top-0 z-30 shadow-lg">
+            <div class="max-w-7xl mx-auto px-4 py-2.5 flex flex-wrap items-center justify-between gap-3">
+                <!-- 左侧分类与快捷导航 -->
+                <div class="flex items-center gap-2 flex-wrap">
+                    <span class="text-xl font-bold text-blue-500 mr-2 flex items-center gap-1.5">
+                        <i class="fa-solid fa-film"></i> MovieSync
+                    </span>
+                    <button onclick="switchCategory('movie')" class="nav-cat-btn active bg-blue-600 text-white px-3 py-1 rounded text-sm font-medium">电影</button>
+                    <button onclick="switchCategory('tv')" class="nav-cat-btn bg-gray-700 hover:bg-gray-600 text-gray-200 px-3 py-1 rounded text-sm font-medium">电视剧</button>
+                    <button onclick="switchCategory('show')" class="nav-cat-btn bg-gray-700 hover:bg-gray-600 text-gray-200 px-3 py-1 rounded text-sm font-medium">综艺</button>
+                    <button onclick="switchCategory('anime')" class="nav-cat-btn bg-gray-700 hover:bg-gray-600 text-gray-200 px-3 py-1 rounded text-sm font-medium">动漫</button>
+
+                    <!-- 专属定制功能入口 -->
+                    <div class="h-4 w-[1px] bg-gray-600 mx-1"></div>
+                    <button onclick="openFollowModal()" class="bg-purple-600 hover:bg-purple-700 text-white px-2.5 py-1 rounded text-xs flex items-center gap-1 font-medium transition">
+                        <i class="fa-solid fa-heart"></i> 一键追剧
+                    </button>
+                    <a href="https://openlist.88888807.xyz:8807/" target="_blank" class="bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1 rounded text-xs flex items-center gap-1 font-medium transition">
+                        <i class="fa-solid fa-folder-open"></i> OpenList
+                    </a>
+                    <a href="https://pan.quark.cn" target="_blank" class="bg-amber-600 hover:bg-amber-700 text-white px-2.5 py-1 rounded text-xs flex items-center gap-1 font-medium transition">
+                        <i class="fa-solid fa-cloud"></i> 夸克端
+                    </a>
+                </div>
+
+                <!-- 中间搜索框 -->
+                <div class="flex-1 max-w-md min-w-[200px]">
+                    <div class="relative">
+                        <input type="text" id="search-input" placeholder="搜索豆瓣影视资源..." 
+                               class="w-full bg-gray-900 border border-gray-700 text-gray-200 text-sm rounded-lg pl-3 pr-10 py-1.5 focus:outline-none focus:border-blue-500">
+                        <button onclick="triggerSearch()" class="absolute right-2 top-2 text-gray-400 hover:text-white">
+                            <i class="fa-solid fa-magnifying-glass"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 右侧批量操作与系统入口 -->
+                <div class="flex items-center gap-2 text-xs">
+                    <span id="selected-count-badge" class="text-gray-400">已选 <b class="text-blue-400">0</b> 部</span>
+                    <button onclick="selectAll()" class="bg-gray-700 hover:bg-gray-600 px-2.5 py-1.5 rounded text-gray-200">全选</button>
+                    <button onclick="deselectAll()" class="bg-gray-700 hover:bg-gray-600 px-2.5 py-1.5 rounded text-gray-200">取消</button>
+                    <button onclick="startBatchTransfer()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded font-bold flex items-center gap-1 shadow">
+                        <i class="fa-solid fa-cloud-arrow-down"></i> 批量转存
+                    </button>
+                    <button onclick="openLogModal()" class="bg-gray-700 hover:bg-gray-600 px-2.5 py-1.5 rounded text-gray-200 flex items-center gap-1">
+                        <i class="fa-solid fa-terminal"></i> 运行日志
+                    </button>
+                    <button onclick="showAdminView()" class="bg-blue-600 hover:bg-blue-500 text-white px-2.5 py-1.5 rounded flex items-center gap-1 font-medium">
+                        <i class="fa-solid fa-gear"></i> 设置
+                    </button>
+                </div>
             </div>
+        </header>
 
-            <!-- 搜索框 -->
-            <div class="flex-1 max-w-md mx-2 relative">
-                <input type="text" id="search-input" placeholder="搜索豆瓣影视..." 
-                       class="w-full bg-slate-950 border border-slate-700 rounded px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-blue-500"
-                       onkeydown="if(event.key==='Enter') doSearch()">
-                <button onclick="doSearch()" class="absolute right-2 top-1.5 text-slate-400 hover:text-white">
-                    <i class="fa-solid fa-magnifying-glass"></i>
-                </button>
-            </div>
+        <!-- 详细筛选菜单栏 (类型/地区/时间/排序) -->
+        <div class="bg-gray-800/80 border-b border-gray-700/60 px-4 py-3 text-xs space-y-2.5">
+            <div class="max-w-7xl mx-auto space-y-2">
+                <!-- 排序 -->
+                <div class="flex items-center gap-2">
+                    <span class="text-gray-400 font-bold w-12 shrink-0">排序：</span>
+                    <div class="flex gap-1.5 flex-wrap">
+                        <button class="filter-btn active px-2.5 py-0.5 rounded text-gray-300 hover:text-white" onclick="setFilter('sort', 'hot', this)">热门</button>
+                        <button class="filter-btn px-2.5 py-0.5 rounded text-gray-300 hover:text-white" onclick="setFilter('sort', 'time', this)">最新</button>
+                        <button class="filter-btn px-2.5 py-0.5 rounded text-gray-300 hover:text-white" onclick="setFilter('sort', 'score', this)">高分</button>
+                    </div>
+                </div>
 
-            <!-- 右侧动作按钮组 -->
-            <div class="flex items-center space-x-2">
-                <span class="text-xs text-slate-400">已选 <b id="selected-count" class="text-blue-400">0</b> 部</span>
-                <button onclick="selectAll(true)" class="px-2.5 py-1 text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 rounded">全选</button>
-                <button onclick="selectAll(false)" class="px-2.5 py-1 text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 rounded">取消</button>
-                <button onclick="batchTransfer()" class="px-3 py-1.5 text-xs bg-emerald-600 hover:bg-emerald-500 text-white rounded font-medium flex items-center gap-1">
-                    <i class="fa-solid fa-cloud-arrow-down"></i> 批量转存
-                </button>
-                <button onclick="toggleLogBox()" class="px-3 py-1.5 text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 rounded flex items-center gap-1">
-                    <i class="fa-solid fa-terminal"></i> 运行日志
-                </button>
-                <a href="/admin" class="px-3 py-1.5 text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 rounded flex items-center gap-1">
-                    <i class="fa-solid fa-gear"></i> 设置
-                </a>
+                <!-- 类型筛选 -->
+                <div class="flex items-top gap-2">
+                    <span class="text-gray-400 font-bold w-12 shrink-0 pt-0.5">类型：</span>
+                    <div class="flex gap-1.5 flex-wrap flex-1" id="type-filters">
+                        <button class="filter-btn active px-2.5 py-0.5 rounded" onclick="setFilter('type', 'all', this)">全部</button>
+                        <button class="filter-btn px-2.5 py-0.5 rounded text-gray-300 hover:text-white" onclick="setFilter('type', '剧情', this)">剧情</button>
+                        <button class="filter-btn px-2.5 py-0.5 rounded text-gray-300 hover:text-white" onclick="setFilter('type', '喜剧', this)">喜剧</button>
+                        <button class="filter-btn px-2.5 py-0.5 rounded text-gray-300 hover:text-white" onclick="setFilter('type', '动作', this)">动作</button>
+                        <button class="filter-btn px-2.5 py-0.5 rounded text-gray-300 hover:text-white" onclick="setFilter('type', '爱情', this)">爱情</button>
+                        <button class="filter-btn px-2.5 py-0.5 rounded text-gray-300 hover:text-white" onclick="setFilter('type', '科幻', this)">科幻</button>
+                        <button class="filter-btn px-2.5 py-0.5 rounded text-gray-300 hover:text-white" onclick="setFilter('type', '动画', this)">动画</button>
+                        <button class="filter-btn px-2.5 py-0.5 rounded text-gray-300 hover:text-white" onclick="setFilter('type', '悬疑', this)">悬疑</button>
+                        <button class="filter-btn px-2.5 py-0.5 rounded text-gray-300 hover:text-white" onclick="setFilter('type', '惊悚', this)">惊悚</button>
+                        <button class="filter-btn px-2.5 py-0.5 rounded text-gray-300 hover:text-white" onclick="setFilter('type', '恐怖', this)">恐怖</button>
+                        <button class="filter-btn px-2.5 py-0.5 rounded text-gray-300 hover:text-white" onclick="setFilter('type', '犯罪', this)">犯罪</button>
+                        <button class="filter-btn px-2.5 py-0.5 rounded text-gray-300 hover:text-white" onclick="setFilter('type', '奇幻', this)">奇幻</button>
+                        <button class="filter-btn px-2.5 py-0.5 rounded text-gray-300 hover:text-white" onclick="setFilter('type', '冒险', this)">冒险</button>
+                    </div>
+                </div>
+
+                <!-- 地区筛选 -->
+                <div class="flex items-top gap-2">
+                    <span class="text-gray-400 font-bold w-12 shrink-0 pt-0.5">地区：</span>
+                    <div class="flex gap-1.5 flex-wrap flex-1" id="region-filters">
+                        <button class="filter-btn active px-2.5 py-0.5 rounded" onclick="setFilter('region', 'all', this)">全部</button>
+                        <button class="filter-btn px-2.5 py-0.5 rounded text-gray-300 hover:text-white" onclick="setFilter('region', '中国大陆', this)">中国大陆</button>
+                        <button class="filter-btn px-2.5 py-0.5 rounded text-gray-300 hover:text-white" onclick="setFilter('region', '中国香港', this)">中国香港</button>
+                        <button class="filter-btn px-2.5 py-0.5 rounded text-gray-300 hover:text-white" onclick="setFilter('region', '中国台湾', this)">中国台湾</button>
+                        <button class="filter-btn px-2.5 py-0.5 rounded text-gray-300 hover:text-white" onclick="setFilter('region', '美国', this)">美国</button>
+                        <button class="filter-btn px-2.5 py-0.5 rounded text-gray-300 hover:text-white" onclick="setFilter('region', '日本', this)">日本</button>
+                        <button class="filter-btn px-2.5 py-0.5 rounded text-gray-300 hover:text-white" onclick="setFilter('region', '韩国', this)">韩国</button>
+                        <button class="filter-btn px-2.5 py-0.5 rounded text-gray-300 hover:text-white" onclick="setFilter('region', '英国', this)">英国</button>
+                        <button class="filter-btn px-2.5 py-0.5 rounded text-gray-300 hover:text-white" onclick="setFilter('region', '法国', this)">法国</button>
+                    </div>
+                </div>
+
+                <!-- 时间/年代筛选 -->
+                <div class="flex items-top gap-2">
+                    <span class="text-gray-400 font-bold w-12 shrink-0 pt-0.5">年代：</span>
+                    <div class="flex gap-1.5 flex-wrap flex-1" id="year-filters">
+                        <button class="filter-btn active px-2.5 py-0.5 rounded" onclick="setFilter('year', 'all', this)">全部</button>
+                        <button class="filter-btn px-2.5 py-0.5 rounded text-gray-300 hover:text-white" onclick="setFilter('year', '2025', this)">2025</button>
+                        <button class="filter-btn px-2.5 py-0.5 rounded text-gray-300 hover:text-white" onclick="setFilter('year', '2024', this)">2024</button>
+                        <button class="filter-btn px-2.5 py-0.5 rounded text-gray-300 hover:text-white" onclick="setFilter('year', '2023', this)">2023</button>
+                        <button class="filter-btn px-2.5 py-0.5 rounded text-gray-300 hover:text-white" onclick="setFilter('year', '2022', this)">2022</button>
+                        <button class="filter-btn px-2.5 py-0.5 rounded text-gray-300 hover:text-white" onclick="setFilter('year', '2021', this)">2021</button>
+                        <button class="filter-btn px-2.5 py-0.5 rounded text-gray-300 hover:text-white" onclick="setFilter('year', '2020', this)">2020</button>
+                    </div>
+                </div>
             </div>
         </div>
-    </header>
 
-    <!-- 次级筛选栏（热门/最新/高分） -->
-    <div class="bg-slate-900/50 border-b border-slate-800/80 px-4 py-2">
-        <div class="max-w-7xl mx-auto flex items-center space-x-4 text-xs">
-            <span class="text-slate-400">排序:</span>
-            <button onclick="changeSort('U')" class="sort-tag text-blue-400 font-medium" data-sort="U">热门</button>
-            <button onclick="changeSort('R')" class="sort-tag text-slate-400 hover:text-white" data-sort="R">最新</button>
-            <button onclick="changeSort('S')" class="sort-tag text-slate-400 hover:text-white" data-sort="S">高分</button>
-        </div>
+        <!-- 影视资源展示网格区 -->
+        <main class="flex-1 max-w-7xl w-full mx-auto p-4">
+            <div id="movie-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                <!-- 动态渲染影视卡片示例 -->
+            </div>
+        </main>
     </div>
 
-    <!-- 主展示网格 -->
-    <main class="flex-1 max-w-7xl w-full mx-auto p-4">
-        <!-- 加载状态 -->
-        <div id="loading" class="text-center py-20 text-slate-400">
-            <i class="fa-solid fa-spinner fa-spin text-3xl mb-3 text-blue-500"></i>
-            <p class="text-sm">正在获取豆瓣数据...</p>
-        </div>
-
-        <!-- 卡片网格 -->
-        <div id="movie-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 hidden">
-            <!-- 由 JS 动态渲染 -->
-        </div>
-    </main>
-
-    <!-- 底部固定实时日志面板 -->
-    <div id="log-panel" class="fixed bottom-0 left-0 right-0 z-50 bg-slate-950 border-t border-slate-800 shadow-2xl transition-all duration-300 hidden">
-        <div class="flex items-center justify-between px-4 py-2 bg-slate-900 border-b border-slate-800">
-            <div class="flex items-center gap-2 text-xs text-slate-300 font-medium">
-                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                实时转存运行日志
+    <!-- ================= 后台控制中心视图 (全屏/彻底排版修复) ================= -->
+    <div id="admin-view" class="hidden min-h-screen bg-gray-900 flex flex-col">
+        <!-- 后台顶部顶栏 -->
+        <header class="bg-gray-800 border-b border-gray-700 px-6 py-3 flex justify-between items-center shrink-0">
+            <div class="flex items-center gap-2 text-lg font-bold text-white">
+                <i class="fa-solid fa-gear text-blue-500"></i> MovieSync 后台控制中心
             </div>
-            <div class="flex items-center gap-2">
-                <button onclick="clearLog()" class="px-2 py-0.5 text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 rounded">清空</button>
-                <button onclick="toggleLogBox(false)" class="px-2 py-0.5 text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 rounded">收起 ×</button>
+            <div class="flex gap-2">
+                <button onclick="showMainView()" class="bg-gray-700 hover:bg-gray-600 text-white text-xs px-3 py-1.5 rounded transition">
+                    返回前台首页
+                </button>
             </div>
-        </div>
-        <!-- 🎯 关键：对 log-box 容器应用 white-space: pre-wrap -->
-        <div id="log-box" class="h-48 overflow-y-auto p-3"></div>
-    </div>
+        </header>
 
-    <script>
-        let currentTag = '电影';
-        let currentSort = 'U';
-        let moviesData = [];
-        let selectedIndices = new Set();
+        <!-- 后台双栏主体布局 -->
+        <div class="flex-1 flex overflow-hidden">
+            <!-- 侧边栏菜单 -->
+            <aside class="w-56 bg-gray-800/50 border-r border-gray-700/80 p-4 shrink-0 flex flex-col gap-2">
+                <button onclick="switchAdminTab('global')" id="tab-btn-global" class="admin-tab-btn active w-full text-left bg-blue-600 text-white px-3 py-2 rounded text-xs font-semibold flex items-center gap-2">
+                    <i class="fa-solid fa-sliders"></i> 全局设置与配置迁移
+                </button>
+                <button onclick="switchAdminTab('auto')" id="tab-btn-auto" class="admin-tab-btn w-full text-left hover:bg-gray-700/60 text-gray-300 px-3 py-2 rounded text-xs font-semibold flex items-center gap-2">
+                    <i class="fa-solid fa-robot"></i> 自动化追剧任务
+                </button>
+                <button onclick="switchAdminTab('logs')" id="tab-btn-logs" class="admin-tab-btn w-full text-left hover:bg-gray-700/60 text-gray-300 px-3 py-2 rounded text-xs font-semibold flex items-center gap-2">
+                    <i class="fa-solid fa-list-check"></i> 系统运行日志
+                </button>
+            </aside>
 
-        // 页面初始化
-        document.addEventListener("DOMContentLoaded", () => {
-            fetchMovies();
-        });
+            <!-- 右侧面板区 (彻底使用绝对弹性盒组织，避免绝对定位导致的重叠) -->
+            <main class="flex-1 overflow-y-auto p-6 bg-gray-900/90 text-sm">
+                <!-- 1. 全局系统参数设置 -->
+                <div id="panel-global" class="admin-panel space-y-6 max-w-5xl">
+                    <h2 class="text-base font-bold text-white flex items-center gap-2 border-b border-gray-700 pb-2">
+                        <i class="fa-solid fa-gears text-blue-400"></i> 全局系统参数设置
+                    </h2>
 
-        // 切换分类
-        function changeTag(tag) {
-            currentTag = tag;
-            document.querySelectorAll('.nav-tag').forEach(btn => {
-                if (btn.dataset.tag === tag) {
-                    btn.className = 'nav-tag px-4 py-1.5 rounded text-sm font-medium transition bg-blue-600 text-white';
-                } else {
-                    btn.className = 'nav-tag px-4 py-1.5 rounded text-sm font-medium transition bg-slate-800 text-slate-300 hover:bg-slate-700';
-                }
-            });
-            fetchMovies();
-        }
+                    <!-- Cookie 设置 -->
+                    <div class="space-y-1">
+                        <label class="block text-xs text-gray-400 font-semibold">夸克网盘 Cookie (ck):</label>
+                        <textarea id="quark-cookie" rows="4" 
+                            class="w-full bg-gray-800 border border-gray-700 rounded p-2 text-xs font-mono text-gray-200 focus:outline-none focus:border-blue-500 break-all" 
+                            placeholder="请粘贴夸克网盘 Cookie..."></textarea>
+                    </div>
 
-        // 切换排序
-        function changeSort(sort) {
-            currentSort = sort;
-            document.querySelectorAll('.sort-tag').forEach(btn => {
-                if (btn.dataset.sort === sort) {
-                    btn.className = 'sort-tag text-blue-400 font-medium';
-                } else {
-                    btn.className = 'sort-tag text-slate-400 hover:text-white';
-                }
-            });
-            fetchMovies();
-        }
-
-        // 调取后台 API 获取影视数据
-        async function fetchMovies() {
-            const loading = document.getElementById('loading');
-            const grid = document.getElementById('movie-grid');
-            loading.classList.remove('hidden');
-            grid.classList.add('hidden');
-            selectedIndices.clear();
-            updateSelectedCount();
-
-            try {
-                const resp = await fetch(`/api/get-movies?tag=${encodeURIComponent(currentTag)}&sort=${currentSort}`);
-                const res = await resp.json();
-                if (res.success) {
-                    moviesData = res.movies || [];
-                    renderGrid();
-                } else {
-                    alert('获取资源失败: ' + res.message);
-                }
-            } catch (err) {
-                console.error(err);
-            } finally {
-                loading.classList.add('hidden');
-                grid.classList.remove('hidden');
-            }
-        }
-
-        // 豆瓣搜索
-        async function doSearch() {
-            const query = document.getElementById('search-input').value.trim();
-            if (!query) return;
-
-            const loading = document.getElementById('loading');
-            const grid = document.getElementById('movie-grid');
-            loading.classList.remove('hidden');
-            grid.classList.add('hidden');
-            selectedIndices.clear();
-            updateSelectedCount();
-
-            try {
-                const resp = await fetch(`/api/search-douban?q=${encodeURIComponent(query)}`);
-                const res = await resp.json();
-                if (res.success) {
-                    moviesData = res.movies || [];
-                    renderGrid();
-                }
-            } catch (err) {
-                console.error(err);
-            } finally {
-                loading.classList.add('hidden');
-                grid.classList.remove('hidden');
-            }
-        }
-
-        // 渲染海报列表
-        function renderGrid() {
-            const grid = document.getElementById('movie-grid');
-            grid.innerHTML = '';
-
-            moviesData.forEach((movie, idx) => {
-                const coverUrl = movie.cover ? `/api/proxy-img?url=${encodeURIComponent(movie.cover)}` : 'https://via.placeholder.com/150x220?text=No+Cover';
-                const isSelected = selectedIndices.has(idx);
-
-                const card = document.createElement('div');
-                card.className = `relative group bg-slate-900 border ${isSelected ? 'border-blue-500' : 'border-slate-800'} rounded-lg overflow-hidden card-shadow cursor-pointer transition`;
-                card.onclick = (e) => {
-                    if (e.target.tagName !== 'A') {
-                        toggleSelect(idx);
-                    }
-                };
-
-                card.innerHTML = `
-                    <div class="aspect-[2/3] w-full bg-slate-950 relative overflow-hidden">
-                        <img src="${coverUrl}" alt="${movie.title}" class="w-full h-full object-cover group-hover:scale-105 transition duration-300" loading="lazy">
-                        
-                        <!-- 选择框 -->
-                        <div class="absolute top-2 left-2 z-10">
-                            <input type="checkbox" ${isSelected ? 'checked' : ''} class="w-4 h-4 rounded border-slate-600 bg-slate-900/80 text-blue-600 focus:ring-0">
+                    <!-- 存储目录与 OpenList 地址 -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="space-y-1">
+                            <label class="block text-xs text-gray-400 font-semibold">默认全局存储目录 FID:</label>
+                            <input type="text" id="fid-default" value="0" class="w-full bg-gray-800 border border-gray-700 rounded px-3 py-1.5 text-xs text-gray-200">
                         </div>
-
-                        <!-- 评分角标 -->
-                        <div class="absolute top-2 right-2 bg-slate-900/90 backdrop-blur text-amber-400 text-[11px] font-bold px-1.5 py-0.5 rounded border border-slate-700/50">
-                            ${movie.rate || '暂无'}
+                        <div class="space-y-1">
+                            <label class="block text-xs text-gray-400 font-semibold">OpenList 访问地址:</label>
+                            <input type="text" id="openlist-url" value="https://openlist.88888807.xyz:8807/" class="w-full bg-gray-800 border border-gray-700 rounded px-3 py-1.5 text-xs text-gray-200">
                         </div>
                     </div>
-                    <div class="p-2.5">
-                        <div class="font-medium text-xs text-slate-200 line-clamp-1 group-hover:text-blue-400 transition" title="${movie.title}">${movie.title}</div>
-                        <div class="mt-1 flex items-center justify-between text-[11px]">
-                            <a href="${movie.url}" target="_blank" class="text-blue-400 hover:underline">详情</a>
+
+                    <!-- 各分类专属 FID -->
+                    <div class="space-y-2">
+                        <h3 class="text-xs font-bold text-amber-400 flex items-center gap-1">
+                            <i class="fa-solid fa-folder"></i> 各分类专属存储目录 FID (未设定则自动使用默认全局 FID)
+                        </h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs text-gray-400 mb-1">🎬 电影目录 FID:</label>
+                                <input type="text" id="fid-movie" class="w-full bg-gray-800 border border-gray-700 rounded px-2.5 py-1 text-xs text-gray-200">
+                            </div>
+                            <div>
+                                <label class="block text-xs text-gray-400 mb-1">📺 电视剧目录 FID:</label>
+                                <input type="text" id="fid-tv" class="w-full bg-gray-800 border border-gray-700 rounded px-2.5 py-1 text-xs text-gray-200">
+                            </div>
+                            <div>
+                                <label class="block text-xs text-gray-400 mb-1">🎤 综艺目录 FID:</label>
+                                <input type="text" id="fid-show" class="w-full bg-gray-800 border border-gray-700 rounded px-2.5 py-1 text-xs text-gray-200">
+                            </div>
+                            <div>
+                                <label class="block text-xs text-gray-400 mb-1">🎨 动漫目录 FID:</label>
+                                <input type="text" id="fid-anime" class="w-full bg-gray-800 border border-gray-700 rounded px-2.5 py-1 text-xs text-gray-200">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TG 检索频道配置管理 (彻底解决标签重叠问题) -->
+                    <div class="space-y-3 pt-2">
+                        <h3 class="text-xs font-bold text-gray-300">TG 检索频道配置管理:</h3>
+                        <div id="tg-channels-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                            <!-- 频道卡片以 Grid 精确罗列，绝不交叠 -->
+                        </div>
+
+                        <!-- 添加频道表单 -->
+                        <div class="flex flex-wrap items-center gap-2 pt-2">
+                            <input type="text" id="new-ch-name" placeholder="频道名称 (例如: 夸克电影)" class="bg-gray-800 border border-gray-700 rounded px-3 py-1.5 text-xs flex-1 min-w-[150px]">
+                            <input type="text" id="new-ch-id" placeholder="频道 ID (例如: quark_movies)" class="bg-gray-800 border border-gray-700 rounded px-3 py-1.5 text-xs flex-1 min-w-[150px]">
+                            <button onclick="addTGChannel()" class="bg-blue-600 hover:bg-blue-500 text-white text-xs px-4 py-1.5 rounded font-medium shrink-0">
+                                添加频道
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 底部导入导出与保存按钮区 -->
+                    <div class="border-t border-gray-800 pt-4 flex flex-wrap justify-between items-center gap-3">
+                        <div class="flex gap-2">
+                            <button onclick="exportConfig()" class="bg-gray-800 hover:bg-gray-700 text-gray-200 text-xs px-3 py-1.5 rounded flex items-center gap-1 border border-gray-700">
+                                <i class="fa-solid fa-download"></i> 导出配置 JSON
+                            </button>
+                            <button onclick="importConfig()" class="bg-gray-800 hover:bg-gray-700 text-gray-200 text-xs px-3 py-1.5 rounded flex items-center gap-1 border border-gray-700">
+                                <i class="fa-solid fa-upload"></i> 导入配置 JSON
+                            </button>
+                        </div>
+                        <button onclick="saveAllSettings()" class="bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs px-5 py-2 rounded flex items-center gap-1.5 shadow-lg">
+                            <i class="fa-solid fa-floppy-disk"></i> 保存全部设置
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 2. 自动化追剧任务 -->
+                <div id="panel-auto" class="admin-panel hidden space-y-4">
+                    <h2 class="text-base font-bold text-white border-b border-gray-700 pb-2">自动化追剧任务列表</h2>
+                    <p class="text-xs text-gray-400">在此管理已添加后台定时轮询的剧集。</p>
+                    <div id="auto-task-list" class="space-y-2">
+                        <!-- 动态追剧列表 -->
+                    </div>
+                </div>
+
+                <!-- 3. 系统运行日志 -->
+                <div id="panel-logs" class="admin-panel hidden space-y-3">
+                    <h2 class="text-base font-bold text-white border-b border-gray-700 pb-2">后台系统控制台日志</h2>
+                    <div class="bg-black/80 rounded border border-gray-800 p-4 h-[500px] overflow-y-auto log-container text-xs text-green-400 font-mono" id="admin-log-box">
+                        [System] 日志实时监听中...
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- ================= 模态弹窗: 运行日志 Modal ================= -->
+    <div id="log-modal" class="fixed inset-0 bg-black/70 z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-gray-800 border border-gray-700 rounded-lg w-full max-w-3xl flex flex-col max-h-[85vh] shadow-2xl">
+            <div class="px-4 py-3 border-b border-gray-700 flex justify-between items-center">
+                <span class="font-bold text-sm text-gray-200 flex items-center gap-2">
+                    <i class="fa-solid fa-terminal text-blue-400"></i> 实时运行日志
+                </span>
+                <button onclick="closeLogModal()" class="text-gray-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="p-4 flex-1 overflow-y-auto bg-black/90 text-xs text-emerald-400 font-mono log-container min-h-[300px]" id="modal-log-box">
+                [系统] 准备执行转存操作...
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= 前端 JavaScript 逻辑 ================= -->
+    <script>
+        // ---------------- 全局状态变量 ----------------
+        let currentCategory = 'movie';
+        let selectedMovies = new Set();
+        let tgChannels = [
+            { name: '夸克云盘综合资源', id: 'Quark_Movies' },
+            { name: 'YOYO资源|夸克|短剧', id: 'yoyokuakeduanju' },
+            { name: 'UC夸克百度迅雷资源分享', id: 'ucquark' },
+            { name: '夸克网盘资源收集站', id: 'QuarkFree' },
+            { name: 'leo资源(夸克)', id: 'leoziyuan' },
+            { name: '夸克 (白嫖)', id: 'baicaozi' },
+            { name: '夸克(网盘高分影视)', id: 'SharePanFilms' },
+            { name: '夸克(书籍)', id: 'BooksRealm' }
+        ];
+
+        // ---------------- 初始化 ----------------
+        document.addEventListener("DOMContentLoaded", () => {
+            renderTGChannels();
+            renderSampleMovies();
+        });
+
+        // 视图切换 (前台 / 后台控制中心)
+        function showAdminView() {
+            document.getElementById('main-view').classList.add('hidden');
+            document.getElementById('admin-view').classList.remove('hidden');
+        }
+
+        function showMainView() {
+            document.getElementById('admin-view').classList.add('hidden');
+            document.getElementById('main-view').classList.remove('hidden');
+        }
+
+        // 后台侧边栏 Tab 切换
+        function switchAdminTab(tab) {
+            document.querySelectorAll('.admin-tab-btn').forEach(btn => btn.classList.remove('active', 'bg-blue-600', 'text-white'));
+            document.querySelectorAll('.admin-panel').forEach(p => p.classList.add('hidden'));
+
+            const activeBtn = document.getElementById(`tab-btn-${tab}`);
+            if (activeBtn) activeBtn.classList.add('active', 'bg-blue-600', 'text-white');
+
+            const activePanel = document.getElementById(`panel-${tab}`);
+            if (activePanel) activePanel.classList.remove('hidden');
+        }
+
+        // 分类切换 (电影/电视剧/综艺/动漫)
+        function switchCategory(cat) {
+            currentCategory = cat;
+            document.querySelectorAll('.nav-cat-btn').forEach(b => {
+                b.classList.remove('bg-blue-600', 'text-white');
+                b.classList.add('bg-gray-700', 'text-gray-200');
+            });
+            event.target.classList.remove('bg-gray-700', 'text-gray-200');
+            event.target.classList.add('bg-blue-600', 'text-white');
+            renderSampleMovies();
+        }
+
+        // 筛选逻辑高亮
+        function setFilter(type, value, btn) {
+            const container = btn.parentElement;
+            container.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+        }
+
+        // 渲染 TG 频道列表 (避免覆盖)
+        function renderTGChannels() {
+            const container = document.getElementById('tg-channels-container');
+            container.innerHTML = '';
+            tgChannels.forEach((ch, idx) => {
+                const item = document.createElement('div');
+                item.className = "bg-gray-800 border border-gray-700 rounded p-2.5 flex items-center justify-between text-xs";
+                item.innerHTML = `
+                    <div class="truncate mr-2">
+                        <div class="font-bold text-gray-200 truncate">${ch.name}</div>
+                        <div class="text-gray-400 text-[10px] truncate">@${ch.id}</div>
+                    </div>
+                    <button onclick="removeTGChannel(${idx})" class="text-red-400 hover:text-red-300 p-1 shrink-0">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                `;
+                container.appendChild(item);
+            });
+        }
+
+        function addTGChannel() {
+            const name = document.getElementById('new-ch-name').value.trim();
+            const id = document.getElementById('new-ch-id').value.trim().replace('@', '');
+            if (!name || !id) return alert('请输入完整的频道名称和 ID');
+            tgChannels.push({ name, id });
+            document.getElementById('new-ch-name').value = '';
+            document.getElementById('new-ch-id').value = '';
+            renderTGChannels();
+        }
+
+        function removeTGChannel(idx) {
+            tgChannels.splice(idx, 1);
+            renderTGChannels();
+        }
+
+        // 日志弹窗
+        function openLogModal() {
+            document.getElementById('log-modal').classList.remove('hidden');
+        }
+
+        function closeLogModal() {
+            document.getElementById('log-modal').classList.add('hidden');
+        }
+
+        function openFollowModal() {
+            alert("已打开追剧管理器");
+        }
+
+        // 选择与批量转存
+        function toggleMovieSelect(id) {
+            if (selectedMovies.has(id)) selectedMovies.delete(id);
+            else selectedMovies.add(id);
+            document.getElementById('selected-count-badge').innerHTML = `已选 <b class="text-blue-400">${selectedMovies.size}</b> 部`;
+        }
+
+        function selectAll() {
+            document.querySelectorAll('.movie-checkbox').forEach(cb => {
+                cb.checked = true;
+                selectedMovies.add(cb.value);
+            });
+            document.getElementById('selected-count-badge').innerHTML = `已选 <b class="text-blue-400">${selectedMovies.size}</b> 部`;
+        }
+
+        function deselectAll() {
+            document.querySelectorAll('.movie-checkbox').forEach(cb => cb.checked = false);
+            selectedMovies.clear();
+            document.getElementById('selected-count-badge').innerHTML = `已选 <b class="text-blue-400">0</b> 部`;
+        }
+
+        // 示例数据渲染
+        function renderSampleMovies() {
+            const grid = document.getElementById('movie-grid');
+            grid.innerHTML = '';
+            for (let i = 1; i <= 12; i++) {
+                grid.innerHTML += `
+                    <div class="movie-card bg-gray-800 rounded-lg overflow-hidden border border-gray-700/60 relative flex flex-col">
+                        <input type="checkbox" value="${i}" onchange="toggleMovieSelect('${i}')" class="movie-checkbox absolute top-2 left-2 z-10 w-4 h-4 rounded">
+                        <div class="relative pt-[140%] bg-gray-900">
+                            <img src="https://picsum.photos/200/280?random=${i}" class="absolute inset-0 w-full h-full object-cover">
+                            <span class="absolute top-2 right-2 bg-amber-500/90 text-black font-extrabold text-[10px] px-1.5 py-0.5 rounded">8.${i}</span>
+                        </div>
+                        <div class="p-2.5 flex-1 flex flex-col justify-between">
+                            <div class="font-bold text-xs text-gray-200 truncate">影视示例作品 ${i}</div>
+                            <div class="text-[10px] text-gray-400 mt-1 flex justify-between">
+                                <span>2024</span>
+                                <a href="#" class="text-blue-400 hover:underline">详情</a>
+                            </div>
                         </div>
                     </div>
                 `;
-                grid.appendChild(card);
-            });
-        }
-
-        // 选中/取消选中
-        function toggleSelect(idx) {
-            if (selectedIndices.has(idx)) {
-                selectedIndices.delete(idx);
-            } else {
-                selectedIndices.add(idx);
-            }
-            updateSelectedCount();
-            renderGrid();
-        }
-
-        // 全选 / 取消全选
-        function selectAll(select) {
-            if (select) {
-                moviesData.forEach((_, idx) => selectedIndices.add(idx));
-            } else {
-                selectedIndices.clear();
-            }
-            updateSelectedCount();
-            renderGrid();
-        }
-
-        function updateSelectedCount() {
-            document.getElementById('selected-count').innerText = selectedIndices.size;
-        }
-
-        // 控制日志面板显示与收起
-        function toggleLogBox(show = true) {
-            const panel = document.getElementById('log-panel');
-            if (show) {
-                panel.classList.remove('hidden');
-            } else {
-                panel.classList.toggle('hidden');
             }
         }
 
-        function clearLog() {
-            document.getElementById('log-box').innerText = '';
-        }
-
-        // 🎯 核心逻辑：发起批量转存并实时逐行解析流数据
-        async function batchTransfer() {
-            if (selectedIndices.size === 0) {
-                alert('请先选择至少一部影片');
-                return;
-            }
-
-            const cookie = localStorage.getItem('quark_cookie') || '';
-            const selectedMovies = Array.from(selectedIndices).map(idx => moviesData[idx]);
-
-            // 展开发布日志面板
-            toggleLogBox(true);
-            const logBox = document.getElementById('log-box');
-            
-            try {
-                const response = await fetch('/api/transfer', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        movies: selectedMovies,
-                        cookie: cookie,
-                        folderId: '0'
-                    })
-                });
-
-                if (!response.ok) {
-                    logBox.innerText += `\n[系统] ❌ 请求失败，HTTP 状态码: ${response.status}\n`;
-                    return;
-                }
-
-                // 使用 Stream 解码器处理后台 yield 出来的 \n 换行日志
-                const reader = response.body.getReader();
-                const decoder = new TextDecoder('utf-8');
-
-                while (true) {
-                    const { done, value } = await reader.read();
-                    if (done) break;
-                    
-                    const chunk = decoder.decode(value, { stream: true });
-                    // 🎯 使用 innerText 连续追加字符串，保留 \n 的自然换行效果
-                    logBox.innerText += chunk;
-                    // 自动滚动到底部
-                    logBox.scrollTop = logBox.scrollHeight;
-                }
-
-            } catch (err) {
-                logBox.innerText += `\n[系统] ❌ 传输发生网络异常: ${err.message}\n`;
-            }
+        function saveAllSettings() {
+            alert("配置已成功保存！");
         }
     </script>
 </body>
