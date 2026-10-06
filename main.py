@@ -4,15 +4,18 @@ import requests
 import re
 from flask import Flask, render_template, request, jsonify, Response, stream_with_context, session, redirect, url_for
 from werkzeug.security import generate_password_hash, check_password_hash
+from concurrent.futures import ThreadPoolExecutor
 
-from quark_engine import QuarkEngine
+from quark_engine import QuarkEngine, clean_tv_filename
+from subscription_manager import SubscriptionManager
 from search_service import SearchService
 from utils import load_channels, save_channels, DOUBAN_HEADERS
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'moviesync_secret_key_2026_secure')
 
-# 预设专属分类 FID 映射配置
+AUTH_FILE = 'auth.json'
+
 CATEGORY_FIDS = {
     "电影": "3ef79d1b370a4b27bd334b7bbba7e6e1",
     "电视剧": "fe24e17d8d254997b21710c73b22b6e7",
@@ -20,15 +23,98 @@ CATEGORY_FIDS = {
     "动漫": "55a44b99fac641679e1ebf55dcb38be9"
 }
 
+def load_auth():
+    if os.path.exists(AUTH_FILE):
+        try:
+            with open(AUTH_FILE, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return None
+
+def save_auth(data):
+    with open(AUTH_FILE, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+sub_manager = SubscriptionManager(get_cookie_func=lambda: app.config.get('QUARK_COOKIE', ''))
+sub_manager.start_scheduler()
+
+# 🎯 全局登录与鉴权拦截器
 @app.before_request
 def require_login():
     if request.path.startswith('/static'):
         return
-    allowed_paths = ['/login', '/api/login', '/setup', '/api/setup']
+
+    auth_data = load_auth()
+
+    # 系统未初始化时跳转至 /setup
+    if not auth_data or not auth_data.get('initialized'):
+        if request.path not in ['/setup', '/api/setup']:
+            return redirect('/setup')
+        return
+
+    # 已初始化时禁止访问 /setup
+    if request.path in ['/setup', '/api/setup']:
+        return redirect('/login')
+
+    # 未登录拦截
+    allowed_paths = ['/login', '/api/login']
     if request.path not in allowed_paths and not session.get('logged_in'):
         if request.path.startswith('/api/'):
-            return jsonify({'success': False, 'message': '未登录'}), 401
+            return jsonify({'success': False, 'message': '未登录', 'need_login': True}), 401
         return redirect('/login')
+
+@app.route('/setup')
+def setup_page():
+    return render_template('login.html', is_setup=True)
+
+@app.route('/api/setup', methods=['POST'])
+def api_setup():
+    auth_data = load_auth()
+    if auth_data and auth_data.get('initialized'):
+        return jsonify({'success': False, 'message': '系统已完成初始化'})
+
+    data = request.json or {}
+    username = data.get('username', '').strip()
+    password = data.get('password', '').strip()
+
+    if not username or not password:
+        return jsonify({'success': False, 'message': '账号与密码不能为空'})
+
+    new_auth = {
+        "initialized": True,
+        "username": username,
+        "password_hash": generate_password_hash(password)
+    }
+    save_auth(new_auth)
+
+    session['logged_in'] = True
+    session['username'] = username
+    return jsonify({'success': True, 'message': '管理员账号创建成功！'})
+
+@app.route('/login')
+def login_page():
+    if session.get('logged_in'):
+        return redirect('/')
+    return render_template('login.html', is_setup=False)
+
+@app.route('/api/login', methods=['POST'])
+def api_login():
+    data = request.json or {}
+    username = data.get('username', '').strip()
+    password = data.get('password', '').strip()
+    
+    auth_data = load_auth()
+    if auth_data and username == auth_data.get('username') and check_password_hash(auth_data.get('password_hash'), password):
+        session['logged_in'] = True
+        session['username'] = username
+        return jsonify({'success': True, 'message': '登录成功'})
+    return jsonify({'success': False, 'message': '用户名或密码错误'})
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect('/login')
 
 @app.route('/')
 def index():
@@ -38,23 +124,18 @@ def index():
 def admin():
     return render_template('admin.html')
 
-@app.route('/login')
-def login_page():
-    return render_template('login.html')
-
 @app.route('/api/get-movies', methods=['GET'])
 def get_movies():
     main_tag = request.args.get('tag', '电影')
     sort_type = request.args.get('sort', 'U')
     genre = request.args.get('genre', '')
-    
+
     url = "https://m.douban.com/rexxar/api/v2/tv/recommend" if main_tag != '电影' else "https://m.douban.com/rexxar/api/v2/subject/recent_hot/movie"
-    
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
         "Referer": "https://movie.douban.com/"
     }
-    
+
     try:
         if main_tag == '电影':
             params = {"start": "0", "limit": "100", "category": "最新" if sort_type in ['T', 'R'] else "热门", "type": "全部"}
@@ -67,7 +148,7 @@ def get_movies():
                 "tags": genre if genre and genre != '全部' else main_tag,
                 "sort": "R" if sort_type in ['T', 'R'] else "U"
             }
-            
+
         resp = requests.get(url, headers=headers, params=params, timeout=10)
         if resp.status_code == 200:
             data = resp.json()
@@ -85,6 +166,42 @@ def get_movies():
         print(f"请求异常: {e}")
     return jsonify({'success': False, 'movies': []})
 
+@app.route('/api/search-douban', methods=['GET'])
+def search_douban():
+    query = request.args.get('q', '').strip()
+    if not query:
+        return jsonify({'success': False, 'movies': []})
+    url = f"https://movie.douban.com/j/subject_suggest?q={requests.utils.quote(query)}"
+    try:
+        resp = requests.get(url, headers=DOUBAN_HEADERS, timeout=8)
+        if resp.status_code == 200:
+            data = resp.json()
+            movies = [{
+                'title': item.get('title'),
+                'cover': item.get('img'),
+                'rate': item.get('year', '搜索'),
+                'url': f"https://movie.douban.com/subject/{item.get('id')}/"
+            } for item in data]
+            return jsonify({'success': True, 'movies': movies})
+        return jsonify({'success': False, 'movies': []})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e), 'movies': []})
+
+@app.route('/api/check-cookie', methods=['POST'])
+def check_cookie():
+    try:
+        data = request.json or {}
+        cookie = data.get('cookie', '')
+        if not cookie:
+            return jsonify({'valid': False, 'message': '未配置 Cookie'})
+        engine = QuarkEngine(cookie)
+        valid = engine.check_cookie_valid()
+        if valid:
+            app.config['QUARK_COOKIE'] = cookie
+        return jsonify({'valid': valid, 'message': 'Cookie 有效' if valid else 'Cookie 已失效'})
+    except Exception as e:
+        return jsonify({'valid': False, 'message': f'校验出错: {str(e)}'})
+
 @app.route('/api/channels', methods=['GET', 'POST'])
 def handle_channels():
     if request.method == 'POST':
@@ -93,7 +210,6 @@ def handle_channels():
         return jsonify({'success': True})
     return jsonify({'success': True, 'channels': load_channels()})
 
-# 🎯 核心修复：转存逻辑映射专属 FID 与新建文件夹
 @app.route('/api/transfer', methods=['POST'])
 def transfer():
     data = request.json or {}
@@ -113,10 +229,8 @@ def transfer():
         for idx, movie in enumerate(movies, 1):
             title = movie.get('title', '').strip()
             tag = movie.get('tag', '电影')
-            
-            # 获取对应的分类专属 FID
             target_parent_fid = CATEGORY_FIDS.get(tag, '0')
-            
+
             yield f"\n[系统] 🔍 [{idx}/{len(movies)}] 正在检索：《{title}》（分类: {tag}）...\n"
 
             pwd_id, ch_name = service.search_single_movie(title, channels)
@@ -132,7 +246,6 @@ def transfer():
                 yield f"[系统] ⚠️ 资源解析失败: {err}\n"
                 continue
 
-            # 🎯 专属目录新建文件夹
             yield f"[系统] 📁 正在专属存储目录下新建/定位文件夹：《{title}》...\n"
             movie_folder_fid = service.engine.get_or_create_subfolder(title, target_parent_fid)
 
@@ -145,6 +258,42 @@ def transfer():
                 yield f"[系统] ❌ 转存失败: {msg}\n"
 
     return Response(stream_with_context(generate_logs()), mimetype='text/plain; charset=utf-8')
+
+@app.route('/api/subscriptions', methods=['GET', 'POST', 'DELETE'])
+def handle_subscriptions():
+    if request.method == 'GET':
+        return jsonify({'success': True, 'subscriptions': sub_manager.get_subscriptions()})
+
+    if request.method == 'POST':
+        data = request.json or {}
+        cookie = data.get('cookie', '')
+        if cookie:
+            app.config['QUARK_COOKIE'] = cookie
+
+        new_sub = sub_manager.add_subscription(
+            title=data.get('title'),
+            pwd_id=data.get('pwd_id'),
+            target_fid=data.get('target_fid', '0'),
+            interval_hours=data.get('interval_hours', 6),
+            start_ep=data.get('start_ep', 0)
+        )
+        return jsonify({'success': True, 'subscription': new_sub})
+
+    if request.method == 'DELETE':
+        sub_id = request.args.get('id')
+        sub_manager.delete_subscription(sub_id)
+        return jsonify({'success': True})
+
+@app.route('/api/subscriptions/run-now', methods=['POST'])
+def run_sub_now():
+    data = request.json or {}
+    sub_id = data.get('id')
+    cookie = data.get('cookie', '')
+    if cookie:
+        app.config['QUARK_COOKIE'] = cookie
+
+    ok, msg = sub_manager.check_subscription_now(sub_id)
+    return jsonify({'success': ok, 'message': msg})
 
 @app.route('/api/proxy-img')
 def proxy_img():
