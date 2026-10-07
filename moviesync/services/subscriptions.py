@@ -146,7 +146,15 @@ class SubscriptionManager:
                 or ""
             ).strip()
 
-            if fid and fid not in seen:
+            if (
+                fid
+                and len(fid) <= 128
+                and all(
+                    char.isalnum() or char in "_-"
+                    for char in fid
+                )
+                and fid not in seen
+            ):
                 seen.add(fid)
                 target_fids.append(fid)
 
@@ -317,12 +325,17 @@ class SubscriptionManager:
                 f"{err or '未找到文件'}",
             )
 
-        saved = set(
-            sub.get(
-                "saved_episodes",
-                [],
+        saved = {
+            str(item)
+            for item in (
+                sub.get(
+                    "saved_episodes",
+                    [],
+                )
+                or []
             )
-        )
+            if isinstance(item, (str, int))
+        }
 
         selected = []
         found_keys = []
@@ -521,15 +534,28 @@ class SubscriptionManager:
                 time.time()
             )
 
-            current["next_run_at"] = (
-                time.time()
-                + int(
+            try:
+                interval_hours = int(
                     current.get(
                         "interval_hours",
                         6,
                     )
                 )
-                * 3600
+            except (TypeError, ValueError):
+                interval_hours = 6
+
+            interval_hours = max(
+                1,
+                min(
+                    self.max_interval_hours,
+                    interval_hours,
+                ),
+            )
+
+            current["interval_hours"] = interval_hours
+            current["next_run_at"] = (
+                time.time()
+                + interval_hours * 3600
             )
 
             current["last_error"] = (
@@ -629,26 +655,39 @@ class SubscriptionManager:
     def _scheduler_loop(
         self,
     ) -> None:
-        while not self.stop_event.wait(
-            30
-        ):
+        while not self.stop_event.wait(30):
+            try:
+                subscriptions = self.get_subscriptions()
+            except Exception as exc:
+                self.logger.exception(
+                    "读取自动追剧任务失败: %s",
+                    exc,
+                )
+                continue
+
             now = time.time()
 
-            for sub in self.get_subscriptions():
-                if (
-                    float(
+            for sub in subscriptions:
+                try:
+                    next_run_at = float(
                         sub.get(
                             "next_run_at",
                             0,
                         )
                         or 0
                     )
-                    > now
-                ):
+                except (TypeError, ValueError):
+                    next_run_at = 0
+
+                if next_run_at > now:
                     continue
 
-                self.check_subscription_now(
-                    str(
-                        sub.get("id")
+                try:
+                    self.check_subscription_now(
+                        str(sub.get("id") or "")
                     )
-                )
+                except Exception:
+                    self.logger.exception(
+                        "自动追剧任务调度异常: %s",
+                        sub.get("id"),
+                    )
