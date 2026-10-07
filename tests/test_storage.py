@@ -1,3 +1,7 @@
+"""JSON 存储层单元测试。
+
+覆盖：原子写入/读取，以及损坏 JSON 回退默认值。
+"""
 import json
 
 from moviesync.storage import JsonStore
