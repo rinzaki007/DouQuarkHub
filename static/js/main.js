@@ -461,10 +461,24 @@ function isEpisodeFile(fileName) {
     return /(?:S\d{1,2}E\d{1,4}|第\s*\d+\s*[集话]|(?:EP|E)\s*\d{1,4})/i.test(text);
 }
 
+function updateCandidateSelectionCount(mIdx, cIdx) {
+    const inputs = document.querySelectorAll(\`input[name="batch-file-\${mIdx}-\${cIdx}"]\`);
+    const selected = Array.from(inputs).filter(input => input.checked).length;
+    const count = document.getElementById(\`candidate-selected-count-\${mIdx}-\${cIdx}\`);
+    const button = document.getElementById(\`candidate-transfer-\${mIdx}-\${cIdx}\`);
+    if (count) count.textContent = \`已选 \${selected} 个\`;
+    if (button) {
+        button.disabled = selected === 0;
+        button.classList.toggle('opacity-50', selected === 0);
+        button.classList.toggle('cursor-not-allowed', selected === 0);
+    }
+}
+
 function setCandidateFiles(mIdx, cIdx, checked) {
     document.querySelectorAll(\`input[name="batch-file-\${mIdx}-\${cIdx}"]\`).forEach(input => {
         input.checked = checked;
     });
+    updateCandidateSelectionCount(mIdx, cIdx);
 }
 
 function toggleCandidateFiles(mIdx, cIdx) {
@@ -511,12 +525,12 @@ function openCandidateModal(movies, candidatesMap) {
                 );
                 const versionLabel = getCandidateVersionLabel(cand, files, resolutionText);
                 const episodeCount = files.filter(file => isEpisodeFile(file.file_name)).length;
-                const isSeries = episodeCount >= 2 && files.length >= 3;
+                const isSeries = (movie.tag === '电视剧' || currentTag === '电视剧') && (episodeCount >= 1 || files.length >= 2);
                 const filesBoxId = \`candidate-files-\${mIdx}-\${cIdx}\`;
                 const toggleId = \`candidate-files-toggle-\${mIdx}-\${cIdx}\`;
                 const fileCheckboxes = files.map((f, fIdx) => \`
                     <label class="candidate-file-row flex cursor-pointer items-center gap-3 rounded-lg border border-transparent px-3 py-2 hover:border-slate-700 hover:bg-slate-800/70">
-                        <input type="checkbox" name="batch-file-\${mIdx}-\${cIdx}" value="\${escapeHtml(f.fid)}" class="h-4 w-4 shrink-0 rounded border-slate-600 bg-slate-900 text-blue-600 focus:ring-0">
+                        <input type="checkbox" name="batch-file-\${mIdx}-\${cIdx}" value="\${escapeHtml(f.fid)}" class="h-4 w-4 shrink-0 rounded border-slate-600 bg-slate-900 text-blue-600 focus:ring-0" onchange="updateCandidateSelectionCount(\${mIdx}, \${cIdx})">
                         <span class="min-w-0 flex-1 truncate text-xs text-slate-300" title="\${escapeHtml(f.file_name)}">\${escapeHtml(f.file_name)}</span>
                         <span class="shrink-0 text-[10px] text-slate-500">\${escapeHtml(f.resolution || '未知')} · \${escapeHtml(f.size_text || formatCandidateSize(f.size))}</span>
                     </label>\`).join('');
@@ -540,8 +554,8 @@ function openCandidateModal(movies, candidatesMap) {
                                     \${isSeries ? '<span class="resource-chip"><i class="fa-solid fa-list-ol"></i> ' + episodeCount + ' 集可选</span>' : ''}
                                 </div>
                             </div>
-                            <button onclick="confirmBatchTransferForCandidate(\${mIdx}, \${cIdx})" class="shrink-0 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-semibold text-white shadow-lg shadow-emerald-600/15 hover:bg-emerald-500">
-                                <i class="fa-solid fa-cloud-arrow-down mr-1"></i> 转存所选
+                            <button onclick="confirmBatchTransferForCandidate(\${mIdx}, \${cIdx})" id="candidate-transfer-\${mIdx}-\${cIdx}" disabled onclick="confirmBatchTransferForCandidate(\${mIdx}, \${cIdx})" class="shrink-0 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-semibold text-white shadow-lg shadow-emerald-600/15 hover:bg-emerald-500 opacity-50 cursor-not-allowed">
+                                <i class="fa-solid fa-cloud-arrow-down mr-1"></i> 转存所选 <span id="candidate-selected-count-\${mIdx}-\${cIdx}" class="ml-1 text-[10px] font-normal opacity-80">已选 0 个</span>
                             </button>
                         </div>
                         <div class="mt-4 overflow-hidden rounded-xl border border-slate-800 bg-slate-950/80">
