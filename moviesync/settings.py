@@ -1,3 +1,8 @@
+"""MovieSync 运行时设置。
+
+用途：确定数据目录、监听地址、端口、Session Secret、Cookie Secure 和调试模式。
+维护说明：Docker 默认使用 /app/data；Secret Key 会自动持久化到 data/.secret_key，避免容器重启导致会话全部失效。
+"""
 from __future__ import annotations
 
 import os
