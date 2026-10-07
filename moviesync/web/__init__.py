@@ -1,3 +1,8 @@
+"""MovieSync Web 层。
+
+用途：提供登录限流、认证前置检查、安全响应头和 Blueprint 注册。
+维护说明：所有需要登录的 API 会在 before_request 阶段拦截；具体写接口再由路由装饰器执行 CSRF 校验。
+"""
 from __future__ import annotations
 
 import secrets
