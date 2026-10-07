@@ -291,16 +291,16 @@ function renderGrid() {
                     <i class="fa-solid fa-star mr-0.5"></i>${escapeHtml(movie.rate || '暂无')}
                 </div>
                 <div class="absolute bottom-2.5 left-2.5 right-2.5 flex items-center justify-between gap-2">
-                    <span class="rounded-md bg-black/55 px-2 py-1 text-[10px] text-slate-200 backdrop-blur-md">${escapeHtml(movie.tag || currentTag)}</span>
-                    ${year ? '<span class="rounded-md bg-black/55 px-2 py-1 text-[10px] text-slate-300 backdrop-blur-md">' + escapeHtml(year) + '</span>' : ''}
+                    <div class="flex items-center gap-1.5">
+                        <span class="rounded-md border border-slate-400/20 bg-black/55 px-2 py-1 text-[10px] text-slate-300 backdrop-blur-md">${escapeHtml(movie.tag || currentTag)}</span>
+                        ${year ? '<span class="rounded-md bg-black/55 px-2 py-1 text-[10px] text-slate-300 backdrop-blur-md">' + escapeHtml(year) + '</span>' : ''}
+                    </div>
+                    <a href="${escapeHtml(movie.url || '#')}" target="_blank" rel="noopener noreferrer" class="douban-poster-btn" aria-label="打开豆瓣详情">豆瓣 <i class="fa-solid fa-arrow-up-right-from-square"></i></a>
                 </div>
             </div>
             <div class="p-3">
                 <div class="truncate text-sm font-semibold text-slate-100 group-hover:text-blue-300" title="${escapeHtml(movie.title)}">${escapeHtml(movie.title)}</div>
-                <div class="mt-2 flex justify-end">
-                <a href="${escapeHtml(movie.url || '#')}" target="_blank" rel="noopener noreferrer" class="douban-poster-btn" aria-label="打开豆瓣详情">豆瓣 <i class="fa-solid fa-arrow-up-right-from-square"></i></a>
-                </div>
-            </div>`;
+            </div>`;>`;
         const cover = card.querySelector('.movie-cover');
         cover?.addEventListener('error', () => { if (cover.dataset.fallback === '1') return; cover.dataset.fallback = '1'; cover.src = noCoverImage; });
         grid.appendChild(card);
