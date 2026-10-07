@@ -51,6 +51,7 @@
             <div><h2 class="text-sm font-semibold text-white">智能追剧</h2><p class="mt-1 text-[11px] text-slate-500">监控指定分享源的新集，只在发现新资源后执行转存。</p></div>
             <div class="flex items-center gap-1 rounded-lg border border-slate-800 bg-slate-950 p-1 text-[11px]">
                 <button data-filter="all" onclick="setFilter('all')" class="task-filter rounded-md bg-slate-700 px-3 py-1.5 text-slate-100">全部</button>
+                <button data-filter="running" onclick="setFilter('running')" class="task-filter rounded-md px-3 py-1.5 text-slate-400 hover:text-white">执行中</button>
                 <button data-filter="error" onclick="setFilter('error')" class="task-filter rounded-md px-3 py-1.5 text-slate-400 hover:text-white">异常</button>
                 <button data-filter="waiting" onclick="setFilter('waiting')" class="task-filter rounded-md px-3 py-1.5 text-slate-400 hover:text-white">待检查</button>
             </div>
@@ -87,6 +88,16 @@
             </div>
             <div class="flex items-center justify-between border-t border-slate-800 pt-4"><span id="task-form-status" class="text-xs text-slate-500"></span><button id="task-submit" onclick="createTask()" disabled class="rounded-lg bg-purple-600 px-5 py-2.5 text-xs font-medium text-white opacity-40 disabled:cursor-not-allowed">保存并启用</button></div>
         </div>
+    </aside>
+</div>
+<div id="task-detail-drawer" class="fixed inset-0 z-[120] hidden">
+    <div onclick="closeTaskDetail()" class="absolute inset-0 bg-black/65 backdrop-blur-sm"></div>
+    <aside class="absolute right-0 top-0 h-full w-full max-w-2xl overflow-y-auto border-l border-slate-800 bg-slate-900 shadow-2xl">
+        <div class="sticky top-0 z-10 flex items-center justify-between border-b border-slate-800 bg-slate-900/95 px-5 py-4 backdrop-blur">
+            <div><div class="text-[10px] font-medium uppercase tracking-widest text-purple-400">TASK DETAIL</div><h2 id="detail-title" class="mt-1 text-base font-semibold text-white">任务详情</h2></div>
+            <button onclick="closeTaskDetail()" class="rounded-md px-2 py-1 text-slate-400 hover:bg-slate-800 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div id="detail-body" class="space-y-4 p-5"></div>
     </aside>
 </div>
 <div id="task-toast" class="pointer-events-none fixed right-3 top-20 z-[200] flex w-[min(360px,calc(100vw-24px))] flex-col gap-2"></div>
