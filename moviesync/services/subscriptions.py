@@ -1,3 +1,8 @@
+"""自动追剧任务管理器。
+
+用途：创建/删除/立即执行订阅任务，并在后台周期性检查夸克分享中的新集数或指定文件。
+维护说明：订阅会持久化到 data/subscriptions.json；每次执行都会重新获取分享 Token，并再次校验目标 FID。
+"""
 from __future__ import annotations
 
 import time
