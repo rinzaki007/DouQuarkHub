@@ -155,6 +155,7 @@ function renderTasks() {
             '<div class="flex shrink-0 flex-wrap content-start justify-end gap-2">' +
             '<button data-action="detail" data-id="' + escapeTask(task.id) + '" class="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-[11px] text-slate-300 hover:bg-slate-800"><i class="fa-solid fa-circle-info mr-1"></i>详情</button>' +
             (task.type === 'subscription' ? '<button data-action="run-sub" data-id="' + escapeTask(task.subscription_id) + '" class="rounded-lg bg-purple-600 px-3 py-2 text-[11px] font-medium text-white hover:bg-purple-500"><i class="fa-solid fa-play mr-1"></i>立即检查</button>' : '') +
+            ((task.status === 'success' || task.status === 'failed' || task.status === 'error') ? '<button data-action="delete" data-id="' + escapeTask(task.id) + '" class="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-[11px] text-slate-400 hover:bg-slate-800 hover:text-rose-300"><i class="fa-solid fa-trash mr-1"></i>删除</button>' : '') +
             (retryable ? '<button data-action="retry" data-id="' + escapeTask(task.id) + '" class="rounded-lg border border-amber-800 bg-amber-950/40 px-3 py-2 text-[11px] text-amber-300 hover:bg-amber-900/60"><i class="fa-solid fa-rotate-right mr-1"></i>失败重试</button>' : '') +
             '</div></div>';
         list.appendChild(card);
@@ -162,6 +163,7 @@ function renderTasks() {
     list.querySelectorAll('[data-action="detail"]').forEach(btn => btn.onclick = () => openTaskDetail(btn.dataset.id));
     list.querySelectorAll('[data-action="run-sub"]').forEach(btn => btn.onclick = () => runSubscription(btn.dataset.id));
     list.querySelectorAll('[data-action="retry"]').forEach(btn => btn.onclick = () => retryTask(btn.dataset.id));
+    list.querySelectorAll('[data-action="delete"]').forEach(btn => btn.onclick = () => deleteTask(btn.dataset.id));
 }
 
 async function openTaskDetail(id) {
@@ -380,12 +382,25 @@ async function deleteTask(id) {
     if(!task) return;
     if(!confirm('确定删除“' + task.title + '”吗？删除后不会影响已经转存到夸克的文件。')) return;
     try {
-        const resp=await apiFetchTask('/api/subscriptions?id='+encodeURIComponent(id),{method:'DELETE'});
+        const resp=await apiFetchTask('/api/tasks/' + encodeURIComponent(id),{method:'DELETE'});
         const res=await resp.json();
         if(!res.success) throw new Error(res.message || '删除失败');
         taskToast('任务已删除');
         await loadTasks();
     }catch(err){ taskToast(err.message || '删除失败'); }
+}
+
+async function clearHistory() {
+    const terminal = tasks.filter(t => ['success','failed','error'].includes(t.status));
+    if (!terminal.length) return taskToast('没有可清理的已结束任务');
+    if (!confirm('确定清空全部已完成/失败任务及执行记录吗？正在执行中的任务不会受到影响。')) return;
+    try {
+        const resp=await apiFetchTask('/api/tasks/clear-history',{method:'POST'});
+        const res=await resp.json();
+        if(!res.success) throw new Error(res.message || '清理失败');
+        taskToast(res.message || '历史已清空');
+        await loadTasks();
+    }catch(err){ taskToast(err.message || '清理失败'); }
 }
 
 setInterval(() => { if (!document.hidden && tasks.length) { renderStats(); renderTasks(); } }, 60000);
