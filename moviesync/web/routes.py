@@ -124,6 +124,11 @@ def resource_select():
     )
 
 
+@pages.get("/favicon.ico")
+def favicon():
+    return Response(status=204)
+
+
 @pages.get("/admin")
 def admin():
     return render_template(
