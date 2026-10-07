@@ -326,7 +326,7 @@ class SubscriptionManager:
             )
 
         saved = {
-            str(item)
+            item
             for item in (
                 sub.get(
                     "saved_episodes",
