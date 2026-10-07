@@ -11,7 +11,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 
 from ..clients.quark import VIDEO_EXTENSIONS, QuarkClient, sanitize_pwd_id
-from ..clients.telegram import TelegramClient
+from .resource_sources import ResourceSourceManager
 
 
 MAX_VIDEO_FILES_PER_CANDIDATE = 200
@@ -50,9 +50,9 @@ def _detect_resolution(name: str) -> str:
 
 
 class SearchService:
-    def __init__(self, quark: QuarkClient, telegram: TelegramClient, logger):
+    def __init__(self, quark: QuarkClient, resource_sources: ResourceSourceManager, logger):
         self.quark = quark
-        self.telegram = telegram
+        self.resource_sources = resource_sources
         self.logger = logger
         self._share_cache: dict[str, tuple[list[dict[str, Any]], str | None, str | None]] = {}
         self._share_lock = threading.Lock()
@@ -77,81 +77,75 @@ class SearchService:
             self._share_cache[pwd_id] = result
         return result
 
-    def search_movie_candidates(self, movie: object, channels: list[dict]) -> list[dict]:
+    def search_movie_candidates(self, movie: object, config: dict) -> list[dict]:
         title, cleaned_title = self._title(movie)
         if not title:
             return []
-        self.logger.info("开始检索《%s》，频道数=%s", title, len(channels))
+        self.logger.info("开始检索《%s》", title)
 
-        def search_one(index_channel: tuple[int, dict]) -> tuple[int, list[dict]]:
-            index, channel = index_channel
-            local: list[dict] = []
-            try:
-                for source in self.telegram.search_channel(channel, cleaned_title):
-                    pwd_id = sanitize_pwd_id(source["pwd_id"])
-                    if not pwd_id:
-                        continue
-                    files, stoken, err = self._get_share_files(pwd_id)
-                    if err or not files:
-                        self.logger.debug("频道 %s 命中 %s 但解析失败: %s", source["channel"], pwd_id, err)
-                        continue
-                    videos = [
-                        {
-                            "fid": f.get("fid"),
-                            "file_name": f.get("file_name", ""),
-                            "size": f.get("size", 0),
-                            "size_text": _format_size(f.get("size", 0)),
-                            "resolution": _detect_resolution(f.get("file_name", "")),
-                        }
-                        for f in files
-                        if f.get("fid")
-                        and str(f.get("file_name", "")).lower().endswith(VIDEO_EXTENSIONS)
-                    ][:MAX_VIDEO_FILES_PER_CANDIDATE]
-                    if videos:
-                        resolutions = {}
-                        for video in videos:
-                            resolution = video["resolution"]
-                            resolutions[resolution] = resolutions.get(resolution, 0) + 1
-                        total_size = sum(int(v.get("size") or 0) for v in videos)
-                        local.append({
-                            "channel": source["channel"],
-                            "pwd_id": pwd_id,
-                            "files": videos,
-                            "file_count": len(videos),
-                            "total_size": total_size,
-                            "total_size_text": _format_size(total_size),
-                            "resolutions": resolutions,
-                            "summary": (
-                                f"频道: [{source['channel']}] | "
-                                f"{len(videos)} 个视频 | "
-                                f"{_format_size(total_size)}"
-                            ),
-                        })
-            except Exception as exc:
-                self.logger.exception("频道 %s 搜索异常", channel.get("name") or channel.get("id"), exc_info=exc)
-            return index, local
-
-        ordered_results: list[tuple[int, list[dict]]] = []
-        with ThreadPoolExecutor(max_workers=min(8, max(1, len(channels)))) as executor:
-            futures = [executor.submit(search_one, pair) for pair in enumerate(channels)]
-            for future in as_completed(futures):
-                ordered_results.append(future.result())
-        ordered_results.sort(key=lambda item: item[0])
-
+        discovered = self.resource_sources.search(
+            {"title": cleaned_title},
+            config,
+        )
         candidates: list[dict] = []
         seen_pwd_ids: set[str] = set()
-        for _, result in ordered_results:
-            for candidate in result:
-                if candidate["pwd_id"] not in seen_pwd_ids:
-                    seen_pwd_ids.add(candidate["pwd_id"])
-                    candidates.append(candidate)
-                    if len(candidates) >= MAX_CANDIDATES_PER_MOVIE:
-                        self.logger.info(
-                            "《%s》检索完成，有效候选=%s（已达到结果上限）",
-                            title,
-                            len(candidates),
-                        )
-                        return candidates
+
+        for source in discovered:
+            pwd_id = sanitize_pwd_id(source.get("pwd_id"))
+            if not pwd_id or pwd_id in seen_pwd_ids:
+                continue
+            files, stoken, err = self._get_share_files(pwd_id)
+            if err or not files:
+                self.logger.debug(
+                    "资源源 %s 命中 %s 但解析失败: %s",
+                    source.get("source_name") or source.get("source_id"),
+                    pwd_id,
+                    err,
+                )
+                continue
+
+            videos = [
+                {
+                    "fid": f.get("fid"),
+                    "file_name": f.get("file_name", ""),
+                    "size": f.get("size", 0),
+                    "size_text": _format_size(f.get("size", 0)),
+                    "resolution": _detect_resolution(f.get("file_name", "")),
+                }
+                for f in files
+                if f.get("fid")
+                and str(f.get("file_name", "")).lower().endswith(VIDEO_EXTENSIONS)
+            ][:MAX_VIDEO_FILES_PER_CANDIDATE]
+
+            if not videos:
+                continue
+
+            resolutions = {}
+            for video in videos:
+                resolution = video["resolution"]
+                resolutions[resolution] = resolutions.get(resolution, 0) + 1
+
+            total_size = sum(int(v.get("size") or 0) for v in videos)
+            seen_pwd_ids.add(pwd_id)
+            candidates.append({
+                "source_id": source.get("source_id", "unknown"),
+                "source_name": source.get("source_name", "未知来源"),
+                "channel": source.get("channel", ""),
+                "pwd_id": pwd_id,
+                "files": videos,
+                "file_count": len(videos),
+                "total_size": total_size,
+                "total_size_text": _format_size(total_size),
+                "resolutions": resolutions,
+                "summary": (
+                    f"来源: [{source.get('source_name', '未知来源')}] | "
+                    f"频道: [{source.get('channel', '')}] | "
+                    f"{len(videos)} 个视频 | {_format_size(total_size)}"
+                ),
+            })
+            if len(candidates) >= MAX_CANDIDATES_PER_MOVIE:
+                break
+
         self.logger.info("《%s》检索完成，有效候选=%s", title, len(candidates))
         return candidates
 
