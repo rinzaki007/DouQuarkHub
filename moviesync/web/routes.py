@@ -702,19 +702,28 @@ def transfer_selected():
         "target_fid": target_fid,
     }
 
+    # 任务在线程池中异步执行，后台线程没有 Flask 的默认请求上下文。
+    # 显式捕获真实 Flask App，并在 runner 中建立应用上下文。
+    app = current_app._get_current_object()
+
     def runner(progress):
-        current_config = _services()["config"].load()
-        current_cookie = _services()["config"].get_cookie()
-        if not current_cookie:
-            return False, "未配置夸克 Cookie", {"success": 0, "skipped": 0, "failed": 1}
-        service = _services()["search_factory"](current_cookie)
-        return service.transfer_selected_resource_with_progress(
-            movie,
-            candidate,
-            target_fid,
-            current_config.get("category_fids", {}),
-            progress,
-        )
+        with app.app_context():
+            current_config = _services()["config"].load()
+            current_cookie = _services()["config"].get_cookie()
+            if not current_cookie:
+                return False, "未配置夸克 Cookie", {
+                    "success": 0,
+                    "skipped": 0,
+                    "failed": 1,
+                }
+            service = _services()["search_factory"](current_cookie)
+            return service.transfer_selected_resource_with_progress(
+                movie,
+                candidate,
+                target_fid,
+                current_config.get("category_fids", {}),
+                progress,
+            )
 
     task = _services()["tasks"].create_transfer_task(payload, runner)
     return jsonify({
@@ -778,22 +787,30 @@ def retry_task(task_id):
     if old.get("type") != "transfer":
         return _json_error("不支持重试的任务类型")
 
+    app = current_app._get_current_object()
+
     def runner(progress):
-        payload = old.get("retry_payload") or {}
-        movie = payload.get("movie") or {}
-        candidate = payload.get("candidate") or {}
-        current_config = _services()["config"].load()
-        current_cookie = _services()["config"].get_cookie()
-        if not current_cookie:
-            return False, "未配置夸克 Cookie", {"success": 0, "skipped": 0, "failed": 1}
-        service = _services()["search_factory"](current_cookie)
-        return service.transfer_selected_resource_with_progress(
-            movie,
-            candidate,
-            payload.get("target_fid") or current_config.get("default_fid", "0"),
-            current_config.get("category_fids", {}),
-            progress,
-        )
+        with app.app_context():
+            payload = old.get("retry_payload") or {}
+            movie = payload.get("movie") or {}
+            candidate = payload.get("candidate") or {}
+            current_config = _services()["config"].load()
+            current_cookie = _services()["config"].get_cookie()
+            if not current_cookie:
+                return False, "未配置夸克 Cookie", {
+                    "success": 0,
+                    "skipped": 0,
+                    "failed": 1,
+                }
+            service = _services()["search_factory"](current_cookie)
+            return service.transfer_selected_resource_with_progress(
+                movie,
+                candidate,
+                payload.get("target_fid")
+                or current_config.get("default_fid", "0"),
+                current_config.get("category_fids", {}),
+                progress,
+            )
 
     task = manager.retry_transfer(task_id, runner)
     if not task:
