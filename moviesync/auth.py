@@ -1,3 +1,8 @@
+"""MovieSync 管理员认证与账号安全存储。
+
+用途：管理员初始化、登录密码校验、用户名/密码修改，以及旧版 auth.json 迁移。
+维护说明：密码只保存 Werkzeug 哈希；修改账号信息后由 Web 层清理当前会话，要求重新登录。
+"""
 from __future__ import annotations
 
 from pathlib import Path
