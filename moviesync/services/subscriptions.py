@@ -179,6 +179,7 @@ class SubscriptionManager:
             "last_check_at": None,
             "next_run_at": time.time(),
             "last_error": "",
+            "retry_count": 0,
         }
 
         with self.lock:
@@ -553,9 +554,33 @@ class SubscriptionManager:
             )
 
             current["interval_hours"] = interval_hours
+
+            if success:
+                current["retry_count"] = 0
+                delay_seconds = interval_hours * 3600
+            else:
+                try:
+                    retry_count = int(
+                        current.get(
+                            "retry_count",
+                            0,
+                        )
+                    )
+                except (TypeError, ValueError):
+                    retry_count = 0
+
+                retry_count = max(0, retry_count) + 1
+                current["retry_count"] = retry_count
+
+                # 临时故障采用短退避，连续失败再逐步拉长，
+                # 但不会超过用户设置的正常检测周期。
+                delay_seconds = min(
+                    interval_hours * 3600,
+                    300 * (2 ** min(retry_count - 1, 6)),
+                )
+
             current["next_run_at"] = (
-                time.time()
-                + interval_hours * 3600
+                time.time() + delay_seconds
             )
 
             current["last_error"] = (
