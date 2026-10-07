@@ -15,3 +15,20 @@ def test_clean_tv_filename_avoids_resolution_as_episode():
     assert clean_tv_filename("Show.S01E02.1080p.mkv")[0] == 2
     assert clean_tv_filename("Show.1080p.mkv")[0] is None
     assert clean_tv_filename("Show.第12集.mkv")[0] == 12
+
+
+def test_quark_share_listing_errors_are_not_reported_as_success(monkeypatch):
+    from moviesync.clients.http import ApiError
+    from moviesync.clients.quark import QuarkClient
+
+    client = QuarkClient("cookie")
+
+    def fail(*args, **kwargs):
+        raise ApiError("temporary upstream failure")
+
+    monkeypatch.setattr(client.http, "request_json", fail)
+
+    files, stoken, error = client.get_share_files("AbC123")
+    assert files is None
+    assert stoken is None
+    assert "temporary upstream failure" in error
