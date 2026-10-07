@@ -776,6 +776,28 @@ def get_tasks():
     return jsonify({"success": True, "tasks": items})
 
 
+@api.delete("/tasks/<task_id>")
+@require_csrf
+def delete_task(task_id):
+    task_id = str(task_id)
+    if task_id.startswith("subscription:"):
+        sub_id = task_id.split(":", 1)[1]
+        if not _services()["subscriptions"].delete_subscription(sub_id):
+            return _json_error("未找到追剧任务", 404)
+        return jsonify({"success": True, "message": "追剧任务已删除"})
+    ok, message = _services()["tasks"].delete_task(task_id)
+    if not ok:
+        return _json_error(message, 400 if message != "任务不存在" else 404)
+    return jsonify({"success": True, "message": message})
+
+
+@api.post("/tasks/clear-history")
+@require_csrf
+def clear_task_history():
+    removed = _services()["tasks"].clear_history()
+    return jsonify({"success": True, "removed": removed, "message": f"已清理 {removed} 条已结束任务"})
+
+
 @api.get("/tasks/<task_id>")
 def get_task_detail(task_id):
     if str(task_id).startswith("subscription:"):
