@@ -272,10 +272,25 @@ class DoubanClient:
             or ""
         )
 
+        summary = (
+            item.get("summary")
+            or target.get("summary")
+            or item.get("description")
+            or target.get("description")
+            or ""
+        )
+        year = item.get("year") or target.get("year") or ""
+        genres = item.get("genres") or target.get("genres") or []
+        if not isinstance(genres, list):
+            genres = []
+
         return {
             "title": title,
             "cover": cover,
             "rate": str(rating),
+            "summary": str(summary).strip(),
+            "year": str(year).strip(),
+            "genres": [str(value).strip() for value in genres if value],
             "url": (
                 f"https://movie.douban.com/subject/{subject_id}/"
                 if subject_id
