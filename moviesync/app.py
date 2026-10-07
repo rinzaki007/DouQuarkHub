@@ -18,8 +18,8 @@ from .clients.quark import QuarkClient
 from .clients.telegram import TelegramClient
 from .config_store import ConfigStore
 from .logging_setup import configure_logging, recent_logs
-from .services.search import SearchService
 from .services.resource_sources import ResourceSourceManager
+from .services.search import SearchService
 from .services.subscriptions import SubscriptionManager
 from .services.tasks import TaskManager
 from .settings import PROJECT_ROOT, load_settings
