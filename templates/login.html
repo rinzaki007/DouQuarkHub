@@ -99,7 +99,7 @@
                 const backdrop = document.querySelector('.login-backdrop');
                 backdrop.style.backgroundImage =
                     'linear-gradient(135deg, rgba(2,6,23,.78), rgba(15,23,42,.58)), url("' +
-                    movie.cover.replace(/"/g, '%22') + '")';
+                    '/api/proxy-img?url=' + encodeURIComponent(movie.cover) + '")';
                 backdrop.classList.add('ready');
             } catch (err) {
                 console.debug('登录页背景海报加载失败', err);
