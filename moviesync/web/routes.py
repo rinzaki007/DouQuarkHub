@@ -1,3 +1,8 @@
+"""MovieSync Flask 页面与 API 路由。
+
+用途：提供首页、登录/初始化、后台配置、豆瓣数据、资源检索/转存、自动追剧和图片代理等 HTTP 接口。
+维护说明：修改数据的 API 使用 CSRF 校验；FID 会在路由层先校验，再交给业务服务继续处理。
+"""
 from __future__ import annotations
 
 import secrets
