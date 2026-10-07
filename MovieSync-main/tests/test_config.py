@@ -1,0 +1,30 @@
+from moviesync.config_store import ConfigStore, ConfigValidationError
+
+
+def test_config_preserves_secret_when_not_replaced(tmp_path):
+    store = ConfigStore(tmp_path / "config.json", tmp_path / "legacy")
+    store.save({"quark_cookie": "secret-cookie", "channels": [{"name": "测试", "id": "test_channel"}]})
+    store.save({"default_fid": "123"})
+    assert store.get_cookie() == "secret-cookie"
+    public = store.public()
+    assert "quark_cookie" not in public
+    assert public["has_quark_cookie"] is True
+
+
+def test_channels_are_normalized_and_deduplicated(tmp_path):
+    store = ConfigStore(tmp_path / "config.json", tmp_path / "legacy")
+    channels = store.save_channels([
+        {"name": "A", "id": "@channel_a"},
+        {"name": "B", "id": "channel_a"},
+    ])
+    assert channels == [{"id": "channel_a", "name": "A"}]
+
+
+def test_invalid_channel_is_rejected(tmp_path):
+    store = ConfigStore(tmp_path / "config.json", tmp_path / "legacy")
+    try:
+        store.save_channels([{"name": "bad", "id": "https://evil.example/a"}])
+    except ConfigValidationError:
+        pass
+    else:
+        raise AssertionError("invalid channel should be rejected")
