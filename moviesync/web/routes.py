@@ -6,7 +6,6 @@
 from __future__ import annotations
 
 import secrets
-from concurrent.futures import ThreadPoolExecutor
 from functools import wraps
 from urllib.parse import urlparse
 
