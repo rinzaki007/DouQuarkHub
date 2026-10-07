@@ -132,7 +132,7 @@ function renderTasks() {
         const progress = Math.max(0, Math.min(100, Number(task.progress || 0)));
         const retryable = task.type === 'transfer' && task.status === 'failed';
         const card = document.createElement('article');
-        card.className = 'p-4 transition hover:bg-white/[.025]';
+        card.className = 'glass-panel m-2 rounded-2xl p-4 transition hover:border-slate-600';
         const phase = escapeTask(task.phase_label || task.message || '等待执行');
         const cover = task.cover ? '/api/proxy-img?url=' + encodeURIComponent(task.cover) : '';
         card.innerHTML =
