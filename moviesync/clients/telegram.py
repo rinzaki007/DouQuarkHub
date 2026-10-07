@@ -13,7 +13,7 @@ from bs4 import BeautifulSoup
 from .http import ApiError, HttpClient
 
 CHANNEL_RE = re.compile(r"^[A-Za-z0-9_]{2,64}$")
-QUARK_RE = re.compile(r"(?:https?://)?(?:pan\.)?quark\.cn/s/([A-Za-z0-9]{1,128})", re.IGNORECASE)
+QUARK_RE = re.compile(r"(?:https?://)?(?:pan\.)?quark\.cn/s/([A-Za-z0-9]{1,128})(?![A-Za-z0-9])", re.IGNORECASE)
 
 MAX_SEARCH_MESSAGES = 100
 MAX_SHARES_PER_CHANNEL = 20
