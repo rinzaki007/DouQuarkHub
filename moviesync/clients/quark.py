@@ -128,7 +128,16 @@ class QuarkClient:
                 return str(item["fid"]), None
         return None, error_message
 
-    def get_share_files(self, pwd_id: object, max_depth: int = 3, max_files: int = 5000) -> tuple[list[dict[str, Any]] | None, str | None, str | None]:
+    def get_share_files(
+        self,
+        pwd_id: object,
+        max_depth: int = 3,
+        max_files: int = 5000,
+    ) -> tuple[
+        list[dict[str, Any]] | None,
+        str | None,
+        str | None,
+    ]:
         pwd_id = sanitize_pwd_id(pwd_id)
         if not pwd_id:
             return None, None, "分享链接 ID 无效"
@@ -160,7 +169,8 @@ class QuarkClient:
             while page <= 20 and len(all_files) < max_files:
                 url = (
                     "https://drive.quark.cn/1/clouddrive/share/sharepage/detail"
-                    f"?pr=ucpro&fr=pc&pwd_id={quote(pwd_id)}&stoken={quote(stoken, safe="")}"
+                    f"?pr=ucpro&fr=pc&pwd_id={quote(pwd_id)}"
+                    f"&stoken={quote(stoken, safe='')}"
                     f"&pdir_fid={quote(str(parent_fid))}&p={page}&num=200"
                 )
                 try:
@@ -186,7 +196,13 @@ class QuarkClient:
         walk("0", 0)
         return all_files, str(stoken), None
 
-    def save_files(self, pwd_id: object, files_to_save: list[dict[str, Any]], stoken: str | None, target_fid: object = "0") -> tuple[bool, str]:
+    def save_files(
+        self,
+        pwd_id: object,
+        files_to_save: list[dict[str, Any]],
+        stoken: str | None,
+        target_fid: object = "0",
+    ) -> tuple[bool, str]:
         pwd_id = sanitize_pwd_id(pwd_id)
         if not pwd_id:
             return False, "分享链接 ID 无效"
