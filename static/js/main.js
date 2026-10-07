@@ -171,12 +171,16 @@ async function fetchMovies() {
         if (requestId !== movieRequestSeq) return;
 
         if (res.success) {
-            moviesData = res.movies || [];
+            moviesData = Array.isArray(res.movies) ? res.movies : [];
             renderGrid();
+            updateEmptyState();
+        } else if (requestId === movieRequestSeq) {
+            showToast(res.message || '加载影片失败', 'error');
         }
     } catch (err) {
         if (requestId === movieRequestSeq) {
             console.error(err);
+            showToast('影片加载失败，请稍后重试', 'error');
         }
     } finally {
         if (requestId === movieRequestSeq) {
@@ -205,12 +209,16 @@ async function doSearch() {
         if (requestId !== searchRequestSeq) return;
 
         if (res.success) {
-            moviesData = res.movies || [];
+            moviesData = Array.isArray(res.movies) ? res.movies : [];
             renderGrid();
+            updateEmptyState();
+        } else if (requestId === searchRequestSeq) {
+            showToast(res.message || '搜索失败', 'error');
         }
     } catch (err) {
         if (requestId === searchRequestSeq) {
             console.error(err);
+            showToast('搜索失败，请稍后重试', 'error');
         }
     } finally {
         if (requestId === searchRequestSeq) {
@@ -220,6 +228,39 @@ async function doSearch() {
     }
 }
 
+
+function showToast(message, type = 'info') {
+    const container = document.getElementById('toast-container');
+    if (!container) return;
+
+    const toast = document.createElement('div');
+    const icon = type === 'error'
+        ? 'fa-circle-exclamation'
+        : type === 'success'
+            ? 'fa-circle-check'
+            : 'fa-circle-info';
+
+    toast.className = 'pointer-events-auto flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-900/95 px-4 py-3 text-xs text-slate-200 shadow-2xl backdrop-blur';
+    toast.innerHTML = `<i class="fa-solid ${icon}"></i><span></span>`;
+    toast.querySelector('span').textContent = String(message || '');
+    container.appendChild(toast);
+
+    window.setTimeout(() => {
+        toast.classList.add('opacity-0');
+        toast.style.transition = 'opacity 180ms ease';
+        window.setTimeout(() => toast.remove(), 220);
+    }, 3200);
+}
+
+function updateEmptyState() {
+    const grid = document.getElementById('movie-grid');
+    const empty = document.getElementById('empty-state');
+    if (!grid || !empty) return;
+
+    const hasMovies = Array.isArray(moviesData) && moviesData.length > 0;
+    empty.classList.toggle('hidden', hasMovies);
+    grid.classList.toggle('hidden', !hasMovies);
+}
 
 function getNoCoverImage() {
     const svg = `
