@@ -118,6 +118,12 @@ def tasks():
         "tasks.html"
     )
 
+@pages.get("/resource-select")
+def resource_select():
+    return render_template(
+        "resource_select.html"
+    )
+
 
 @pages.get("/admin")
 def admin():
