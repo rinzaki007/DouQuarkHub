@@ -14,7 +14,6 @@ from threading import Event, RLock, Thread
 from ..clients.quark import QuarkClient, clean_tv_filename, sanitize_pwd_id
 from ..storage import JsonStore
 
-
 SUBSCRIPTION_SCHEMA_VERSION = 2
 
 
