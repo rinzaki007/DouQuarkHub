@@ -120,6 +120,20 @@ class SearchService:
         target_fid: str = "0",
         category_fids: dict | None = None,
     ) -> tuple[bool, str]:
+        ok, message, _ = self.transfer_selected_resource_with_progress(
+            movie, candidate, target_fid, category_fids
+        )
+        return ok, message
+
+    def transfer_selected_resource_with_progress(
+        self,
+        movie: object,
+        candidate: dict,
+        target_fid: str = "0",
+        category_fids: dict | None = None,
+        progress=None,
+    ) -> tuple[bool, str, dict]:
+        progress = progress or (lambda *_args: None)
         title, _ = self._title(movie)
         tag = str(movie.get("tag", "电影")) if isinstance(movie, dict) else "电影"
         parent_fid = (category_fids or {}).get(tag, target_fid) or "0"
@@ -130,24 +144,31 @@ class SearchService:
             if isinstance(item, dict) and item.get("fid")
         ]
         selected_fids = list(dict.fromkeys(selected_fids))
+        total = len(selected_fids)
         if not pwd_id or not selected_fids:
-            return False, "候选资源参数无效"
+            return False, "候选资源参数无效", {"success": 0, "skipped": 0, "failed": total}
 
-        # 客户端传来的 stoken/fid 不作为可信来源，重新从分享页获取并验证所选文件。
+        progress(20, "正在重新验证分享资源…")
         files, fresh_stoken, err = self._get_share_files(pwd_id)
         if err or not files or not fresh_stoken:
-            return False, f"分享资源解析失败: {err or '未知错误'}"
+            return False, f"分享资源解析失败: {err or '未知错误'}", {"success": 0, "skipped": 0, "failed": total}
         available_fids = {str(item.get("fid")) for item in files if item.get("fid")}
         if not set(selected_fids).issubset(available_fids):
-            return False, "所选文件已不存在或不属于该分享资源"
+            return False, "所选文件已不存在或不属于该分享资源", {"success": 0, "skipped": 0, "failed": total}
 
+        progress(45, "正在准备目标文件夹…")
         folder_fid, create_err = self.quark.get_or_create_subfolder(title, parent_fid)
         if not folder_fid:
-            return False, f"创建专属文件夹失败: {create_err}"
+            return False, f"创建专属文件夹失败: {create_err}", {"success": 0, "skipped": 0, "failed": total}
 
-        ok, msg = self.quark.save_files(pwd_id, [{"fid": fid} for fid in selected_fids], fresh_stoken, folder_fid)
+        progress(70, f"正在转存 {total} 个文件…")
+        ok, msg = self.quark.save_files(
+            pwd_id, [{"fid": fid} for fid in selected_fids], fresh_stoken, folder_fid
+        )
         if ok:
             self.logger.info("《%s》转存成功，pwd_id=%s", title, pwd_id)
-            return True, f"《{title}》转存成功！已精准归档至专属文件夹"
+            progress(100, "转存完成")
+            return True, f"《{title}》转存成功！已精准归档至专属文件夹", {"success": total, "skipped": 0, "failed": 0}
         self.logger.warning("《%s》转存失败: %s", title, msg)
-        return False, f"转存失败: {msg}"
+        return False, f"转存失败: {msg}", {"success": 0, "skipped": 0, "failed": total}
+
