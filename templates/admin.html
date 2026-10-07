@@ -98,9 +98,10 @@
         }
 
     </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 
-<body class="min-h-screen flex flex-col bg-slate-950 text-slate-100">
+<body class="min-h-screen flex flex-col glass-panel text-slate-100">
 
     <!-- ==========================================================
          顶栏
@@ -186,7 +187,7 @@
             <button
                 onclick="switchTab('security')"
                 id="tab-btn-security"
-                class="tab-btn w-full text-left bg-slate-900/60 hover:bg-slate-800/80 text-slate-300 px-3.5 py-2.5 rounded text-xs font-semibold flex items-center gap-2 transition"
+                class="tab-btn w-full text-left glass-panel hover:bg-slate-800/80 text-slate-300 px-3.5 py-2.5 rounded text-xs font-semibold flex items-center gap-2 transition"
             >
                 <i class="fa-solid fa-shield-halved"></i>
                 账户安全
@@ -196,7 +197,7 @@
             <button
                 onclick="switchTab('logs')"
                 id="tab-btn-logs"
-                class="tab-btn w-full text-left bg-slate-900/60 hover:bg-slate-800/80 text-slate-300 px-3.5 py-2.5 rounded text-xs font-semibold flex items-center gap-2 transition"
+                class="tab-btn w-full text-left glass-panel hover:bg-slate-800/80 text-slate-300 px-3.5 py-2.5 rounded text-xs font-semibold flex items-center gap-2 transition"
             >
                 <i class="fa-solid fa-terminal"></i>
                 系统运行日志
@@ -209,7 +210,7 @@
              右侧内容
              ====================================================== -->
 
-        <main class="flex-1 overflow-y-auto p-4 sm:p-6 bg-slate-950/80">
+        <main class="flex-1 overflow-y-auto p-4 sm:p-6 glass-panel">
 
 
             <!-- ==================================================
@@ -244,7 +245,7 @@
                     <textarea
                         id="quark-cookie"
                         rows="4"
-                        class="glass-input w-full bg-slate-900/60 border border-slate-800/80 rounded p-3 text-xs font-mono text-slate-200 focus:outline-none focus:border-blue-500 break-all"
+                        class="glass-input w-full glass-panel border border-slate-800/80 rounded p-3 text-xs font-mono text-slate-200 focus:outline-none focus:border-blue-500 break-all"
                         placeholder="请粘贴夸克网盘 Cookie..."
                     ></textarea>
 
@@ -269,7 +270,7 @@
                             type="text"
                             id="fid-default"
                             value="0"
-                            class="glass-input w-full bg-slate-900/60 border border-slate-800/80 rounded px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-blue-500"
+                            class="glass-input w-full glass-panel border border-slate-800/80 rounded px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-blue-500"
                         >
 
                     </div>
@@ -409,7 +410,7 @@
 
                     <div
                         id="tg-channels-container"
-                        class="flex flex-wrap gap-2 p-3 bg-slate-900/60 rounded-lg border border-slate-800 min-h-[60px]"
+                        class="flex flex-wrap gap-2 p-3 glass-panel rounded-lg border border-slate-800 min-h-[60px]"
                     >
                         <!-- JS 动态渲染 -->
                     </div>
@@ -513,7 +514,7 @@
 
                 <!-- 安全说明 -->
 
-                <div class="bg-slate-900/60 border border-slate-800 rounded-lg p-4">
+                <div class="glass-panel border border-slate-800 rounded-lg p-4">
 
                     <div class="flex items-start gap-3">
 
@@ -583,7 +584,7 @@
                             maxlength="64"
                             autocomplete="username"
                             placeholder="请输入新的管理员用户名"
-                            class="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2.5 text-xs text-slate-200 focus:outline-none focus:border-blue-500"
+                            class="w-full glass-panel border border-slate-800 rounded px-3 py-2.5 text-xs text-slate-200 focus:outline-none focus:border-blue-500"
                         >
 
                     </div>
@@ -606,7 +607,7 @@
                             id="security-username-current-password"
                             autocomplete="current-password"
                             placeholder="请输入当前密码"
-                            class="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2.5 text-xs text-slate-200 focus:outline-none focus:border-blue-500"
+                            class="w-full glass-panel border border-slate-800 rounded px-3 py-2.5 text-xs text-slate-200 focus:outline-none focus:border-blue-500"
                         >
 
                     </div>
@@ -667,7 +668,7 @@
                             id="security-current-password"
                             autocomplete="current-password"
                             placeholder="请输入当前密码"
-                            class="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2.5 text-xs text-slate-200 focus:outline-none focus:border-blue-500"
+                            class="w-full glass-panel border border-slate-800 rounded px-3 py-2.5 text-xs text-slate-200 focus:outline-none focus:border-blue-500"
                         >
 
                     </div>
@@ -694,7 +695,7 @@
                                 maxlength="128"
                                 autocomplete="new-password"
                                 placeholder="至少 8 位"
-                                class="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2.5 text-xs text-slate-200 focus:outline-none focus:border-blue-500"
+                                class="w-full glass-panel border border-slate-800 rounded px-3 py-2.5 text-xs text-slate-200 focus:outline-none focus:border-blue-500"
                             >
 
                         </div>
@@ -717,7 +718,7 @@
                                 maxlength="128"
                                 autocomplete="new-password"
                                 placeholder="再次输入新密码"
-                                class="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2.5 text-xs text-slate-200 focus:outline-none focus:border-blue-500"
+                                class="w-full glass-panel border border-slate-800 rounded px-3 py-2.5 text-xs text-slate-200 focus:outline-none focus:border-blue-500"
                             >
 
                         </div>
@@ -788,7 +789,7 @@
 
                 <div
                     id="admin-log-box"
-                    class="bg-slate-950 border border-slate-800 rounded-lg p-4 h-[550px] overflow-y-auto log-box-style text-xs text-sky-400 font-mono shadow-inner"
+                    class="glass-panel border border-slate-800 rounded-lg p-4 h-[550px] overflow-y-auto log-box-style text-xs text-sky-400 font-mono shadow-inner"
                 >
                     正在连接系统日志服务...
                 </div>
@@ -1030,7 +1031,7 @@
             ).forEach(btn => {
 
                 btn.className =
-                    'tab-btn w-full text-left bg-slate-900/60 hover:bg-slate-800/80 text-slate-300 px-3.5 py-2.5 rounded text-xs font-semibold flex items-center gap-2 transition';
+                    'tab-btn w-full text-left glass-panel hover:bg-slate-800/80 text-slate-300 px-3.5 py-2.5 rounded text-xs font-semibold flex items-center gap-2 transition';
 
             });
 
