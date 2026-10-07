@@ -1,3 +1,7 @@
+"""配置层单元测试。
+
+覆盖：敏感 Cookie 保留、公共配置脱敏、频道规范化/去重以及非法频道拒绝。
+"""
 from moviesync.config_store import ConfigStore, ConfigValidationError
 
 
