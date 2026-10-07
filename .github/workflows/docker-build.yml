@@ -1,3 +1,5 @@
+# MovieSync GitHub Actions
+# 用途：在 main 分支变更后自动构建并发布 Docker 镜像。
 name: Build and Push Docker Image
 
 on:
