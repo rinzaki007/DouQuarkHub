@@ -10,6 +10,7 @@ from ..storage import JsonStore
 
 
 MAX_TASKS = 300
+TASK_SCHEMA_VERSION = 1
 
 
 class TaskManager:
@@ -18,6 +19,28 @@ class TaskManager:
         self.logger = logger
         self.lock = RLock()
         self.executor = ThreadPoolExecutor(max_workers=3, thread_name_prefix="moviesync-task")
+        self._recover_interrupted_tasks()
+
+    def _recover_interrupted_tasks(self):
+        with self.lock:
+            items = self.store.read()
+            if not isinstance(items, list):
+                return
+            changed = False
+            for item in items:
+                if not isinstance(item, dict):
+                    continue
+                if item.get("status") in {"queued", "running"}:
+                    item["status"] = "failed"
+                    item["message"] = "服务重启导致任务中断，可执行失败重试"
+                    item["failed_count"] = max(1, int(item.get("failed_count", 0) or 0))
+                    item["updated_at"] = time.time()
+                    changed = True
+                if item.get("schema_version") != TASK_SCHEMA_VERSION:
+                    item["schema_version"] = TASK_SCHEMA_VERSION
+                    changed = True
+            if changed:
+                self._save(items)
 
     def list_tasks(self):
         with self.lock:
@@ -32,6 +55,7 @@ class TaskManager:
     def create_transfer_task(self, payload, runner):
         task = {
             "id": uuid.uuid4().hex,
+            "schema_version": TASK_SCHEMA_VERSION,
             "type": "transfer",
             "kind": "普通转存",
             "title": str(payload.get("title") or "未命名资源")[:200],
