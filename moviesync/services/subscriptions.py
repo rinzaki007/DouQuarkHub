@@ -14,6 +14,7 @@ from typing import Callable
 from ..clients.quark import (
     QuarkClient,
     clean_tv_filename,
+    sanitize_pwd_id,
 )
 from ..storage import JsonStore
 
@@ -95,13 +96,16 @@ class SubscriptionManager:
             title or ""
         ).strip()
 
-        pwd_id = str(
-            pwd_id or ""
-        ).strip()
-
-        if not title or not pwd_id:
+        if not 1 <= len(title) <= 200:
             raise ValueError(
-                "标题和分享 ID 不能为空"
+                "追剧名称长度必须在 1-200 个字符之间"
+            )
+
+        pwd_id = sanitize_pwd_id(pwd_id)
+
+        if not pwd_id:
+            raise ValueError(
+                "分享链接 ID 无效"
             )
 
         target_fid = _normalize_fid(
@@ -131,7 +135,7 @@ class SubscriptionManager:
         target_fids = []
         seen = set()
 
-        for item in files or []:
+        for item in (files or [])[:200]:
             fid = str(
                 item.get("fid")
                 if isinstance(
@@ -155,7 +159,7 @@ class SubscriptionManager:
             "start_ep": start_ep,
             "channel": str(
                 channel or ""
-            ).strip(),
+            ).strip()[:100],
             "files": [
                 {
                     "fid": fid
