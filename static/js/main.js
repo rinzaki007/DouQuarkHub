@@ -5,7 +5,6 @@ let currentTag = '电影';
 let currentSort = 'U';
 
 let moviesData = [];
-let selectedIndices = new Set();
 let currentChaseSelectedCandidate = null;
 let candidateModalState = null;
 let chaseCandidateState = [];
@@ -160,8 +159,6 @@ async function fetchMovies() {
     const grid = document.getElementById('movie-grid');
     loading.classList.remove('hidden');
     grid.classList.add('hidden');
-    selectedIndices.clear();
-    updateSelectedCount();
 
     try {
         const url = `/api/get-movies?tag=${encodeURIComponent(currentTag)}&sort=${currentSort}`;
@@ -199,8 +196,6 @@ async function doSearch() {
     const grid = document.getElementById('movie-grid');
     loading.classList.remove('hidden');
     grid.classList.add('hidden');
-    selectedIndices.clear();
-    updateSelectedCount();
 
     try {
         const resp = await apiFetch(`/api/search-douban?q=${encodeURIComponent(query)}`);
@@ -281,9 +276,7 @@ function renderGrid() {
     const noCoverImage = getNoCoverImage();
 
     moviesData.forEach((movie, idx) => {
-        const coverUrl = movie.cover ? '/api/proxy-img?url=' + encodeURIComponent(movie.cover) : noCoverImage;
-        const isSelected = selectedIndices.has(idx);
-        const card = document.createElement('article');
+        const coverUrl = movie.cover ? '/api/proxy-img?url=' + encodeURIComponent(movie.cover) : noCoverImage;        const card = document.createElement('article');
         card.className = 'movie-card group relative overflow-hidden rounded-2xl border ' +
             (isSelected ? 'border-blue-500 ring-2 ring-blue-500/30' : 'border-slate-800/80') +
             ' bg-slate-900/80 shadow-lg transition duration-300 hover:-translate-y-1 hover:border-slate-600 hover:shadow-2xl';
@@ -293,11 +286,6 @@ function renderGrid() {
             <div class="relative aspect-[2/3] overflow-hidden bg-slate-950">
                 <img src="${coverUrl}" alt="${escapeHtml(movie.title)}" class="movie-cover h-full w-full object-cover transition duration-500 group-hover:scale-105" loading="lazy">
                 <div class="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-black/10"></div>
-                <div class="absolute left-2.5 top-2.5">
-                    <label class="flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg border border-white/15 bg-black/45 backdrop-blur-md" onclick="event.stopPropagation()">
-                        <input type="checkbox" ${isSelected ? 'checked' : ''} class="h-3.5 w-3.5 rounded border-slate-500 bg-slate-900 text-blue-600 focus:ring-0" onclick="event.stopPropagation(); toggleSelect(${idx})">
-                    </label>
-                </div>
                 <div class="absolute right-2.5 top-2.5 rounded-lg border border-amber-300/20 bg-black/55 px-2 py-1 text-[11px] font-bold text-amber-300 backdrop-blur-md">
                     <i class="fa-solid fa-star mr-0.5"></i>${escapeHtml(movie.rate || '暂无')}
                 </div>
@@ -391,54 +379,6 @@ async function searchAndOpenCandidates(selectedMovies) {
 }
 
 
-function toggleSelect(idx) {
-    if (selectedIndices.has(idx)) selectedIndices.delete(idx);
-    else selectedIndices.add(idx);
-    updateSelectedCount();
-    renderGrid();
-}
-
-function selectAll(select) {
-    if (select) moviesData.forEach((_, idx) => selectedIndices.add(idx));
-    else selectedIndices.clear();
-    updateSelectedCount();
-    renderGrid();
-}
-
-function updateSelectedCount() {
-    const count = selectedIndices.size;
-    document.getElementById('selected-count').innerText = count;
-
-    const countSpan = document.getElementById('selected-count');
-    let parentContainer = countSpan ? countSpan.closest('div') : null;
-
-    if (parentContainer) {
-        let previewTag = document.getElementById('selected-titles-preview');
-        if (!previewTag) {
-            previewTag = document.createElement('div');
-            previewTag.id = 'selected-titles-preview';
-            previewTag.className = 'flex items-center gap-1.5 overflow-hidden ml-2';
-            parentContainer.appendChild(previewTag);
-        }
-
-        if (count === 0) {
-            previewTag.innerHTML = '';
-        } else {
-            const selectedTitles = Array.from(selectedIndices).map(idx => moviesData[idx]?.title).filter(Boolean);
-            const displayText = selectedTitles.length > 2
-                ? `《${selectedTitles[0]}》等 ${selectedTitles.length} 部影片`
-                : selectedTitles.map(t => `《${t}》`).join(', ');
-
-            previewTag.innerHTML = `
-                <span class="text-slate-400 text-xs shrink-0">已选:</span>
-                <span class="px-2 py-0.5 bg-blue-950/80 text-blue-300 border border-blue-800/60 rounded text-xs font-medium truncate max-w-[280px]" title="${escapeHtml(selectedTitles.join(', '))}">
-                    ${escapeHtml(displayText)}
-                </span>
-            `;
-        }
-    }
-}
-
 function toggleLogBox(show = true) {
     const panel = document.getElementById('log-panel');
     if (show) {
@@ -494,32 +434,6 @@ function appendLogLine(text, type = 'info') {
     });
     logBox.scrollTop = logBox.scrollHeight;
 }
-
-async function batchTransfer() {
-    if (selectedIndices.size === 0) return alert('请先选择至少一部影片');
-    const selectedMovies = Array.from(selectedIndices).map(idx => {
-        const item = moviesData[idx];
-        return {title:item.title, tag:currentTag || '电影', cover:item.cover, url:item.url};
-    });
-    showToast('正在检索 ' + selectedMovies.length + ' 部影视的资源…', 'info');
-    try {
-        const response = await apiFetch('/api/search-candidates', {
-            method:'POST',
-            headers:{'Content-Type':'application/json'},
-            body:JSON.stringify({movies:selectedMovies})
-        });
-        const res=await response.json();
-        if(!res.success) return showToast(res.message || '资源检索失败','error');
-        const candidatesMap=res.candidates_map || {};
-        const totalFound=selectedMovies.reduce((sum,m)=>sum+((candidatesMap[m.title]||[]).length),0);
-        if(!totalFound) return showToast('没有找到可用资源','warning');
-        showToast('找到 '+totalFound+' 个可用资源版本','success');
-        openCandidateModal(selectedMovies,candidatesMap);
-    } catch(err) {
-        showToast(err.message || '资源检索异常','error');
-    }
-}
-
 
 function formatCandidateSize(bytes) {
     const n = Number(bytes || 0);
