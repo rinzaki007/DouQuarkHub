@@ -21,11 +21,28 @@ def _json_error(message: str, status: int = 400):
 def require_csrf(view):
     @wraps(view)
     def wrapped(*args, **kwargs):
-        if request.method in {"POST", "PUT", "PATCH", "DELETE"}:
+        if request.method in {
+            "POST",
+            "PUT",
+            "PATCH",
+            "DELETE",
+        }:
             expected = session.get("csrf_token")
-            supplied = request.headers.get("X-CSRF-Token")
-            if not expected or supplied != expected:
-                return _json_error("CSRF 校验失败", 403)
+
+            supplied = (
+                request.headers.get("X-CSRF-Token")
+                or request.form.get("csrf_token")
+            )
+
+            if not expected or not secrets.compare_digest(
+                str(expected),
+                str(supplied or ""),
+            ):
+                return _json_error(
+                    "CSRF 校验失败",
+                    403,
+                )
+
         return view(*args, **kwargs)
 
     return wrapped
