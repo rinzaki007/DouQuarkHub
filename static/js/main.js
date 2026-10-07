@@ -337,14 +337,22 @@ function closeMovieDetail() {
 function movieDetailTransfer() {
     const movie = moviesData[activeMovieDetailIndex];
     if (!movie) return;
-    closeMovieDetail();
     const selectedMovie = {
         title: movie.title,
         tag: movie.tag || currentTag || '电影',
         cover: movie.cover,
-        url: movie.url
+        url: movie.url,
+        rate: movie.rate || ''
     };
-    searchAndOpenCandidates([selectedMovie]);
+    try {
+        sessionStorage.setItem('moviesync_resource_movie', JSON.stringify(selectedMovie));
+    } catch (err) {
+        console.warn('保存当前影视信息失败:', err);
+        showToast('无法打开资源选择页，请刷新后重试', 'error');
+        return;
+    }
+    closeMovieDetail();
+    window.location.href = '/resource-select';
 }
 
 function movieDetailChase() {
