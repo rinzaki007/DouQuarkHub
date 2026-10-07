@@ -521,61 +521,81 @@ async function batchTransfer() {
 }
 
 
+function formatCandidateSize(bytes) {
+    const n = Number(bytes || 0);
+    if (!n) return '未知大小';
+    const units = ['B','KB','MB','GB','TB'];
+    let value = n, i = 0;
+    while (value >= 1024 && i < units.length - 1) { value /= 1024; i++; }
+    return (value >= 10 || i === 0 ? value.toFixed(0) : value.toFixed(1)) + ' ' + units[i];
+}
+
 function openCandidateModal(movies, candidatesMap) {
     candidateModalState = { movies, candidatesMap };
     loadCategoryOptions();
-
     const container = document.getElementById('candidate-content');
     container.innerHTML = '';
-    
+
     movies.forEach((movie, mIdx) => {
         const title = movie.title;
         const candidates = candidatesMap[title] || [];
-
-        const movieSection = document.createElement('div');
-        movieSection.className = 'bg-slate-950 border border-slate-800 rounded-lg p-4 space-y-3';
-        
-        let html = `<div class="font-bold text-sm text-blue-400 flex items-center justify-between border-b border-slate-800 pb-2">
-            <span>🎬 《${escapeHtml(title)}》</span>
-            <span class="text-xs text-slate-400 font-normal">找到 ${candidates.length} 个候选源版本</span>
-        </div>`;
-
-        if (candidates.length === 0) {
-            html += `<div class="text-xs text-rose-400 py-2">未能在配置的频道中找到匹配资源</div>`;
+        const movieSection = document.createElement('section');
+        movieSection.className = 'candidate-movie-section rounded-2xl border border-slate-800 bg-slate-950/70 p-4 space-y-4';
+        let html = `
+            <div class="flex flex-wrap items-end justify-between gap-2 border-b border-slate-800 pb-3">
+                <div>
+                    <div class="text-sm font-semibold text-white">🎬 《${escapeHtml(title)}》</div>
+                    <div class="mt-1 text-[11px] text-slate-500">共找到 ${candidates.length} 个候选资源版本</div>
+                </div>
+            </div>`;
+        if (!candidates.length) {
+            html += '<div class="rounded-xl border border-amber-900/50 bg-amber-950/20 p-4 text-xs text-amber-300">未在当前频道配置中找到可用资源。</div>';
         } else {
-            html += `<div class="space-y-3 mt-2">`;
+            html += '<div class="space-y-3">';
             candidates.forEach((cand, cIdx) => {
-                const fileCheckboxes = cand.files.map((f) => `
-                    <label class="flex items-center gap-2 py-1 text-xs text-slate-300 hover:text-white cursor-pointer">
-                        <input type="checkbox" name="batch-file-${mIdx}-${cIdx}" value="${escapeHtml(f.fid)}" class="rounded bg-slate-900 border-slate-700 text-blue-600 focus:ring-0">
-                        <span class="font-mono">${escapeHtml(f.file_name)}</span>
-                    </label>
-                `).join('');
-
+                const files = Array.isArray(cand.files) ? cand.files : [];
+                const resolutions = Object.keys(cand.resolutions || {});
+                const resolutionText = resolutions.length ? resolutions.join(' / ') : [...new Set(files.map(f => f.resolution).filter(Boolean))].join(' / ') || '未知';
+                const totalSize = cand.total_size_text || formatCandidateSize(files.reduce((sum,f) => sum + Number(f.size || 0), 0));
+                const sourceName = cand.channel || '未知频道';
+                const fileCheckboxes = files.map((f, fIdx) => `
+                    <label class="candidate-file-row flex cursor-pointer items-center gap-3 rounded-lg border border-transparent px-3 py-2 hover:border-slate-700 hover:bg-slate-800/70">
+                        <input type="checkbox" name="batch-file-${mIdx}-${cIdx}" value="${escapeHtml(f.fid)}" class="h-4 w-4 shrink-0 rounded border-slate-600 bg-slate-900 text-blue-600 focus:ring-0">
+                        <span class="min-w-0 flex-1 truncate text-xs text-slate-300" title="${escapeHtml(f.file_name)}">${escapeHtml(f.file_name)}</span>
+                        <span class="shrink-0 text-[10px] text-slate-500">${escapeHtml(f.resolution || '未知')} · ${escapeHtml(f.size_text || formatCandidateSize(f.size))}</span>
+                    </label>`).join('');
                 html += `
-                    <div class="bg-slate-900 border border-slate-800/80 rounded-lg p-3 text-xs space-y-2">
-                        <div class="flex items-center justify-between text-slate-300">
-                            <span class="font-semibold text-emerald-400"><i class="fa-brands fa-telegram"></i> 频道: ${escapeHtml(cand.channel)}</span>
-                            <span class="text-slate-400 font-mono text-[11px]">短码: ${escapeHtml(cand.pwd_id)} | 包含 ${cand.files.length} 个文件</span>
-                        </div>
-                        <div class="bg-slate-950 p-2.5 rounded-md max-h-40 overflow-y-auto space-y-1 border border-slate-800">
-                            <div class="text-[11px] text-slate-400 mb-1 font-medium">勾选您需要转存的具体文件：</div>
-                            ${fileCheckboxes}
-                        </div>
-                        <div class="text-right pt-1">
-                            <button onclick='confirmBatchTransferForCandidate(${mIdx}, ${cIdx})' class="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-xs font-medium transition shadow flex items-center gap-1 ml-auto">
-                                <i class="fa-solid fa-cloud-arrow-down"></i> 确认转存勾选项
+                    <article class="candidate-resource-card rounded-2xl border border-slate-800 bg-slate-900/80 p-4 transition hover:border-slate-700">
+                        <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                            <div class="min-w-0">
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <span class="inline-flex items-center gap-1.5 rounded-lg border border-sky-900/60 bg-sky-950/40 px-2 py-1 text-[11px] font-semibold text-sky-300"><i class="fa-brands fa-telegram"></i>${escapeHtml(sourceName)}</span>
+                                    <span class="rounded-lg border border-slate-700 bg-slate-950 px-2 py-1 font-mono text-[10px] text-slate-500">${escapeHtml(cand.pwd_id)}</span>
+                                </div>
+                                <div class="mt-3 flex flex-wrap gap-2">
+                                    <span class="resource-chip"><i class="fa-solid fa-film"></i> ${files.length} 个视频</span>
+                                    <span class="resource-chip"><i class="fa-solid fa-hard-drive"></i> ${escapeHtml(totalSize)}</span>
+                                    <span class="resource-chip resource-chip-accent"><i class="fa-solid fa-display"></i> ${escapeHtml(resolutionText)}</span>
+                                </div>
+                            </div>
+                            <button onclick="confirmBatchTransferForCandidate(${mIdx}, ${cIdx})" class="shrink-0 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-semibold text-white shadow-lg shadow-emerald-600/15 hover:bg-emerald-500">
+                                <i class="fa-solid fa-cloud-arrow-down mr-1"></i> 转存所选文件
                             </button>
                         </div>
-                    </div>
-                `;
+                        <div class="mt-4 overflow-hidden rounded-xl border border-slate-800 bg-slate-950/80">
+                            <div class="flex items-center justify-between border-b border-slate-800 px-3 py-2">
+                                <span class="text-[11px] font-medium text-slate-300">文件列表</span>
+                                <button type="button" onclick="document.querySelectorAll('input[name=\\'batch-file-${mIdx}-${cIdx}\\']').forEach(x=>x.checked=true)" class="text-[10px] text-blue-400 hover:text-blue-300">全选</button>
+                            </div>
+                            <div class="max-h-56 overflow-y-auto p-2">${fileCheckboxes || '<div class="p-4 text-center text-xs text-slate-500">没有可显示的文件</div>'}</div>
+                        </div>
+                    </article>`;
             });
-            html += `</div>`;
+            html += '</div>';
         }
         movieSection.innerHTML = html;
         container.appendChild(movieSection);
     });
-
     document.getElementById('candidate-modal').classList.remove('hidden');
 }
 
