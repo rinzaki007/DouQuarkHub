@@ -1717,7 +1717,7 @@
             const box = document.getElementById("resource-source-health");
             if (!box) return;
             if (!sources.length) {
-                box.innerHTML = '<div class="glass-panel rounded-xl p-3 text-xs text-slate-500">暂无资源来源</div>';
+                box.innerHTML = '<div class="glass-panel rounded-xl p-4 text-xs text-slate-500">暂无资源来源</div>';
                 return;
             }
 
@@ -1734,44 +1734,71 @@
                 const status = health.status || source.status || "unknown";
                 const meta = statusMeta[status] || statusMeta.unknown;
                 const message = health.message || source.message || "尚未检查";
-                const checked = health.last_checked_at ?
-                    new Date(health.last_checked_at * 1000).toLocaleString() : "—";
+                const checked = health.last_checked_at
+                    ? new Date(health.last_checked_at * 1000).toLocaleString()
+                    : "—";
                 const channels = health.channels || source.channels || [];
                 const failed = channels.filter((item) => item.status !== "healthy");
+                const healthyCount = channels.filter((item) => item.status === "healthy").length;
 
-                return '<div class="glass-panel rounded-xl p-3">' +
-                    '<div class="flex items-center justify-between gap-2">' +
-                    '<div class="flex items-center gap-2 text-sm font-semibold text-slate-200"><i class="fa-solid fa-plug text-slate-400"></i>' +
-                    escapeHtml(source.name || source.id || "未知来源") + '</div>' +
-                    '<span class="text-[11px] font-medium ' + meta[1] + '"><i class="fa-solid ' + meta[2] + ' mr-1"></i>' +
-                    meta[0] + '</span>' +
+                const channelSummary = channels.length
+                    ? healthyCount + "/" + channels.length + " 个频道正常"
+                    : "未返回频道明细";
+
+                return '<div class="glass-panel rounded-2xl p-4">' +
+                    '<div class="flex flex-wrap items-center justify-between gap-3">' +
+                        '<div class="min-w-0">' +
+                            '<div class="flex items-center gap-2 text-sm font-semibold text-slate-100">' +
+                                '<span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-slate-950/60 text-slate-400 border border-slate-700/50">' +
+                                    '<i class="fa-solid fa-plug"></i>' +
+                                '</span>' +
+                                '<span>' + escapeHtml(source.name || source.id || "未知来源") + '</span>' +
+                            '</div>' +
+                            '<div class="mt-1 text-[10px] text-slate-500">' +
+                                escapeHtml(channelSummary) + ' · 最近检查 ' + escapeHtml(checked) +
+                            '</div>' +
+                        '</div>' +
+                        '<span class="shrink-0 rounded-full border border-current/10 px-2.5 py-1 text-[11px] font-medium ' + meta[1] + '">' +
+                            '<i class="fa-solid ' + meta[2] + ' mr-1"></i>' + meta[0] +
+                        '</span>' +
                     '</div>' +
-                    '<div class="mt-2 text-[11px] text-slate-400">' + escapeHtml(message) + '</div>' +
+                    '<div class="mt-3 rounded-xl border border-slate-700/40 bg-slate-950/25 px-3 py-2 text-[11px] text-slate-400">' +
+                        escapeHtml(message) +
+                    '</div>' +
                     (channels.length ? (
-                        '<div class="mt-3 space-y-1.5">' +
-                        channels.map((channel) => {
-                            const ok = channel.status === "healthy";
-                            const partial = channel.status === "degraded";
-                            const color = ok ? "text-emerald-300" : partial ? "text-amber-300" : "text-rose-300";
-                            const icon = ok ? "fa-circle-check" : partial ? "fa-triangle-exclamation" : "fa-circle-xmark";
-                            const label = ok ? "正常" : partial ? "异常" : "不可用";
-                            return '<div class="flex items-start justify-between gap-3 rounded-lg border ' +
-                                (ok ? 'border-emerald-400/10 bg-emerald-400/5' : 'border-rose-400/15 bg-rose-400/5') +
-                                ' px-2.5 py-2">' +
-                                '<div class="min-w-0">' +
-                                '<div class="flex items-center gap-1.5 text-xs text-slate-200"><i class="fa-solid ' + icon + ' ' + color + '"></i>' +
-                                escapeHtml(channel.name || channel.id || "未命名频道") + '</div>' +
-                                '<div class="mt-0.5 text-[10px] text-slate-500">' +
-                                escapeHtml(channel.message || "未返回检测信息") + '</div>' +
-                                '</div>' +
-                                '<span class="shrink-0 text-[10px] font-medium ' + color + '">' + label + '</span>' +
+                        '<div class="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">' +
+                            channels.map((channel) => {
+                                const ok = channel.status === "healthy";
+                                const partial = channel.status === "degraded";
+                                const color = ok ? "text-emerald-300" : partial ? "text-amber-300" : "text-rose-300";
+                                const icon = ok ? "fa-circle-check" : partial ? "fa-triangle-exclamation" : "fa-circle-xmark";
+                                const label = ok ? "正常" : partial ? "异常" : "不可用";
+                                const border = ok
+                                    ? "border-emerald-400/15 bg-emerald-400/[0.04]"
+                                    : partial
+                                        ? "border-amber-400/20 bg-amber-400/[0.05]"
+                                        : "border-rose-400/20 bg-rose-400/[0.05]";
+                                return '<div class="min-w-0 rounded-xl border ' + border + ' px-3 py-2.5">' +
+                                    '<div class="flex items-center justify-between gap-2">' +
+                                        '<div class="min-w-0 flex items-center gap-1.5 text-xs font-medium text-slate-200">' +
+                                            '<i class="fa-solid ' + icon + ' ' + color + '"></i>' +
+                                            '<span class="truncate" title="' + escapeHtml(channel.id || "") + '">' +
+                                                escapeHtml(channel.name || channel.id || "未命名频道") +
+                                            '</span>' +
+                                        '</div>' +
+                                        '<span class="shrink-0 text-[10px] font-medium ' + color + '">' + label + '</span>' +
+                                    '</div>' +
+                                    '<div class="mt-1 truncate text-[10px] text-slate-500" title="' + escapeHtml(channel.message || "") + '">' +
+                                        escapeHtml(channel.message || "未返回检测信息") +
+                                    '</div>' +
                                 '</div>';
-                        }).join("") +
+                            }).join("") +
                         '</div>'
                     ) : '') +
-                    (failed.length ? '<div class="mt-2 text-[10px] font-medium text-rose-300">⚠ 有 ' + failed.length + ' 个频道异常，请检查频道配置。</div>' : '') +
-                    '<div class="mt-2 text-[10px] text-slate-500">最近检查：' + checked + '</div>' +
-                    '</div>';
+                    (failed.length
+                        ? '<div class="mt-3 flex items-center gap-1.5 rounded-lg bg-rose-500/5 px-2.5 py-2 text-[10px] font-medium text-rose-300"><i class="fa-solid fa-triangle-exclamation"></i>有 ' + failed.length + ' 个频道异常，建议检查频道配置。</div>'
+                        : '') +
+                '</div>';
             }).join("");
         }
 
