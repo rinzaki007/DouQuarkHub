@@ -18,7 +18,7 @@ CHANNEL_ID_RE = re.compile(r"^[A-Za-z0-9_]{2,64}$")
 FID_RE = re.compile(r"^[A-Za-z0-9_-]{1,128}$")
 
 MAX_CHANNELS = 100
-CONFIG_SCHEMA_VERSION = 2
+CONFIG_SCHEMA_VERSION = 3
 
 
 class ConfigValidationError(ValueError):
@@ -39,6 +39,21 @@ class ConfigStore:
             "openlist_url": DEFAULT_OPENLIST_URL,
             "category_fids": deepcopy(DEFAULT_CATEGORY_FIDS),
             "channels": [],
+            "resource_sources": [
+                {
+                    "id": "telegram",
+                    "name": "Telegram",
+                    "type": "telegram",
+                    "enabled": True,
+                    "health": {
+                        "status": "unknown",
+                        "message": "尚未检查",
+                        "last_checked_at": None,
+                        "last_success_at": None,
+                        "failure_count": 0,
+                    },
+                }
+            ],
             "schema_version": CONFIG_SCHEMA_VERSION,
         }
 
@@ -210,6 +225,23 @@ class ConfigStore:
             defaults.get("channels", [])
         )
 
+        source_defaults = self._defaults()["resource_sources"]
+        incoming_sources = defaults.get("resource_sources") or []
+        source_map = {
+            str(item.get("id")): item
+            for item in incoming_sources
+            if isinstance(item, dict) and item.get("id")
+        }
+        defaults["resource_sources"] = []
+        for source in source_defaults:
+            item = dict(source)
+            saved = source_map.get(source["id"], {})
+            item["enabled"] = bool(saved.get("enabled", item["enabled"]))
+            health = dict(item["health"])
+            health.update(saved.get("health") or {})
+            item["health"] = health
+            defaults["resource_sources"].append(item)
+
         return defaults
 
     def get_cookie(self) -> str:
@@ -286,10 +318,61 @@ class ConfigStore:
                 incoming["channels"]
             )
 
+        if "resource_sources" in incoming:
+            source_items = incoming["resource_sources"]
+            if not isinstance(source_items, list):
+                raise ConfigValidationError("resource_sources 必须是数组")
+            normalized_sources = []
+            for item in source_items:
+                if not isinstance(item, dict):
+                    raise ConfigValidationError("资源源配置无效")
+                source_id = str(item.get("id") or "").strip().lower()
+                if source_id != "telegram":
+                    continue
+                normalized_sources.append({
+                    "id": "telegram",
+                    "name": "Telegram",
+                    "type": "telegram",
+                    "enabled": bool(item.get("enabled", True)),
+                    "health": current["resource_sources"][0].get("health", {}),
+                })
+                break
+            if normalized_sources:
+                current["resource_sources"] = normalized_sources
+
         current["schema_version"] = CONFIG_SCHEMA_VERSION
         self.store.write(current)
 
         return current
+
+    def get_resource_sources(self) -> list[dict]:
+        return self.load().get("resource_sources", [])
+
+    def update_resource_source_health(
+        self,
+        source_id: str,
+        status: str,
+        message: str,
+    ) -> None:
+        current = self.load()
+        import time
+
+        now = time.time()
+        for item in current.get("resource_sources", []):
+            if item.get("id") != source_id:
+                continue
+            health = item.setdefault("health", {})
+            health["status"] = str(status or "unknown")
+            health["message"] = str(message or "")[:200]
+            health["last_checked_at"] = now
+            if status == "healthy":
+                health["last_success_at"] = now
+            elif status == "unavailable":
+                health["failure_count"] = int(
+                    health.get("failure_count", 0) or 0
+                ) + 1
+            self.store.write(current)
+            return
 
     def save_channels(
         self,
