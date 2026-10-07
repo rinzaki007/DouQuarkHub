@@ -560,7 +560,7 @@ function openCandidateModal(movies, candidatesMap) {
                 const sourceName = cand.channel || '未知频道';
                 const fileCheckboxes = files.map((f, fIdx) => `
                     <label class="candidate-file-row flex cursor-pointer items-center gap-3 rounded-lg border border-transparent px-3 py-2 hover:border-slate-700 hover:bg-slate-800/70">
-                        <input type="checkbox" name="batch-file-${mIdx}-${cIdx}" value="${escapeHtml(f.fid)}" class="h-4 w-4 shrink-0 rounded border-slate-600 bg-slate-900 text-blue-600 focus:ring-0">
+                        <input type="checkbox" name="batch-file-${mIdx}-${cIdx}" value="${escapeHtml(f.fid)}" class="h-4 w-4 shrink-0 rounded border-slate-600 bg-slate-900 text-blue-600 focus:ring-0" checked>
                         <span class="min-w-0 flex-1 truncate text-xs text-slate-300" title="${escapeHtml(f.file_name)}">${escapeHtml(f.file_name)}</span>
                         <span class="shrink-0 text-[10px] text-slate-500">${escapeHtml(f.resolution || '未知')} · ${escapeHtml(f.size_text || formatCandidateSize(f.size))}</span>
                     </label>`).join('');
@@ -584,7 +584,7 @@ function openCandidateModal(movies, candidatesMap) {
                         </div>
                         <div class="mt-4 overflow-hidden rounded-xl border border-slate-800 bg-slate-950/80">
                             <div class="flex items-center justify-between border-b border-slate-800 px-3 py-2">
-                                <span class="text-[11px] font-medium text-slate-300">文件列表</span>
+                                <span class="text-[11px] font-medium text-slate-300">文件列表 · 默认全选，可取消不需要的文件</span>
                                 <button type="button" onclick="document.querySelectorAll('input[name=\\'batch-file-${mIdx}-${cIdx}\\']').forEach(x=>x.checked=true)" class="text-[10px] text-blue-400 hover:text-blue-300">全选</button>
                             </div>
                             <div class="max-h-56 overflow-y-auto p-2">${fileCheckboxes || '<div class="p-4 text-center text-xs text-slate-500">没有可显示的文件</div>'}</div>
