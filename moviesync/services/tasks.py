@@ -94,7 +94,6 @@ class TaskManager:
         old = self._get(str(task_id))
         if not old or old.get("type") != "transfer":
             return None
-        payload = old.get("retry_payload") or {}
         with self.lock:
             items = self.list_tasks()
             new = dict(old)
