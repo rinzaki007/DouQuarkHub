@@ -1,16 +1,21 @@
-FROM docker.m.daocloud.io/library/python:3.10-slim
+FROM python:3.12-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    MOVIESYNC_DATA_DIR=/app/data
 
 WORKDIR /app
 
-# 先复制依赖清单并安装，利用 Docker 缓存加速构建1
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+RUN pip install --no-cache-dir -r requirements.txt
 
-# 复制当前目录下所有拆分后的代码和静态文件
 COPY . .
+RUN mkdir -p /app/data /app/data/logs
 
-# 暴露 5000 端口
+VOLUME ["/app/data"]
 EXPOSE 5000
 
-# 将启动入口修改为 main.py
-CMD ["python", "main.py"]
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+  CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/healthz', timeout=3)"
+
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "1", "--threads", "8", "--timeout", "120", "main:app"]
