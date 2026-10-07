@@ -10,7 +10,8 @@ from ..storage import JsonStore
 
 
 MAX_TASKS = 300
-TASK_SCHEMA_VERSION = 1
+TASK_SCHEMA_VERSION = 2
+MAX_EVENTS = 60
 
 
 class TaskManager:
@@ -32,12 +33,18 @@ class TaskManager:
                     continue
                 if item.get("status") in {"queued", "running"}:
                     item["status"] = "failed"
+                    item["phase"] = "failed"
+                    item["phase_label"] = "任务中断"
                     item["message"] = "服务重启导致任务中断，可执行失败重试"
                     item["failed_count"] = max(1, int(item.get("failed_count", 0) or 0))
                     item["updated_at"] = time.time()
+                    self._append_event(item, "error", item["message"])
                     changed = True
                 if item.get("schema_version") != TASK_SCHEMA_VERSION:
                     item["schema_version"] = TASK_SCHEMA_VERSION
+                    item.setdefault("phase", "waiting")
+                    item.setdefault("phase_label", "等待执行")
+                    item.setdefault("events", [])
                     changed = True
             if changed:
                 self._save(items)
@@ -52,24 +59,67 @@ class TaskManager:
     def _save(self, items):
         self.store.write(items[-MAX_TASKS:])
 
+    @staticmethod
+    def _phase_for_progress(progress):
+        value = int(progress or 0)
+        if value <= 10:
+            return "validate", "校验资源"
+        if value <= 30:
+            return "list_files", "获取文件列表"
+        if value <= 60:
+            return "create_folder", "准备目标文件夹"
+        if value < 100:
+            return "transfer", "提交夸克转存"
+        return "completed", "转存完成"
+
+    @staticmethod
+    def _append_event(item, level, message):
+        events = item.setdefault("events", [])
+        text = str(message or "").strip()
+        if not text:
+            return
+        if events and events[-1].get("message") == text:
+            return
+        events.append({
+            "at": time.time(),
+            "level": str(level or "info"),
+            "message": text[:300],
+        })
+        del events[:-MAX_EVENTS]
+
     def create_transfer_task(self, payload, runner):
+        movie = payload.get("movie") if isinstance(payload.get("movie"), dict) else {}
+        title = str(movie.get("title") or movie.get("name") or payload.get("title") or "未命名资源")[:200]
+        candidate = payload.get("candidate") if isinstance(payload.get("candidate"), dict) else {}
+        files = candidate.get("files") if isinstance(candidate.get("files"), list) else []
+        now = time.time()
         task = {
             "id": uuid.uuid4().hex,
             "schema_version": TASK_SCHEMA_VERSION,
             "type": "transfer",
             "kind": "普通转存",
-            "title": str(payload.get("title") or "未命名资源")[:200],
+            "title": title,
+            "cover": str(movie.get("cover") or ""),
             "status": "queued",
+            "phase": "waiting",
+            "phase_label": "等待执行",
             "progress": 0,
-            "total": max(0, len(payload.get("candidate", {}).get("files", []) or [])),
+            "total": max(0, len(files)),
             "success_count": 0,
             "skipped_count": 0,
             "failed_count": 0,
-            "message": "等待执行",
-            "created_at": time.time(),
-            "updated_at": time.time(),
+            "message": "任务已创建，等待执行",
+            "source_channel": str(candidate.get("channel") or ""),
+            "share_code": str(candidate.get("pwd_id") or ""),
+            "target_fid": str(payload.get("target_fid") or "0"),
+            "created_at": now,
+            "started_at": None,
+            "finished_at": None,
+            "updated_at": now,
+            "events": [],
             "retry_payload": payload,
         }
+        self._append_event(task, "info", "任务已创建")
         with self.lock:
             items = self.list_tasks()
             items.append(task)
@@ -83,30 +133,68 @@ class TaskManager:
             current = next((x for x in items if x.get("id") == task_id), None)
             if not current:
                 return
+            old_message = current.get("message")
             current.update(changes)
             current["updated_at"] = time.time()
+            message = current.get("message")
+            if message and message != old_message:
+                level = "error" if current.get("status") == "failed" else (
+                    "success" if current.get("status") == "success" else "info"
+                )
+                self._append_event(current, level, message)
             self._save(items)
 
+    def _progress_update(self, task_id, progress, message):
+        value = max(0, min(100, int(progress)))
+        phase, phase_label = self._phase_for_progress(value)
+        self._update(
+            task_id,
+            progress=value,
+            message=str(message)[:300],
+            phase=phase,
+            phase_label=phase_label,
+        )
+
     def _run_transfer(self, task_id, runner):
-        self._update(task_id, status="running", progress=10, message="正在验证资源…")
+        self._update(
+            task_id,
+            status="running",
+            progress=10,
+            phase="validate",
+            phase_label="校验资源",
+            message="正在重新验证分享资源…",
+            started_at=time.time(),
+        )
         try:
-            result = runner(lambda progress, message: self._update(
-                task_id, progress=max(0, min(100, int(progress))), message=str(message)[:300]
-            ))
+            result = runner(lambda progress, message: self._progress_update(task_id, progress, message))
             ok, message, counts = result
             counts = counts if isinstance(counts, dict) else {}
+            now = time.time()
+            current = self._get(task_id)
+            final_progress = 100 if ok else max(10, int(current.get("progress", 10)))
             self._update(
                 task_id,
                 status="success" if ok else "failed",
-                progress=100 if ok else max(10, self._get(task_id).get("progress", 10)),
+                progress=final_progress,
+                phase="completed" if ok else "failed",
+                phase_label="转存完成" if ok else "执行失败",
                 message=str(message)[:500],
                 success_count=int(counts.get("success", 0)),
                 skipped_count=int(counts.get("skipped", 0)),
                 failed_count=int(counts.get("failed", 0)),
+                finished_at=now,
             )
         except Exception as exc:
             self.logger.exception("一次性转存任务 %s 执行异常", task_id)
-            self._update(task_id, status="failed", message=f"任务执行异常: {exc}", failed_count=1)
+            self._update(
+                task_id,
+                status="failed",
+                phase="failed",
+                phase_label="执行失败",
+                message=f"任务执行异常: {exc}",
+                failed_count=1,
+                finished_at=time.time(),
+            )
 
     def _get(self, task_id):
         return next((x for x in self.list_tasks() if x.get("id") == task_id), {})
@@ -123,11 +211,17 @@ class TaskManager:
             new = dict(old)
             new["id"] = uuid.uuid4().hex
             new["status"] = "queued"
+            new["phase"] = "waiting"
+            new["phase_label"] = "等待重试"
             new["progress"] = 0
-            new["message"] = "等待重试"
+            new["message"] = "已创建重试任务，等待执行"
             new["success_count"] = new["skipped_count"] = new["failed_count"] = 0
             new["created_at"] = time.time()
+            new["started_at"] = None
+            new["finished_at"] = None
             new["updated_at"] = time.time()
+            new["events"] = []
+            self._append_event(new, "info", "已创建重试任务")
             items.append(new)
             self._save(items)
         self.executor.submit(self._run_transfer, new["id"], runner)
