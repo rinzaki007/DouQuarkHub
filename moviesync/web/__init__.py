@@ -116,6 +116,13 @@ def register_web(app, services):
             "Permissions-Policy",
             "camera=(), microphone=(), geolocation=()",
         )
+
+        if request.path.startswith("/api/") or request.path == "/admin":
+            response.headers.setdefault(
+                "Cache-Control",
+                "no-store",
+            )
+
         return response
 
     @app.errorhandler(413)
