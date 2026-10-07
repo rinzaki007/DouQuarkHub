@@ -21,3 +21,20 @@ body {
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: rgba(51, 65, 85, 0.6); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: rgba(71, 85, 105, 0.8); }
+
+
+/* 管理后台输入框：避免浏览器自动填充后出现白色背景 */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active,
+textarea:-webkit-autofill,
+textarea:-webkit-autofill:hover,
+textarea:-webkit-autofill:focus,
+textarea:-webkit-autofill:active {
+    -webkit-text-fill-color: #e2e8f0;
+    -webkit-box-shadow: 0 0 0 1000px #020617 inset;
+    box-shadow: 0 0 0 1000px #020617 inset;
+    caret-color: #e2e8f0;
+    transition: background-color 9999s ease-in-out 0s;
+}
