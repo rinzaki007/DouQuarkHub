@@ -954,11 +954,19 @@ def proxy_img():
                     ";",
                     1,
                 )[0]
+                .strip()
+                .lower()
             )
 
-            if not content_type.startswith(
-                "image/"
-            ):
+            allowed_image_types = {
+                "image/jpeg",
+                "image/png",
+                "image/webp",
+                "image/gif",
+                "image/avif",
+            }
+
+            if content_type not in allowed_image_types:
                 return Response(
                     "Not an image",
                     status=415,
