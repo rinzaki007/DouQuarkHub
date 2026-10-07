@@ -32,3 +32,10 @@ def test_invalid_channel_is_rejected(tmp_path):
         pass
     else:
         raise AssertionError("invalid channel should be rejected")
+
+
+def test_config_schema_version_is_present(tmp_path):
+    from moviesync.config_store import CONFIG_SCHEMA_VERSION, ConfigStore
+
+    store = ConfigStore(tmp_path / "config.json", tmp_path / "legacy")
+    assert store.load()["schema_version"] == CONFIG_SCHEMA_VERSION
