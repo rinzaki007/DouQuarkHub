@@ -39,3 +39,16 @@ def test_config_schema_version_is_present(tmp_path):
 
     store = ConfigStore(tmp_path / "config.json", tmp_path / "legacy")
     assert store.load()["schema_version"] == CONFIG_SCHEMA_VERSION
+
+
+def test_resource_source_defaults_and_health_persist(tmp_path):
+    store = ConfigStore(tmp_path / "config.json", tmp_path / "legacy")
+    sources = store.get_resource_sources()
+    assert sources[0]["id"] == "telegram"
+    assert sources[0]["enabled"] is True
+
+    store.update_resource_source_health("telegram", "healthy", "所有已配置频道正常")
+    health = store.get_resource_sources()[0]["health"]
+    assert health["status"] == "healthy"
+    assert health["message"] == "所有已配置频道正常"
+    assert health["last_checked_at"] is not None
