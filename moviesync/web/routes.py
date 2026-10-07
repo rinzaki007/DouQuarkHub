@@ -112,6 +112,13 @@ def index():
     )
 
 
+@pages.get("/tasks")
+def tasks():
+    return render_template(
+        "tasks.html"
+    )
+
+
 @pages.get("/admin")
 def admin():
     return render_template(
