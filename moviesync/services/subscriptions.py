@@ -109,6 +109,11 @@ class SubscriptionManager:
                 changed = True
 
             item["schema_version"] = SUBSCRIPTION_SCHEMA_VERSION
+            item.setdefault("run_history", [])
+            if not isinstance(item["run_history"], list):
+                item["run_history"] = []
+                changed = True
+            item["run_history"] = item["run_history"][-50:]
             item["pending_save_keys"] = [
                 str(key)
                 for key in (
@@ -231,6 +236,7 @@ class SubscriptionManager:
             "last_error": "",
             "retry_count": 0,
             "pending_save_keys": [],
+            "run_history": [],
             "schema_version": SUBSCRIPTION_SCHEMA_VERSION,
         }
 
@@ -656,6 +662,17 @@ class SubscriptionManager:
                 if success
                 else message
             )
+            history = current.get("run_history", [])
+            if not isinstance(history, list):
+                history = []
+            history.append({
+                "at": time.time(),
+                "success": bool(success),
+                "message": str(message)[:500],
+                "success_count": len(success_keys) if success else 0,
+                "failed_count": 0 if success else 1,
+            })
+            current["run_history"] = history[-50:]
 
             if success_keys:
                 old = list(
