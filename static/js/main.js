@@ -278,91 +278,43 @@ function getNoCoverImage() {
 function renderGrid() {
     const grid = document.getElementById('movie-grid');
     grid.innerHTML = '';
-
     const noCoverImage = getNoCoverImage();
 
     moviesData.forEach((movie, idx) => {
-        const coverUrl = movie.cover
-            ? `/api/proxy-img?url=${encodeURIComponent(movie.cover)}`
-            : noCoverImage;
-
+        const coverUrl = movie.cover ? '/api/proxy-img?url=' + encodeURIComponent(movie.cover) : noCoverImage;
         const isSelected = selectedIndices.has(idx);
-
-        const card = document.createElement('div');
-
-        card.className = `relative group bg-slate-900/90 backdrop-blur border ${
-            isSelected
-                ? 'border-blue-500 ring-1 ring-blue-500'
-                : 'border-slate-800/80'
-        } rounded-lg overflow-hidden card-shadow cursor-pointer transition`;
-
-        card.onclick = (e) => {
-            if (!e.target.closest('a, input, button')) {
-                openMovieDetail(idx);
-            }
-        };
-
+        const card = document.createElement('article');
+        card.className = 'movie-card group relative overflow-hidden rounded-2xl border ' +
+            (isSelected ? 'border-blue-500 ring-2 ring-blue-500/30' : 'border-slate-800/80') +
+            ' bg-slate-900/80 shadow-lg transition duration-300 hover:-translate-y-1 hover:border-slate-600 hover:shadow-2xl';
+        card.onclick = (e) => { if (!e.target.closest('a, input, button')) openMovieDetail(idx); };
+        const year = movie.year || (movie.pubdate ? String(movie.pubdate).match(/(19|20)\d{2}/)?.[0] : '');
         card.innerHTML = `
-            <div class="aspect-[2/3] w-full bg-slate-950 relative overflow-hidden">
-                <img
-                    src="${coverUrl}"
-                    alt="${escapeHtml(movie.title)}"
-                    class="movie-cover w-full h-full object-cover group-hover:scale-105 transition duration-300"
-                    loading="lazy"
-                >
-
-                <div class="absolute top-2 left-2 z-10">
-                    <input
-                        type="checkbox"
-                        ${isSelected ? 'checked' : ''}
-                        class="w-4 h-4 rounded border-slate-600 bg-slate-900/80 text-blue-600 focus:ring-0 pointer-events-none"
-                    >
+            <div class="relative aspect-[2/3] overflow-hidden bg-slate-950">
+                <img src="${coverUrl}" alt="${escapeHtml(movie.title)}" class="movie-cover h-full w-full object-cover transition duration-500 group-hover:scale-105" loading="lazy">
+                <div class="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-black/10"></div>
+                <div class="absolute left-2.5 top-2.5">
+                    <label class="flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg border border-white/15 bg-black/45 backdrop-blur-md" onclick="event.stopPropagation()">
+                        <input type="checkbox" ${isSelected ? 'checked' : ''} class="h-3.5 w-3.5 rounded border-slate-500 bg-slate-900 text-blue-600 focus:ring-0" onclick="event.stopPropagation(); toggleSelect(${idx})">
+                    </label>
                 </div>
-
-                <div class="absolute top-2 right-2 bg-slate-900/90 backdrop-blur text-amber-400 text-[11px] font-bold px-1.5 py-0.5 rounded border border-slate-700/50">
-                    ${escapeHtml(movie.rate || '暂无')}
+                <div class="absolute right-2.5 top-2.5 rounded-lg border border-amber-300/20 bg-black/55 px-2 py-1 text-[11px] font-bold text-amber-300 backdrop-blur-md">
+                    <i class="fa-solid fa-star mr-0.5"></i>${escapeHtml(movie.rate || '暂无')}
+                </div>
+                <div class="absolute bottom-2.5 left-2.5 right-2.5 flex items-center justify-between gap-2">
+                    <span class="rounded-md bg-black/55 px-2 py-1 text-[10px] text-slate-200 backdrop-blur-md">${escapeHtml(movie.tag || currentTag)}</span>
+                    ${year ? '<span class="rounded-md bg-black/55 px-2 py-1 text-[10px] text-slate-300 backdrop-blur-md">' + escapeHtml(year) + '</span>' : ''}
                 </div>
             </div>
-
-            <div class="p-2.5">
-                <div
-                    class="font-medium text-xs text-slate-200 line-clamp-1 group-hover:text-blue-400 transition"
-                    title="${escapeHtml(movie.title)}"
-                >
-                    ${escapeHtml(movie.title)}
+            <div class="p-3">
+                <div class="truncate text-sm font-semibold text-slate-100 group-hover:text-blue-300" title="${escapeHtml(movie.title)}">${escapeHtml(movie.title)}</div>
+                <div class="mt-2 flex items-center justify-between gap-2">
+                    <span class="text-[10px] text-slate-500">点击海报查看操作</span>
+                    <a href="${escapeHtml(movie.url || '#')}" target="_blank" rel="noopener noreferrer" class="rounded-lg border border-slate-700 bg-slate-950/80 px-2 py-1 text-[10px] text-slate-300 hover:border-blue-700 hover:text-blue-300">豆瓣 <i class="fa-solid fa-arrow-up-right-from-square ml-1"></i></a>
                 </div>
-
-                <div class="mt-1.5 flex items-center justify-between text-[11px]">
-                    <span class="text-slate-400 text-[10px]">
-                        豆瓣影视
-                    </span>
-
-                    <a
-                        href="${escapeHtml(movie.url)}"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        class="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 bg-blue-950/60 px-2 py-0.5 rounded border border-blue-900/50 transition"
-                    >
-                        <span>详情</span>
-                        <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
-                    </a>
-                </div>
-            </div>
-        `;
-
+            </div>`;
         const cover = card.querySelector('.movie-cover');
-
-        if (cover) {
-            cover.addEventListener('error', () => {
-                if (cover.dataset.fallback === '1') {
-                    return;
-                }
-
-                cover.dataset.fallback = '1';
-                cover.src = noCoverImage;
-            });
-        }
-
+        cover?.addEventListener('error', () => { if (cover.dataset.fallback === '1') return; cover.dataset.fallback = '1'; cover.src = noCoverImage; });
         grid.appendChild(card);
     });
 }
