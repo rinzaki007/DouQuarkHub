@@ -272,3 +272,21 @@ button.glass-panel {
         padding: .9rem !important;
     }
 }
+
+
+/* 海报操作提示：绝不允许换行，空间不足时省略 */
+.poster-action-hint {
+    flex: 1 1 auto;
+    min-width: 0;
+    white-space: nowrap !important;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* 独立资源选择页 */
+.resource-page-card {
+    min-width: 0;
+}
+.resource-page-card .candidate-file-row {
+    min-height: 44px;
+}
