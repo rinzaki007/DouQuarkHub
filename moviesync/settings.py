@@ -73,14 +73,49 @@ def _load_or_create_secret_key(path: Path) -> str:
 
 
 def load_settings() -> Settings:
-    data_dir = Path(os.environ.get("MOVIESYNC_DATA_DIR", str(DEFAULT_DATA_DIR))).expanduser().resolve()
+    data_dir = Path(
+        os.environ.get(
+            "MOVIESYNC_DATA_DIR",
+            str(DEFAULT_DATA_DIR),
+        )
+    ).expanduser().resolve()
     data_dir.mkdir(parents=True, exist_ok=True)
-    secret_key = _load_or_create_secret_key(data_dir / ".secret_key")
+
+    secret_key = _load_or_create_secret_key(
+        data_dir / ".secret_key"
+    )
+
+    raw_port = os.environ.get(
+        "MOVIESYNC_PORT",
+        "5000",
+    ).strip()
+
+    try:
+        port = int(raw_port)
+    except ValueError as exc:
+        raise ValueError(
+            "MOVIESYNC_PORT 必须是 1-65535 的整数"
+        ) from exc
+
+    if not 1 <= port <= 65535:
+        raise ValueError(
+            "MOVIESYNC_PORT 必须是 1-65535 的整数"
+        )
+
     return Settings(
         data_dir=data_dir,
-        host=os.environ.get("MOVIESYNC_HOST", "0.0.0.0"),
-        port=int(os.environ.get("MOVIESYNC_PORT", "5000")),
+        host=os.environ.get(
+            "MOVIESYNC_HOST",
+            "0.0.0.0",
+        ).strip() or "0.0.0.0",
+        port=port,
         secret_key=secret_key,
-        cookie_secure=os.environ.get("MOVIESYNC_COOKIE_SECURE", "0").lower() in {"1", "true", "yes"},
-        debug=os.environ.get("FLASK_DEBUG", "0").lower() in {"1", "true", "yes"},
+        cookie_secure=os.environ.get(
+            "MOVIESYNC_COOKIE_SECURE",
+            "0",
+        ).lower() in {"1", "true", "yes"},
+        debug=os.environ.get(
+            "FLASK_DEBUG",
+            "0",
+        ).lower() in {"1", "true", "yes"},
     )
