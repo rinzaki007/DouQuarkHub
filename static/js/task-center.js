@@ -62,7 +62,7 @@ async function loadTaskCategories() {
 async function loadTasks() {
     const list = document.getElementById('task-list');
     try {
-        const resp = await apiFetchTask('/api/subscriptions');
+        const resp = await apiFetchTask('/api/tasks');
         const res = await resp.json();
         if (!res.success) throw new Error(res.message || '加载失败');
         tasks = Array.isArray(res.tasks) ? res.tasks : [];
@@ -119,6 +119,7 @@ function renderTasks() {
     let visible = tasks;
     if (taskFilter === 'error') visible = tasks.filter(t => ['error','failed'].includes(t.status) || !!t.last_error);
     if (taskFilter === 'waiting') visible = tasks.filter(t => ['waiting','queued'].includes(t.status));
+    if (taskFilter === 'running') visible = tasks.filter(t => ['running','pending'].includes(taskState(t).key) || t.status === 'running');
     if (!visible.length) {
         list.innerHTML = '<div class="p-12 text-center text-xs text-slate-500">暂无符合条件的任务。</div>';
         return;
@@ -126,33 +127,96 @@ function renderTasks() {
     list.innerHTML = '';
     visible.forEach(task => {
         const state = taskState(task);
-        const total = Number(task.total || 0);
-        const done = Number(task.success_count || 0) + Number(task.skipped_count || 0) + Number(task.failed_count || 0);
         const progress = Math.max(0, Math.min(100, Number(task.progress || 0)));
         const retryable = task.type === 'transfer' && task.status === 'failed';
         const card = document.createElement('article');
         card.className = 'p-4 hover:bg-slate-900/60 transition';
+        const phase = escapeTask(task.phase_label || task.message || '等待执行');
+        const cover = task.cover ? '/api/proxy-img?url=' + encodeURIComponent(task.cover) : '';
         card.innerHTML =
-            '<div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">' +
-            '<div class="min-w-0 flex-1"><div class="flex flex-wrap items-center gap-2">' +
+            '<div class="flex gap-3">' +
+            (cover ? '<img src="' + cover + '" class="h-20 w-14 shrink-0 rounded-lg object-cover bg-slate-950" onerror="this.style.display=\'none\'">' : '') +
+            '<div class="min-w-0 flex-1">' +
+            '<div class="flex flex-wrap items-center gap-2">' +
             '<h3 class="truncate text-sm font-semibold text-slate-100">' + escapeTask(task.title) + '</h3>' +
             '<span class="rounded-full border px-2 py-0.5 text-[10px] ' + state.cls + '">' + state.label + '</span>' +
             '<span class="rounded-full border border-slate-700 bg-slate-950 px-2 py-0.5 text-[10px] text-slate-400">' + escapeTask(task.kind || '任务') + '</span>' +
             '</div>' +
-            '<div class="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-800"><div class="h-full rounded-full bg-purple-500 transition-all" style="width:' + progress + '%"></div></div>' +
+            '<div class="mt-3 flex items-center gap-3"><div class="h-2 flex-1 overflow-hidden rounded-full bg-slate-800"><div class="h-full rounded-full bg-purple-500 transition-all" style="width:' + progress + '%"></div></div><span class="w-10 text-right text-[10px] text-slate-400">' + progress + '%</span></div>' +
             '<div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-500">' +
-            '<span>进度 ' + progress + '%</span><span>成功 ' + Number(task.success_count || 0) + '</span><span>跳过 ' + Number(task.skipped_count || 0) + '</span><span>失败 ' + Number(task.failed_count || 0) + '</span>' +
-            (task.next_run_at ? '<span>下次：' + formatNextRun(task.next_run_at) + '</span>' : '') +
-            '</div><div class="mt-2 text-[11px] ' + ((task.status === 'failed' || task.last_error) ? 'text-rose-400' : 'text-slate-500') + '">' +
-            escapeTask(task.message || task.last_error || '') + '</div></div>' +
-            '<div class="flex shrink-0 flex-wrap gap-2">' +
+            '<span class="text-slate-300">' + phase + '</span>' +
+            '<span>成功 ' + Number(task.success_count || 0) + '</span><span>跳过 ' + Number(task.skipped_count || 0) + '</span><span>失败 ' + Number(task.failed_count || 0) + '</span>' +
+            (task.total ? '<span>文件 ' + Number(task.total) + '</span>' : '') +
+            '</div>' +
+            '<div class="mt-2 text-[11px] ' + ((task.status === 'failed' || task.last_error) ? 'text-rose-400' : 'text-slate-500') + '">' + escapeTask(task.message || task.last_error || '') + '</div>' +
+            '</div>' +
+            '<div class="flex shrink-0 flex-wrap content-start justify-end gap-2">' +
+            '<button data-action="detail" data-id="' + escapeTask(task.id) + '" class="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-[11px] text-slate-300 hover:bg-slate-800"><i class="fa-solid fa-circle-info mr-1"></i>详情</button>' +
             (task.type === 'subscription' ? '<button data-action="run-sub" data-id="' + escapeTask(task.subscription_id) + '" class="rounded-lg bg-purple-600 px-3 py-2 text-[11px] font-medium text-white hover:bg-purple-500"><i class="fa-solid fa-play mr-1"></i>立即检查</button>' : '') +
             (retryable ? '<button data-action="retry" data-id="' + escapeTask(task.id) + '" class="rounded-lg border border-amber-800 bg-amber-950/40 px-3 py-2 text-[11px] text-amber-300 hover:bg-amber-900/60"><i class="fa-solid fa-rotate-right mr-1"></i>失败重试</button>' : '') +
             '</div></div>';
         list.appendChild(card);
     });
+    list.querySelectorAll('[data-action="detail"]').forEach(btn => btn.onclick = () => openTaskDetail(btn.dataset.id));
     list.querySelectorAll('[data-action="run-sub"]').forEach(btn => btn.onclick = () => runSubscription(btn.dataset.id));
     list.querySelectorAll('[data-action="retry"]').forEach(btn => btn.onclick = () => retryTask(btn.dataset.id));
+}
+
+async function openTaskDetail(id) {
+    try {
+        const resp = await apiFetchTask('/api/tasks/' + encodeURIComponent(id));
+        const res = await resp.json();
+        if (!res.success) throw new Error(res.message || '任务不存在');
+        renderTaskDetail(res.task);
+        document.getElementById('task-detail-drawer').classList.remove('hidden');
+    } catch (err) {
+        taskToast(err.message || '无法读取任务详情');
+    }
+}
+
+function closeTaskDetail() {
+    document.getElementById('task-detail-drawer')?.classList.add('hidden');
+}
+
+function renderTaskDetail(task) {
+    const title = document.getElementById('detail-title');
+    const body = document.getElementById('detail-body');
+    const state = taskState(task);
+    const progress = Math.max(0, Math.min(100, Number(task.progress || 0)));
+    title.textContent = task.title || '任务详情';
+    const phases = [
+        ['validate','校验资源'],
+        ['list_files','获取文件列表'],
+        ['create_folder','准备目标文件夹'],
+        ['transfer','提交夸克转存'],
+        ['completed','转存完成']
+    ];
+    const phaseIndex = task.status === 'failed' ? -1 : phases.findIndex(x => x[0] === task.phase);
+    body.innerHTML =
+        '<div class="flex gap-4 rounded-2xl border border-slate-800 bg-slate-950 p-4">' +
+        (task.cover ? '<img src="/api/proxy-img?url=' + encodeURIComponent(task.cover) + '" class="h-32 w-24 shrink-0 rounded-xl object-cover bg-slate-900" onerror="this.style.display=\'none\'">' : '') +
+        '<div class="min-w-0 flex-1"><div class="flex flex-wrap items-center gap-2"><span class="rounded-full border px-2 py-0.5 text-[10px] ' + state.cls + '">' + state.label + '</span><span class="text-[11px] text-slate-500">' + escapeTask(task.kind || '任务') + '</span></div>' +
+        '<div class="mt-3 text-2xl font-semibold text-white">' + progress + '%</div><div class="mt-2 h-2 overflow-hidden rounded-full bg-slate-800"><div class="h-full rounded-full bg-purple-500" style="width:' + progress + '%"></div></div>' +
+        '<div class="mt-2 text-[11px] text-slate-400">' + escapeTask(task.phase_label || task.message || '') + '</div></div></div>' +
+        '<div class="rounded-2xl border border-slate-800 bg-slate-950 p-4"><div class="text-xs font-semibold text-slate-200">执行阶段</div><div class="mt-4 space-y-3">' +
+        phases.map((p,i) => {
+            const done = task.status === 'success' || (phaseIndex >= 0 && i < phaseIndex);
+            const active = task.status === 'running' && i === phaseIndex;
+            const failed = task.status === 'failed' && i === Math.max(0, phases.findIndex(x => x[0] === task.phase));
+            const cls = done ? 'text-emerald-400' : active ? 'text-purple-300' : failed ? 'text-rose-400' : 'text-slate-600';
+            const icon = done ? 'fa-circle-check' : failed ? 'fa-circle-xmark' : active ? 'fa-spinner fa-spin' : 'fa-circle';
+            return '<div class="flex items-center gap-3 text-xs ' + cls + '"><i class="fa-solid ' + icon + ' w-4 text-center"></i><span>' + p[1] + '</span>' + (active ? '<span class="text-[10px] text-slate-500">处理中</span>' : '') + '</div>';
+        }).join('') +
+        '</div></div>' +
+        '<div class="grid gap-3 sm:grid-cols-2">' +
+        '<div class="rounded-xl border border-slate-800 bg-slate-950 p-4"><div class="text-[10px] text-slate-500">资源信息</div><div class="mt-2 space-y-1 text-[11px] text-slate-300"><div>频道：' + escapeTask(task.source_channel || '—') + '</div><div>分享码：<span class="font-mono">' + escapeTask(task.share_code || '—') + '</span></div><div>文件数：' + Number(task.total || 0) + '</div></div></div>' +
+        '<div class="rounded-xl border border-slate-800 bg-slate-950 p-4"><div class="text-[10px] text-slate-500">执行统计</div><div class="mt-2 space-y-1 text-[11px] text-slate-300"><div>成功：' + Number(task.success_count || 0) + '</div><div>跳过：' + Number(task.skipped_count || 0) + '</div><div>失败：' + Number(task.failed_count || 0) + '</div></div></div>' +
+        '</div>' +
+        '<div class="rounded-xl border border-slate-800 bg-slate-950 p-4"><div class="text-xs font-semibold text-slate-200">当前状态</div><div class="mt-2 text-[11px] leading-5 ' + (task.status === 'failed' ? 'text-rose-400' : 'text-slate-400') + '">' + escapeTask(task.message || '') + '</div></div>' +
+        '<details class="rounded-xl border border-slate-800 bg-slate-950 p-4"><summary class="cursor-pointer text-xs font-semibold text-slate-300">执行日志</summary><div class="mt-3 space-y-2">' +
+        (task.events || []).map(e => '<div class="flex gap-3 text-[11px]"><span class="shrink-0 font-mono text-slate-600">' + new Date(Number(e.at || 0)*1000).toLocaleTimeString() + '</span><span class="' + (e.level === 'error' ? 'text-rose-400' : e.level === 'success' ? 'text-emerald-400' : 'text-slate-400') + '">' + escapeTask(e.message) + '</span></div>').join('') +
+        '</div></details>' +
+        (task.status === 'failed' && task.type === 'transfer' ? '<button onclick="retryTask(\'' + escapeTask(task.id) + '\'); closeTaskDetail()" class="w-full rounded-xl bg-amber-600 px-4 py-3 text-xs font-medium text-white hover:bg-amber-500"><i class="fa-solid fa-rotate-right mr-1"></i>失败重试</button>' : '');
 }
 
 function renderHistory() {
@@ -205,6 +269,9 @@ function openAddTask() {
     document.getElementById('task-candidate-list').innerHTML = '';
     document.getElementById('task-drawer').classList.remove('hidden');
     loadTaskCategories();
+    const params = new URLSearchParams(window.location.search);
+    const presetTitle = params.get('title') || '';
+    if (presetTitle) document.getElementById('task-title').value = presetTitle;
     setTimeout(() => document.getElementById('task-title').focus(), 50);
 }
 
