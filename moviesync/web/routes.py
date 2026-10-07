@@ -485,45 +485,27 @@ def check_cookie():
 
 @api.get("/check-channels")
 def check_channels_health():
-    channels = (
-        _services()["config"]
-        .get_channels()
+    results = _services()["resource_sources"].check_all()
+    telegram = next(
+        (item for item in results if item.get("id") == "telegram"),
+        {"total": 0, "valid_count": 0},
     )
-
-    telegram = _services()[
-        "telegram"
-    ]
-
-    with ThreadPoolExecutor(
-        max_workers=min(
-            8,
-            max(
-                1,
-                len(channels),
-            ),
-        )
-    ) as executor:
-        results = (
-            list(
-                executor.map(
-                    telegram.check_channel,
-                    channels,
-                )
-            )
-            if channels
-            else []
-        )
-
-    valid_count = sum(
-        bool(item)
-        for item in results
-    )
-
     return jsonify(
         {
             "success": True,
-            "total": len(channels),
-            "valid_count": valid_count,
+            "total": telegram.get("total", 0),
+            "valid_count": telegram.get("valid_count", 0),
+            "resource_sources": results,
+        }
+    )
+
+
+@api.get("/resource-sources")
+def resource_sources_health():
+    return jsonify(
+        {
+            "success": True,
+            "resource_sources": _services()["resource_sources"].get_status(),
         }
     )
 
@@ -689,7 +671,7 @@ def search_candidates():
             title
         ] = service.search_movie_candidates(
             movie,
-            config.get_channels(),
+            config.load(),
         )
 
     return jsonify(
