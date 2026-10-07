@@ -392,7 +392,20 @@ async function searchAndOpenCandidates(selectedMovies) {
         if (!res.success) return showToast(res.message || '无法搜索资源', 'error');
         const candidatesMap = res.candidates_map || {};
         const totalFound = selectedMovies.reduce((sum, movie) => sum + ((candidatesMap[movie.title] || []).length), 0);
-        if (!totalFound) return showToast('没有找到可用资源', 'warning');
+        if (!totalFound) {
+            const unavailable = (res.resource_sources || [])
+                .filter(source => source.enabled !== false && source.health?.status === 'unavailable')
+                .map(source => source.name || source.id)
+                .join('、');
+            return showToast(
+                res.message || (
+                    unavailable
+                        ? '资源来源不可用：' + unavailable + '。请先检查资源来源状态。'
+                        : '当前资源来源暂未找到可用候选，可稍后重试。'
+                ),
+                'warning'
+            );
+        }
         showToast('找到 ' + totalFound + ' 个可用资源版本', 'success');
         openCandidateModal(selectedMovies, candidatesMap);
     } catch (err) {
