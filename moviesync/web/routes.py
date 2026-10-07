@@ -296,106 +296,100 @@ def run_subscription_now():
 def proxy_img():
     target = request.args.get("url", "").strip()
     parsed = urlparse(target)
+
     if parsed.scheme != "https" or not parsed.hostname:
-        return Response("Invalid URL", status=400)
+        return Response(
+            "Invalid URL",
+            status=400,
+        )
 
     host = parsed.hostname.lower()
-    if not (host.endswith(".doubanio.com") or host == "doubanio.com"):
-        return Response("Host not allowed", status=403)
 
-try:
-    with _services()["http"].session.get(
-        target,
-        headers={
-            "User-Agent": (
-                "Mozilla/5.0 "
-                "(Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 "
-                "(KHTML, like Gecko) "
-                "Chrome/131.0.0.0 Safari/537.36"
-            ),
-            "Referer": "https://movie.douban.com/",
-        },
-        timeout=(3, 8),
-        stream=True,
-    ) as response:
+    if not (
+        host.endswith(".doubanio.com")
+        or host == "doubanio.com"
+    ):
+        return Response(
+            "Host not allowed",
+            status=403,
+        )
 
-        if response.status_code != 200:
-            return Response(
-                "Image unavailable",
-                status=404,
+    try:
+        with _services()["http"].session.get(
+            target,
+            headers={
+                "User-Agent": (
+                    "Mozilla/5.0 "
+                    "(Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 "
+                    "(KHTML, like Gecko) "
+                    "Chrome/131.0.0.0 Safari/537.36"
+                ),
+                "Referer": "https://movie.douban.com/",
+            },
+            timeout=(3, 8),
+            stream=True,
+        ) as response:
+
+            if response.status_code != 200:
+                return Response(
+                    "Image unavailable",
+                    status=404,
+                )
+
+            content_type = response.headers.get(
+                "Content-Type",
+                "image/jpeg",
+            ).split(";", 1)[0]
+
+            if not content_type.startswith("image/"):
+                return Response(
+                    "Not an image",
+                    status=415,
+                )
+
+            max_size = 5 * 1024 * 1024
+
+            content_length = response.headers.get(
+                "Content-Length"
             )
 
-        content_type = response.headers.get(
-            "Content-Type",
-            "image/jpeg",
-        ).split(";", 1)[0]
+            if content_length:
+                try:
+                    if int(content_length) > max_size:
+                        return Response(
+                            "Image too large",
+                            status=413,
+                        )
+                except ValueError:
+                    pass
 
-        if not content_type.startswith("image/"):
-            return Response(
-                "Not an image",
-                status=415,
+            content = response.raw.read(
+                max_size + 1
             )
 
-        # 防止异常大的文件被代理下载
-        max_size = 5 * 1024 * 1024
+            if len(content) > max_size:
+                return Response(
+                    "Image too large",
+                    status=413,
+                )
 
-        content_length = response.headers.get(
-            "Content-Length"
-        )
-
-        if content_length:
-            try:
-                if int(content_length) > max_size:
-                    return Response(
-                        "Image too large",
-                        status=413,
-                    )
-            except ValueError:
-                pass
-
-        content = response.raw.read(
-            max_size + 1
-        )
-
-        if len(content) > max_size:
-            return Response(
-                "Image too large",
-                status=413,
+            result = Response(
+                content,
+                mimetype=content_type,
             )
 
-        result = Response(
-            content,
-            mimetype=content_type,
-        )
+            result.headers["Cache-Control"] = (
+                "public, max-age=86400"
+            )
 
-        # 浏览器缓存海报 24 小时
-        result.headers["Cache-Control"] = (
-            "public, max-age=86400"
-        )
-
-        return result
-
-except Exception:
-    return Response(
-        "Image unavailable",
-        status=404,
-    )
-
-        if response.status_code != 200:
-            return Response("Image unavailable", status=404)
-
-        content_type = response.headers.get(
-            "Content-Type", "image/jpeg"
-        ).split(";", 1)[0]
-
-        if not content_type.startswith("image/"):
-            return Response("Not an image", status=415)
-
-        return Response(response.content, mimetype=content_type)
+            return result
 
     except Exception:
-        return Response("Image unavailable", status=404)
+        return Response(
+            "Image unavailable",
+            status=404,
+        )
 
 
 @api.post("/change-password")
