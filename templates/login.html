@@ -19,9 +19,7 @@
         }
         .login-backdrop {
             position: fixed; inset: -40px;
-            background:
-                linear-gradient(135deg, rgba(2,6,23,.88), rgba(15,23,42,.72)),
-                url('/api/random-cover') center/cover no-repeat;
+            background: linear-gradient(135deg, rgba(2,6,23,.88), rgba(15,23,42,.72));
             filter: blur(18px) saturate(.9);
             transform: scale(1.08);
             opacity: .82;
@@ -87,6 +85,23 @@
         <div class="mt-5 text-center text-[10px] text-slate-400/60 tracking-wider">影视资源管理 · MovieSync</div>
     </main>
     <script>
+        async function loadLoginBackdrop() {
+            try {
+                const response = await fetch('/api/get-movies?tag=电影&sort=U', {credentials:'same-origin'});
+                const result = await response.json();
+                const movies = Array.isArray(result.movies) ? result.movies.filter(item => item.cover) : [];
+                if (!movies.length) return;
+                const movie = movies[Math.floor(Math.random() * movies.length)];
+                const backdrop = document.querySelector('.login-backdrop');
+                backdrop.style.backgroundImage =
+                    'linear-gradient(135deg, rgba(2,6,23,.88), rgba(15,23,42,.68)), url("' +
+                    movie.cover.replace(/"/g, '%22') + '")';
+            } catch (err) {
+                console.debug('登录页背景海报加载失败', err);
+            }
+        }
+        loadLoginBackdrop();
+
         const isSetup = {{ 'true' if is_setup else 'false' }};
         async function handleAuth(e) {
             e.preventDefault();
