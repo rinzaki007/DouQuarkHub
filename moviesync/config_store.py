@@ -13,7 +13,6 @@ from urllib.parse import urlparse
 from .settings import DEFAULT_CATEGORY_FIDS, DEFAULT_OPENLIST_URL
 from .storage import JsonStore
 
-
 CHANNEL_ID_RE = re.compile(r"^[A-Za-z0-9_]{2,64}$")
 FID_RE = re.compile(r"^[A-Za-z0-9_-]{1,128}$")
 
