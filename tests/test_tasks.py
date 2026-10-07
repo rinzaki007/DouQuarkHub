@@ -60,7 +60,7 @@ def test_running_subscription_cannot_be_deleted(tmp_path):
     manager = SubscriptionManager(
         tmp_path / "subscriptions.json",
         lambda: "cookie",
-        __import__("logging").getLogger("test"),
+        logging.getLogger("test"),
     )
     sub = manager.add_subscription(title="测试追剧", pwd_id="abc123")
 
