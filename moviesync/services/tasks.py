@@ -8,7 +8,6 @@ from threading import RLock
 
 from ..storage import JsonStore
 
-
 MAX_TASKS = 300
 TASK_SCHEMA_VERSION = 2
 MAX_EVENTS = 60
