@@ -678,83 +678,131 @@ def search_candidates():
 @api.post("/transfer-selected")
 @require_csrf
 def transfer_selected():
-    data = (
-        request.get_json(
-            silent=True
-        )
-        or {}
-    )
-
+    data = request.get_json(silent=True) or {}
     movie = data.get("movie")
     candidate = data.get("candidate")
+    if not isinstance(movie, dict) or not isinstance(candidate, dict):
+        return _json_error("参数不完整")
 
-    if (
-        not isinstance(
-            movie,
-            dict,
-        )
-        or not isinstance(
-            candidate,
-            dict,
-        )
-    ):
-        return _json_error(
-            "参数不完整"
-        )
-
-    cookie = _services()[
-        "config"
-    ].get_cookie()
-
+    cookie = _services()["config"].get_cookie()
     if not cookie:
-        return _json_error(
-            "未配置夸克 Cookie"
-        )
+        return _json_error("未配置夸克 Cookie")
 
     config = _services()["config"].load()
-
     try:
         target_fid = _normalize_fid(
-            data.get(
-                "target_fid"
-            )
-            or config.get(
-                "default_fid",
-                "0",
-            )
+            data.get("target_fid") or config.get("default_fid", "0")
         )
-
     except ValueError as exc:
-        return _json_error(
-            str(exc)
-        )
+        return _json_error(str(exc))
 
-    category_fids = (
-        {}
-        if data.get("target_fid")
-        else config.get(
-            "category_fids",
-            {},
-        )
-    )
+    payload = {
+        "movie": movie,
+        "candidate": candidate,
+        "target_fid": target_fid,
+    }
 
-    success, message = (
-        _services()[
-            "search_factory"
-        ](cookie).transfer_selected_resource(
+    def runner(progress):
+        current_config = _services()["config"].load()
+        current_cookie = _services()["config"].get_cookie()
+        if not current_cookie:
+            return False, "未配置夸克 Cookie", {"success": 0, "skipped": 0, "failed": 1}
+        service = _services()["search_factory"](current_cookie)
+        return service.transfer_selected_resource_with_progress(
             movie,
             candidate,
             target_fid,
-            category_fids,
+            current_config.get("category_fids", {}),
+            progress,
         )
-    )
 
-    return jsonify(
-        {
-            "success": success,
-            "message": message,
-        }
-    )
+    task = _services()["tasks"].create_transfer_task(payload, runner)
+    return jsonify({
+        "success": True,
+        "task": {key: value for key, value in task.items() if key != "retry_payload"},
+        "message": "转存任务已创建",
+    })
+
+
+@api.get("/tasks")
+def get_tasks():
+    manager = _services()["tasks"]
+    transfer_tasks = manager.list_tasks()
+    subscriptions = _services()["subscriptions"].get_subscriptions()
+    items = []
+
+    for task in transfer_tasks:
+        items.append({
+            key: value for key, value in task.items()
+            if key != "retry_payload"
+        })
+
+    for sub in subscriptions:
+        history = sub.get("run_history", []) or []
+        items.append({
+            "id": "subscription:" + str(sub.get("id")),
+            "type": "subscription",
+            "kind": "智能追剧",
+            "title": sub.get("title", "未命名任务"),
+            "status": "error" if sub.get("last_error") else (
+                "pending" if sub.get("pending_save_keys") else "waiting"
+            ),
+            "progress": 100,
+            "total": len(sub.get("files", []) or []),
+            "success_count": len(sub.get("saved_episodes", []) or []),
+            "skipped_count": 0,
+            "failed_count": 1 if sub.get("last_error") else 0,
+            "message": sub.get("last_error") or sub.get("last_check", "等待检查"),
+            "next_run_at": sub.get("next_run_at"),
+            "updated_at": sub.get("last_check_at") or 0,
+            "run_history": history[-10:],
+            "subscription_id": sub.get("id"),
+            "retry_count": sub.get("retry_count", 0),
+        })
+
+    items.sort(key=lambda item: float(item.get("updated_at") or item.get("created_at") or 0), reverse=True)
+    return jsonify({"success": True, "tasks": items})
+
+
+@api.post("/tasks/<task_id>/retry")
+@require_csrf
+def retry_task(task_id):
+    manager = _services()["tasks"]
+    old = manager.get_task(task_id)
+    if not old:
+        return _json_error("未找到任务", 404)
+    if old.get("type") == "subscription":
+        sub_id = old.get("subscription_id")
+        ok, message = _services()["subscriptions"].check_subscription_now(str(sub_id or ""))
+        return jsonify({"success": ok, "message": message})
+    if old.get("type") != "transfer":
+        return _json_error("不支持重试的任务类型")
+
+    def runner(progress):
+        payload = old.get("retry_payload") or {}
+        movie = payload.get("movie") or {}
+        candidate = payload.get("candidate") or {}
+        current_config = _services()["config"].load()
+        current_cookie = _services()["config"].get_cookie()
+        if not current_cookie:
+            return False, "未配置夸克 Cookie", {"success": 0, "skipped": 0, "failed": 1}
+        service = _services()["search_factory"](current_cookie)
+        return service.transfer_selected_resource_with_progress(
+            movie,
+            candidate,
+            payload.get("target_fid") or current_config.get("default_fid", "0"),
+            current_config.get("category_fids", {}),
+            progress,
+        )
+
+    task = manager.retry_transfer(task_id, runner)
+    if not task:
+        return _json_error("任务不存在或无法重试", 400)
+    return jsonify({
+        "success": True,
+        "task": {key: value for key, value in task.items() if key != "retry_payload"},
+        "message": "已创建重试任务",
+    })
 
 
 @api.route(
