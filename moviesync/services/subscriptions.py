@@ -282,6 +282,21 @@ class SubscriptionManager:
 
             return changed
 
+    def clear_run_history(self) -> int:
+        with self.lock:
+            subscriptions = self._load_subscriptions()
+            removed = 0
+            changed = False
+            for item in subscriptions:
+                history = item.get("run_history") or []
+                if history:
+                    removed += len(history)
+                    item["run_history"] = []
+                    changed = True
+            if changed:
+                self.store.write(subscriptions)
+            return removed
+
     def check_subscription_now(
         self,
         sub_id: str,
