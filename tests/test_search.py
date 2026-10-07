@@ -26,3 +26,33 @@ def test_search_deduplicates_share_ids_and_is_stable():
     assert len(candidates) == 1
     assert candidates[0]["channel"] == "first"
     assert "stoken" not in candidates[0]
+
+
+class FakeDoubanResponse:
+    status_code = 200
+
+
+class FakeDoubanHttp:
+    def request_json(self, *args, **kwargs):
+        return FakeDoubanResponse(), [
+            {
+                "title": "测试电影",
+                "img": "https://example.com/poster.jpg",
+                "year": "2025",
+                "id": "1234567",
+            }
+        ]
+
+
+def test_douban_search_does_not_use_year_as_rating(monkeypatch):
+    from moviesync.clients.douban import DoubanClient
+
+    client = DoubanClient()
+    monkeypatch.setattr(client, "http", FakeDoubanHttp())
+
+    results = client.search("测试电影")
+
+    assert len(results) == 1
+    assert results[0]["title"] == "测试电影"
+    assert results[0]["year"] == "2025"
+    assert results[0]["rate"] == "暂无"
