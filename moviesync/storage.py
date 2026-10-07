@@ -9,6 +9,7 @@ import json
 import os
 import tempfile
 import threading
+import time
 from pathlib import Path
 from typing import Any, Callable
 
@@ -27,8 +28,24 @@ class JsonStore:
             try:
                 with self.path.open("r", encoding="utf-8") as handle:
                     return json.load(handle)
-            except (OSError, json.JSONDecodeError):
+            except json.JSONDecodeError:
+                self._quarantine_corrupt_file()
                 return self.default_factory()
+            except OSError:
+                return self.default_factory()
+
+    def _quarantine_corrupt_file(self) -> None:
+        """保留损坏数据副本，避免后续写入把现场直接覆盖。"""
+        if not self.path.exists():
+            return
+        stamp = time.strftime("%Y%m%d-%H%M%S")
+        backup = self.path.with_name(
+            f"{self.path.name}.corrupt-{stamp}"
+        )
+        try:
+            os.replace(self.path, backup)
+        except OSError:
+            pass
 
     def write(self, value: Any) -> None:
         with self.lock:
@@ -42,6 +59,20 @@ class JsonStore:
                 os.replace(temp_name, self.path)
                 try:
                     self.path.chmod(0o600)
+                except OSError:
+                    pass
+
+                # fsync 目录，确保 rename 本身在 Linux/EXT4 等文件系统上
+                # 也尽可能落盘，降低断电后出现旧文件/新文件不一致的概率。
+                try:
+                    dir_fd = os.open(
+                        self.path.parent,
+                        os.O_RDONLY,
+                    )
+                    try:
+                        os.fsync(dir_fd)
+                    finally:
+                        os.close(dir_fd)
                 except OSError:
                     pass
             finally:
