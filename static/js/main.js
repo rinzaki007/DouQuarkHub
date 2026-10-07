@@ -300,7 +300,7 @@ function renderGrid() {
             </div>
             <div class="p-3">
                 <div class="truncate text-sm font-semibold text-slate-100 group-hover:text-blue-300" title="${escapeHtml(movie.title)}">${escapeHtml(movie.title)}</div>
-            </div>`;>`;
+            </div>`;
         const cover = card.querySelector('.movie-cover');
         cover?.addEventListener('error', () => { if (cover.dataset.fallback === '1') return; cover.dataset.fallback = '1'; cover.src = noCoverImage; });
         grid.appendChild(card);
