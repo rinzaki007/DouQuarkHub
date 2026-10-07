@@ -12,7 +12,6 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from .storage import JsonStore
 
-
 MIN_USERNAME_LENGTH = 2
 MAX_USERNAME_LENGTH = 64
 
