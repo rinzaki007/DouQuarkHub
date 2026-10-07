@@ -367,6 +367,85 @@ function renderGrid() {
     });
 }
 
+let activeMovieDetailIndex = null;
+
+function openMovieDetail(idx) {
+    const movie = moviesData[idx];
+    if (!movie) return;
+    activeMovieDetailIndex = idx;
+    const noCoverImage = getNoCoverImage();
+    const cover = document.getElementById('movie-detail-cover');
+    cover.src = movie.cover ? '/api/proxy-img?url=' + encodeURIComponent(movie.cover) : noCoverImage;
+    cover.onerror = () => { cover.onerror = null; cover.src = noCoverImage; };
+    document.getElementById('movie-detail-title').textContent = movie.title || '影视详情';
+    document.getElementById('movie-detail-name').textContent = movie.title || '未命名影视';
+    document.getElementById('movie-detail-meta').innerHTML =
+        '<div><span class="text-slate-500">分类：</span>' + escapeHtml(movie.tag || currentTag) + '</div>' +
+        '<div><span class="text-slate-500">评分：</span>' + escapeHtml(movie.rate || '暂无') + '</div>' +
+        '<div><span class="text-slate-500">操作：</span>选择下面的资源转存或自动追剧</div>';
+    const douban = document.getElementById('movie-detail-douban');
+    douban.href = movie.url || '#';
+    document.getElementById('movie-detail-drawer').classList.remove('hidden');
+}
+
+function closeMovieDetail() {
+    document.getElementById('movie-detail-drawer')?.classList.add('hidden');
+    activeMovieDetailIndex = null;
+}
+
+function movieDetailTransfer() {
+    const movie = moviesData[activeMovieDetailIndex];
+    if (!movie) return;
+    closeMovieDetail();
+    const selectedMovie = {
+        title: movie.title,
+        tag: movie.tag || currentTag || '电影',
+        cover: movie.cover,
+        url: movie.url
+    };
+    searchAndOpenCandidates([selectedMovie]);
+}
+
+function movieDetailChase() {
+    const movie = moviesData[activeMovieDetailIndex];
+    if (!movie) return;
+    closeMovieDetail();
+    const params = new URLSearchParams({
+        title: movie.title || '',
+        tag: movie.tag || currentTag || '电视剧',
+        cover: movie.cover || ''
+    });
+    window.location.href = '/tasks?' + params.toString();
+}
+
+async function searchAndOpenCandidates(selectedMovies) {
+    toggleLogBox(true);
+    clearLog();
+    startLogTimer();
+    appendLogLine('[资源检索] 🔎 正在并发搜索可用资源…', 'info');
+    selectedMovies.forEach(m => appendLogLine('  -> 《' + m.title + '》', 'info'));
+    try {
+        const response = await apiFetch('/api/search-candidates', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({movies: selectedMovies})
+        });
+        const res = await response.json();
+        stopLogTimer();
+        if (!res.success) {
+            appendLogLine('[检索失败] ❌ ' + (res.message || '无法搜索资源'), 'error');
+            return;
+        }
+        const candidatesMap = res.candidates_map || {};
+        const totalFound = selectedMovies.reduce((sum, movie) => sum + ((candidatesMap[movie.title] || []).length), 0);
+        appendLogLine('[检索完成] ✅ 共找到 ' + totalFound + ' 个可用资源版本。', 'success');
+        openCandidateModal(selectedMovies, candidatesMap);
+    } catch (err) {
+        stopLogTimer();
+        appendLogLine('[异常] ❌ ' + (err.message || '资源检索异常'), 'error');
+    }
+}
+
 function toggleSelect(idx) {
     if (selectedIndices.has(idx)) selectedIndices.delete(idx);
     else selectedIndices.add(idx);
@@ -622,13 +701,6 @@ function confirmBatchTransferForCandidate(mIdx, cIdx) {
 
 async function confirmTransferAndSave(movie, candidate, targetFid = '0') {
     closeCandidateModal();
-    toggleLogBox(true);
-    clearLog();
-    startLogTimer();
-    appendLogLine('[任务中心] 📥 正在创建转存任务…', 'info');
-    appendLogLine('  -> 目标频道: ' + candidate.channel, 'info');
-    appendLogLine('  -> 提取短码: ' + candidate.pwd_id, 'info');
-
     try {
         const response = await apiFetch('/api/transfer-selected', {
             method: 'POST',
@@ -637,46 +709,32 @@ async function confirmTransferAndSave(movie, candidate, targetFid = '0') {
         });
         const res = await response.json();
         if (!res.success) {
-            appendLogLine('[创建失败] ❌ ' + (res.message || '无法创建任务'), 'error');
-            stopLogTimer();
+            showToast(res.message || '无法创建转存任务', 'error');
             return;
         }
-
         const taskId = res.task?.id;
-        appendLogLine('[任务已创建] ⏳ 已进入任务中心，可关闭本窗口继续浏览。', 'success');
-        if (!taskId) {
-            appendLogLine('[异常] ❌ 服务端未返回任务 ID。', 'error');
-            stopLogTimer();
-            return;
-        }
-
-        let finished = false;
-        for (let i = 0; i < 120; i++) {
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            const statusResp = await apiFetch('/api/tasks');
-            const statusData = await statusResp.json();
-            const task = (statusData.tasks || []).find(item => item.id === taskId);
-            if (!task) continue;
-
-            if (task.status === 'running') {
-                appendLogLine('[执行中] ' + (task.progress || 0) + '% · ' + (task.message || ''), 'info');
-            }
-            if (task.status === 'success' || task.status === 'failed') {
-                finished = true;
-                appendLogLine(
-                    task.status === 'success'
-                        ? '[转存完成] 🎉 成功 ' + (task.success_count || 0) + '，跳过 ' + (task.skipped_count || 0)
-                        : '[转存失败] ❌ ' + (task.message || '执行失败'),
-                    task.status === 'success' ? 'success' : 'error'
-                );
-                break;
-            }
-        }
-        if (!finished) appendLogLine('[任务仍在执行] ⏳ 已超过前台等待时间，请前往任务中心查看进度。', 'warn');
+        showTaskCreatedToast(movie?.title || '资源', taskId);
     } catch (err) {
-        appendLogLine('[异常捕获] ❌ ' + err.message, 'error');
-    } finally {
-        stopLogTimer();
+        showToast('创建转存任务失败：' + (err.message || '未知错误'), 'error');
     }
 }
+
+function showTaskCreatedToast(title, taskId) {
+    const box = document.getElementById('toast-container');
+    const el = document.createElement('div');
+    el.className = 'pointer-events-auto rounded-xl border border-emerald-800/70 bg-slate-900/95 px-4 py-3 shadow-2xl';
+    el.innerHTML =
+        '<div class="flex items-start gap-3">' +
+        '<div class="mt-0.5 text-emerald-400"><i class="fa-solid fa-circle-check"></i></div>' +
+        '<div class="min-w-0 flex-1"><div class="text-xs font-semibold text-white">转存任务已创建</div>' +
+        '<div class="mt-1 truncate text-[11px] text-slate-400">《' + escapeHtml(title) + '》已进入任务中心</div>' +
+        '<div class="mt-2 flex gap-2">' +
+        '<a href="/tasks" class="rounded-md bg-purple-600 px-2.5 py-1.5 text-[10px] font-medium text-white hover:bg-purple-500">查看任务</a>' +
+        '<button onclick="this.closest(\'div.pointer-events-auto\')?.remove()" class="rounded-md border border-slate-700 px-2.5 py-1.5 text-[10px] text-slate-400">继续浏览</button>' +
+        '</div></div></div>';
+    box.appendChild(el);
+    setTimeout(() => el.remove(), 8000);
+}
+
+
 
