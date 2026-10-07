@@ -1,3 +1,8 @@
+"""通用 HTTP 客户端。
+
+用途：统一 requests Session、线程隔离、超时、JSON 解析和有限次数的指数退避重试。
+维护说明：豆瓣、夸克等客户端通过本类复用请求逻辑，遇到非 JSON 上游响应会转换成 ApiError。
+"""
 from __future__ import annotations
 
 import threading
