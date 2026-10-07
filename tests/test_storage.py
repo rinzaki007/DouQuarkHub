@@ -19,3 +19,13 @@ def test_json_store_returns_default_for_corrupt_json(tmp_path):
     path = tmp_path / "broken.json"
     path.write_text("{not-json", encoding="utf-8")
     assert JsonStore(path, lambda: []).read() == []
+
+
+def test_corrupt_json_is_quarantined(tmp_path):
+    path = tmp_path / "broken.json"
+    path.write_text("{not-json", encoding="utf-8")
+
+    assert JsonStore(path, lambda: []).read() == []
+    backups = list(tmp_path.glob("broken.json.corrupt-*"))
+    assert len(backups) == 1
+    assert backups[0].read_text(encoding="utf-8") == "{not-json"
