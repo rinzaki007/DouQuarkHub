@@ -320,10 +320,24 @@ function openMovieDetail(idx) {
     cover.onerror = () => { cover.onerror = null; cover.src = noCoverImage; };
     document.getElementById('movie-detail-title').textContent = movie.title || '影视详情';
     document.getElementById('movie-detail-name').textContent = movie.title || '未命名影视';
-    document.getElementById('movie-detail-meta').innerHTML =
-        '<div><span class="text-slate-500">分类：</span>' + escapeHtml(movie.tag || currentTag) + '</div>' +
-        '<div><span class="text-slate-500">评分：</span>' + escapeHtml(movie.rate || '暂无') + '</div>' +
-        '<div><span class="text-slate-500">操作：</span>选择下面的资源转存或自动追剧</div>';
+    const metaParts = [
+        '<div><span class="text-slate-500">分类：</span>' + escapeHtml(movie.tag || currentTag) + '</div>',
+        movie.year ? '<div><span class="text-slate-500">年份：</span>' + escapeHtml(movie.year) + '</div>' : '',
+        '<div><span class="text-slate-500">评分：</span>' + escapeHtml(movie.rate || '暂无') + '</div>'
+    ].filter(Boolean);
+    document.getElementById('movie-detail-meta').innerHTML = metaParts.join('') +
+        '<div><span class="text-slate-500">操作：</span>选择资源版本转存，或为剧集开启自动追剧</div>';
+    const summary = document.getElementById('movie-detail-summary');
+    const summaryText = String(movie.summary || '').trim();
+    summary.textContent = summaryText;
+    summary.classList.toggle('hidden', !summaryText);
+    const genres = document.getElementById('movie-detail-genres');
+    const genreList = Array.isArray(movie.genres) ? movie.genres : [];
+    genres.innerHTML = genreList.slice(0, 8).map(item =>
+        '<span class="rounded-md border border-slate-700/60 bg-slate-950/45 px-2 py-1 text-[10px] text-slate-500">' +
+        escapeHtml(item) + '</span>'
+    ).join('');
+    genres.classList.toggle('hidden', genreList.length === 0);
     const douban = document.getElementById('movie-detail-douban');
     douban.href = movie.url || '#';
     document.getElementById('movie-detail-drawer').classList.remove('hidden');
