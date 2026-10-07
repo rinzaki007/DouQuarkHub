@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import re
 import threading
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 
 from ..clients.quark import VIDEO_EXTENSIONS, QuarkClient, sanitize_pwd_id
