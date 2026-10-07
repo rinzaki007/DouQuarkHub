@@ -6,7 +6,7 @@
 
 from __future__ import annotations
 
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor
 from threading import RLock
 from typing import Any
 
@@ -49,11 +49,11 @@ class TelegramResourceSource(ResourceSource):
         with ThreadPoolExecutor(
             max_workers=min(8, max(1, len(channels)))
         ) as executor:
-            futures = {
-                executor.submit(self.client.search_channel, channel, title): channel
+            futures = [
+                executor.submit(self.client.search_channel, channel, title)
                 for channel in channels
-            }
-            for future in as_completed(futures):
+            ]
+            for future in futures:
                 try:
                     for item in future.result():
                         results.append(
