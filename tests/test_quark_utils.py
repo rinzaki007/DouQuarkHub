@@ -1,3 +1,7 @@
+"""夸克工具函数单元测试。
+
+覆盖：分享短码清洗，以及电视剧文件名中的集数识别和分辨率误判规避。
+"""
 from moviesync.clients.quark import clean_tv_filename, sanitize_pwd_id
 
 
