@@ -778,6 +778,36 @@ def get_tasks():
 
 @api.get("/tasks/<task_id>")
 def get_task_detail(task_id):
+    if str(task_id).startswith("subscription:"):
+        sub_id = str(task_id).split(":", 1)[1]
+        sub = next(
+            (item for item in _services()["subscriptions"].get_subscriptions()
+             if str(item.get("id")) == sub_id),
+            None,
+        )
+        if not sub:
+            return _json_error("未找到任务", 404)
+        task = {
+            "id": "subscription:" + sub_id,
+            "type": "subscription",
+            "kind": "智能追剧",
+            "title": sub.get("title", "未命名任务"),
+            "status": "failed" if sub.get("last_error") else ("pending" if sub.get("pending_save_keys") else "waiting"),
+            "phase": "pending" if sub.get("pending_save_keys") else "waiting",
+            "phase_label": "等待夸克确认" if sub.get("pending_save_keys") else "等待下次检查",
+            "progress": 100,
+            "total": len(sub.get("files", []) or []),
+            "success_count": len(sub.get("saved_episodes", []) or []),
+            "skipped_count": 0,
+            "failed_count": 1 if sub.get("last_error") else 0,
+            "message": sub.get("last_error") or sub.get("last_check", "等待检查"),
+            "next_run_at": sub.get("next_run_at"),
+            "updated_at": sub.get("last_check_at") or 0,
+            "run_history": (sub.get("run_history", []) or [])[-20:],
+            "subscription_id": sub_id,
+            "pending_save_keys": sub.get("pending_save_keys", []) or [],
+        }
+        return jsonify({"success": True, "task": task})
     task = _services()["tasks"].get_task(task_id)
     if not task:
         return _json_error("未找到任务", 404)
