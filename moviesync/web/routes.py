@@ -794,8 +794,10 @@ def delete_task(task_id):
 @api.post("/tasks/clear-history")
 @require_csrf
 def clear_task_history():
-    removed = _services()["tasks"].clear_history()
-    return jsonify({"success": True, "removed": removed, "message": f"已清理 {removed} 条已结束任务"})
+    removed_tasks = _services()["tasks"].clear_history()
+    removed_runs = _services()["subscriptions"].clear_run_history()
+    removed = removed_tasks + removed_runs
+    return jsonify({"success": True, "removed": removed, "message": f"已清理 {removed} 条历史记录"})
 
 
 @api.get("/tasks/<task_id>")
