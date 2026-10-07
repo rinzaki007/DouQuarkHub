@@ -200,6 +200,19 @@ async function doSearch() {
 }
 
 
+function getNoCoverImage() {
+    const svg = `
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 600">
+            <rect width="400" height="600" fill="#020617"/>
+            <rect x="90" y="150" width="220" height="250" rx="16" fill="#1e293b"/>
+            <path d="M120 350l55-65 45 50 35-40 45 55" fill="none" stroke="#475569" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="175" cy="225" r="22" fill="#475569"/>
+            <text x="200" y="455" text-anchor="middle" fill="#64748b" font-size="24" font-family="Arial, sans-serif">No Poster</text>
+        </svg>
+    `;
+    return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+}
+
 function renderGrid() {
     const grid = document.getElementById('movie-grid');
     grid.innerHTML = '';
