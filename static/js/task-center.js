@@ -132,7 +132,7 @@ function renderTasks() {
         const progress = Math.max(0, Math.min(100, Number(task.progress || 0)));
         const retryable = task.type === 'transfer' && task.status === 'failed';
         const card = document.createElement('article');
-        card.className = 'p-4 hover:bg-slate-900/60 transition';
+        card.className = 'p-4 transition hover:bg-white/[.025]';
         const phase = escapeTask(task.phase_label || task.message || '等待执行');
         const cover = task.cover ? '/api/proxy-img?url=' + encodeURIComponent(task.cover) : '';
         card.innerHTML =
@@ -153,10 +153,10 @@ function renderTasks() {
             '<div class="mt-2 text-[11px] ' + ((task.status === 'failed' || task.last_error) ? 'text-rose-400' : 'text-slate-500') + '">' + escapeTask(task.message || task.last_error || '') + '</div>' +
             '</div>' +
             '<div class="flex shrink-0 flex-wrap content-start justify-end gap-2">' +
-            '<button data-action="detail" data-id="' + escapeTask(task.id) + '" class="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-[11px] text-slate-300 hover:bg-slate-800"><i class="fa-solid fa-circle-info mr-1"></i>详情</button>' +
-            (task.type === 'subscription' ? '<button data-action="run-sub" data-id="' + escapeTask(task.subscription_id) + '" class="rounded-lg bg-purple-600 px-3 py-2 text-[11px] font-medium text-white hover:bg-purple-500"><i class="fa-solid fa-play mr-1"></i>立即检查</button>' : '') +
-            ((task.type === 'subscription' || task.status === 'success' || task.status === 'failed' || task.status === 'error') ? '<button data-action="delete" data-id="' + escapeTask(task.id) + '" class="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-[11px] text-slate-400 hover:bg-slate-800 hover:text-rose-300"><i class="fa-solid fa-trash mr-1"></i>删除</button>' : '') +
-            (retryable ? '<button data-action="retry" data-id="' + escapeTask(task.id) + '" class="rounded-lg border border-amber-800 bg-amber-950/40 px-3 py-2 text-[11px] text-amber-300 hover:bg-amber-900/60"><i class="fa-solid fa-rotate-right mr-1"></i>失败重试</button>' : '') +
+            '<button data-action="detail" data-id="' + escapeTask(task.id) + '" class="rounded-xl border border-slate-700/70 bg-slate-950/55 px-3 py-2 text-[11px] text-slate-300 hover:bg-slate-800/80"><i class="fa-solid fa-circle-info mr-1"></i>详情</button>' +
+            (task.type === 'subscription' ? '<button data-action="run-sub" data-id="' + escapeTask(task.subscription_id) + '" class="rounded-xl bg-purple-600/90 px-3 py-2 text-[11px] font-medium text-white shadow-lg shadow-purple-600/15 hover:bg-purple-500"><i class="fa-solid fa-play mr-1"></i>立即检查</button>' : '') +
+            ((task.type === 'subscription' || task.status === 'success' || task.status === 'failed' || task.status === 'error') ? '<button data-action="delete" data-id="' + escapeTask(task.id) + '" class="rounded-xl border border-slate-700/70 bg-slate-950/55 px-3 py-2 text-[11px] text-slate-400 hover:bg-slate-800 hover:text-rose-300"><i class="fa-solid fa-trash mr-1"></i>删除</button>' : '') +
+            (retryable ? '<button data-action="retry" data-id="' + escapeTask(task.id) + '" class="rounded-xl border border-amber-800/70 bg-amber-950/35 px-3 py-2 text-[11px] text-amber-300 hover:bg-amber-900/60"><i class="fa-solid fa-rotate-right mr-1"></i>失败重试</button>' : '') +
             '</div></div>';
         list.appendChild(card);
     });
@@ -197,7 +197,7 @@ function renderTaskDetail(task) {
     ];
     const phaseIndex = task.status === 'failed' ? -1 : phases.findIndex(x => x[0] === task.phase);
     body.innerHTML =
-        '<div class="flex gap-4 rounded-2xl border border-slate-800 bg-slate-950 p-4">' +
+        '<div class="flex gap-4 rounded-2xl border border-slate-700/60 bg-slate-950/55 p-4 backdrop-blur-xl">' +
         (task.cover ? '<img src="/api/proxy-img?url=' + encodeURIComponent(task.cover) + '" class="h-32 w-24 shrink-0 rounded-xl object-cover bg-slate-900" onerror="this.style.display=\'none\'">' : '') +
         '<div class="min-w-0 flex-1"><div class="flex flex-wrap items-center gap-2"><span class="rounded-full border px-2 py-0.5 text-[10px] ' + state.cls + '">' + state.label + '</span><span class="text-[11px] text-slate-500">' + escapeTask(task.kind || '任务') + '</span></div>' +
         '<div class="mt-3 text-2xl font-semibold text-white">' + progress + '%</div><div class="mt-2 h-2 overflow-hidden rounded-full bg-slate-800"><div class="h-full rounded-full bg-purple-500" style="width:' + progress + '%"></div></div>' +
