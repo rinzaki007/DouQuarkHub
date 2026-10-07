@@ -283,12 +283,21 @@ function closeAddTask() {
     document.getElementById('task-drawer').classList.add('hidden');
 }
 
+function formatTaskSize(bytes) {
+    const n = Number(bytes || 0);
+    if (!n) return '未知大小';
+    const units = ['B','KB','MB','GB','TB'];
+    let value = n, index = 0;
+    while (value >= 1024 && index < units.length - 1) { value /= 1024; index++; }
+    return (value >= 10 || index === 0 ? value.toFixed(0) : value.toFixed(1)) + ' ' + units[index];
+}
+
 async function searchTaskCandidates() {
     const title = document.getElementById('task-title').value.trim();
     if (!title) return taskToast('请输入剧名');
     const box = document.getElementById('task-candidate-list');
     document.getElementById('task-candidates').classList.remove('hidden');
-    box.innerHTML = '<div class="rounded-lg border border-slate-800 bg-slate-950 p-6 text-center text-xs text-slate-500"><i class="fa-solid fa-spinner fa-spin mr-1"></i>正在并发检索频道…</div>';
+    box.innerHTML = '<div class="rounded-xl border border-slate-800 bg-slate-950 p-6 text-center text-xs text-slate-500"><i class="fa-solid fa-spinner fa-spin mr-1"></i>正在并发检索频道…</div>';
     selectedCandidate = null;
     document.getElementById('task-submit').disabled = true;
     document.getElementById('task-submit').classList.add('opacity-40');
@@ -298,26 +307,33 @@ async function searchTaskCandidates() {
         if (!res.success) throw new Error(res.message || '检索失败');
         const candidates = (res.candidates_map || {})[title] || [];
         if (!candidates.length) {
-            box.innerHTML = '<div class="rounded-lg border border-amber-900/50 bg-amber-950/20 p-5 text-center text-xs text-amber-300">没有找到匹配资源，请换一个剧名或检查频道配置。</div>';
+            box.innerHTML = '<div class="rounded-xl border border-amber-900/50 bg-amber-950/20 p-5 text-center text-xs text-amber-300">没有找到匹配资源，请换一个剧名或检查频道配置。</div>';
             return;
         }
         document.getElementById('candidate-hint').textContent = '找到 ' + candidates.length + ' 个可用源';
         box.innerHTML = '';
         candidates.forEach((candidate, index) => {
             const row = document.createElement('div');
-            row.className = 'rounded-xl border border-slate-800 bg-slate-950 p-4';
+            const files = Array.isArray(candidate.files) ? candidate.files : [];
+            const resolutions = Object.keys(candidate.resolutions || {});
+            const resolutionText = resolutions.length ? resolutions.join(' / ') : [...new Set(files.map(f => f.resolution).filter(Boolean))].join(' / ') || '未知';
+            const totalSize = candidate.total_size_text || formatTaskSize(files.reduce((sum, f) => sum + Number(f.size || 0), 0));
+            row.className = 'rounded-2xl border border-slate-800 bg-slate-950/80 p-4 transition hover:border-slate-700';
             row.innerHTML =
-                '<div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div>' +
-                '<div class="text-xs font-semibold text-emerald-400"><i class="fa-brands fa-telegram mr-1"></i>' + escapeTask(candidate.channel) + '</div>' +
-                '<div class="mt-1 text-[11px] text-slate-500">分享码 ' + escapeTask(candidate.pwd_id) + ' · ' + candidate.files.length + ' 个文件</div></div>' +
-                '<button data-candidate="' + index + '" class="candidate-select rounded-lg border border-purple-700 bg-purple-950/40 px-3 py-2 text-[11px] text-purple-200 hover:bg-purple-900/50">选择此源</button></div>' +
-                '<div class="mt-3 max-h-52 overflow-y-auto rounded-lg border border-slate-800 bg-slate-900/80 p-3 space-y-1">' +
-                candidate.files.map(file => '<label class="flex cursor-pointer items-center gap-2 py-1 text-xs text-slate-300"><input type="checkbox" data-fid="' + escapeTask(file.fid) + '" class="task-file rounded border-slate-700 bg-slate-900 text-purple-600"> <span class="font-mono">' + escapeTask(file.file_name) + '</span></label>').join('') +
+                '<div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div class="min-w-0">' +
+                '<div class="flex flex-wrap items-center gap-2"><span class="inline-flex items-center gap-1.5 rounded-lg border border-sky-900/60 bg-sky-950/40 px-2 py-1 text-[11px] font-semibold text-sky-300"><i class="fa-brands fa-telegram"></i>' + escapeTask(candidate.channel) + '</span>' +
+                '<span class="rounded-lg border border-slate-700 bg-slate-900 px-2 py-1 font-mono text-[10px] text-slate-500">' + escapeTask(candidate.pwd_id) + '</span></div>' +
+                '<div class="mt-3 flex flex-wrap gap-2"><span class="rounded-lg border border-slate-700 bg-slate-900 px-2 py-1 text-[10px] text-slate-400"><i class="fa-solid fa-film mr-1"></i>' + files.length + ' 个视频</span>' +
+                '<span class="rounded-lg border border-slate-700 bg-slate-900 px-2 py-1 text-[10px] text-slate-400"><i class="fa-solid fa-hard-drive mr-1"></i>' + escapeTask(totalSize) + '</span>' +
+                '<span class="rounded-lg border border-blue-900/60 bg-blue-950/30 px-2 py-1 text-[10px] text-blue-300"><i class="fa-solid fa-display mr-1"></i>' + escapeTask(resolutionText) + '</span></div></div>' +
+                '<button data-candidate="' + index + '" class="candidate-select shrink-0 rounded-xl border border-purple-700 bg-purple-950/40 px-4 py-2.5 text-[11px] font-medium text-purple-200 hover:bg-purple-900/50">选择此源</button></div>' +
+                '<div class="mt-4 max-h-60 overflow-y-auto rounded-xl border border-slate-800 bg-slate-900/80 p-2 space-y-1">' +
+                files.map(file => '<label class="flex cursor-pointer items-center gap-3 rounded-lg px-2 py-2 hover:bg-slate-800/70"><input type="checkbox" data-fid="' + escapeTask(file.fid) + '" class="task-file h-4 w-4 rounded border-slate-700 bg-slate-900 text-purple-600"> <span class="min-w-0 flex-1 truncate text-xs text-slate-300">' + escapeTask(file.file_name) + '</span><span class="shrink-0 text-[10px] text-slate-500">' + escapeTask(file.resolution || '未知') + ' · ' + escapeTask(file.size_text || formatTaskSize(file.size)) + '</span></label>').join('') +
                 '</div>';
             row.querySelector('.candidate-select').onclick = function() {
                 selectedCandidate = {candidate:candidate,row:row};
-                document.querySelectorAll('.candidate-select').forEach(b => { b.className='candidate-select rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-[11px] text-slate-400'; b.textContent='选择此源'; });
-                this.className='candidate-select rounded-lg bg-emerald-600 px-3 py-2 text-[11px] text-white';
+                document.querySelectorAll('.candidate-select').forEach(b => { b.className='candidate-select rounded-xl border border-slate-700 bg-slate-900 px-4 py-2.5 text-[11px] text-slate-400'; b.textContent='选择此源'; });
+                this.className='candidate-select rounded-xl bg-emerald-600 px-4 py-2.5 text-[11px] font-medium text-white';
                 this.textContent='已选择';
                 document.getElementById('task-submit').disabled=false;
                 document.getElementById('task-submit').classList.remove('opacity-40');
@@ -326,7 +342,7 @@ async function searchTaskCandidates() {
             box.appendChild(row);
         });
     } catch (err) {
-        box.innerHTML = '<div class="rounded-lg border border-rose-900/50 bg-rose-950/20 p-5 text-xs text-rose-300">检索失败：' + escapeTask(err.message) + '</div>';
+        box.innerHTML = '<div class="rounded-xl border border-rose-900/50 bg-rose-950/20 p-5 text-xs text-rose-300">检索失败：' + escapeTask(err.message) + '</div>';
     }
 }
 
