@@ -20,6 +20,7 @@ from .config_store import ConfigStore
 from .logging_setup import configure_logging, recent_logs
 from .services.search import SearchService
 from .services.subscriptions import SubscriptionManager
+from .services.tasks import TaskManager
 from .settings import PROJECT_ROOT, load_settings
 from .web import LoginRateLimiter, register_web
 
@@ -67,6 +68,11 @@ def create_app(
     telegram = TelegramClient()
     http = HttpClient()
 
+    tasks = TaskManager(
+        settings.data_dir / "tasks.json",
+        logger,
+    )
+
     subscriptions = SubscriptionManager(
         settings.subscriptions_file,
         config_store.get_cookie,
@@ -82,6 +88,7 @@ def create_app(
         "telegram": telegram,
         "http": http,
         "subscriptions": subscriptions,
+        "tasks": tasks,
         "quark_factory": lambda cookie: QuarkClient(cookie),
         "search_factory": lambda cookie: SearchService(
             QuarkClient(cookie),
