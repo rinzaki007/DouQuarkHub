@@ -1,3 +1,8 @@
+"""MovieSync 持久化配置管理。
+
+用途：管理夸克 Cookie、默认/分类 FID、OpenList 地址和 Telegram 频道，并校验外部输入。
+维护说明：统一配置写入 data/config.json；对外 public() 会主动隐藏夸克 Cookie。
+"""
 from __future__ import annotations
 
 import re
