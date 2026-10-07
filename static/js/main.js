@@ -1,3 +1,6 @@
+/* MovieSync 主页面 JavaScript
+ * 用途：负责豆瓣列表加载/渲染、搜索、选择影片、资源候选弹窗、白名单转存、日志、频道状态和自动追剧。
+ * 维护说明：apiFetch() 统一携带同源 Cookie 与 CSRF；当前版本还提供 getNoCoverImage()，避免无海报时因缺少函数导致整页渲染中断。 */
 let currentTag = '电影';
 let currentSort = 'U';
 
