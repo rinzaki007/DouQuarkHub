@@ -221,6 +221,7 @@ class ResourceSourceManager:
                 source_id,
                 result["status"],
                 result.get("message", ""),
+                result.get("channels"),
             )
 
         return results
