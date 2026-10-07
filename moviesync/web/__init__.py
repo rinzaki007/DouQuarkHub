@@ -149,6 +149,13 @@ def register_web(app, services):
 
         return response
 
+    @app.errorhandler(404)
+    def not_found(error):
+        services["logger"].warning("请求路径不存在: %s %s", request.method, request.path)
+        if request.path.startswith("/api/"):
+            return jsonify({"success": False, "message": "接口不存在"}), 404
+        return "Not Found", 404
+
     @app.errorhandler(413)
     def payload_too_large(_):
         return jsonify({"success": False, "message": "请求数据过大"}), 413
