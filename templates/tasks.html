@@ -10,7 +10,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body class="min-h-screen bg-[radial-gradient(circle_at_top,rgba(59,130,246,.10),transparent_32%),#020617]">
-<header class="sticky top-0 z-40 border-b border-slate-800/80 bg-slate-900/65 backdrop-blur-xl">
+<header class="glass-nav sticky top-0 z-40 border-b border-slate-800/80">
     <div class="mx-auto flex max-w-screen-2xl items-center justify-between gap-4 px-3 py-2.5 sm:px-4">
         <div class="flex min-w-0 items-center gap-2">
             <a href="/" class="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm font-semibold text-white hover:bg-slate-800"><i class="fa-solid fa-film text-blue-500"></i><span>MovieSync</span></a>
@@ -40,13 +40,13 @@
     </section>
 
     <section class="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <div class="rounded-xl border border-slate-800 bg-slate-900/60 p-4 backdrop-blur-xl"><div class="text-xs text-slate-500">全部任务</div><div id="stat-total" class="mt-2 text-2xl font-semibold text-white">—</div></div>
-        <div class="rounded-xl border border-slate-800 bg-slate-900/80 p-4"><div class="text-xs text-slate-500">等待检查</div><div id="stat-waiting" class="mt-2 text-2xl font-semibold text-blue-400">—</div></div>
-        <div class="rounded-xl border border-slate-800 bg-slate-900/80 p-4"><div class="text-xs text-slate-500">异常任务</div><div id="stat-error" class="mt-2 text-2xl font-semibold text-rose-400">—</div></div>
-        <div class="rounded-xl border border-slate-800 bg-slate-900/80 p-4"><div class="text-xs text-slate-500">即将检查</div><div id="stat-soon" class="mt-2 text-2xl font-semibold text-amber-400">—</div></div>
+        <div class="glass-panel rounded-xl p-4"><div class="text-xs text-slate-500">全部任务</div><div id="stat-total" class="mt-2 text-2xl font-semibold text-white">—</div></div>
+        <div class="glass-panel rounded-xl p-4"><div class="text-xs text-slate-500">等待检查</div><div id="stat-waiting" class="mt-2 text-2xl font-semibold text-blue-400">—</div></div>
+        <div class="glass-panel rounded-xl p-4"><div class="text-xs text-slate-500">异常任务</div><div id="stat-error" class="mt-2 text-2xl font-semibold text-rose-400">—</div></div>
+        <div class="glass-panel rounded-xl p-4"><div class="text-xs text-slate-500">即将检查</div><div id="stat-soon" class="mt-2 text-2xl font-semibold text-amber-400">—</div></div>
     </section>
 
-    <section class="rounded-2xl border border-slate-700/60 bg-slate-900/55 backdrop-blur-xl shadow-[0_18px_55px_rgba(0,0,0,.18)]">
+    <section class="glass-panel rounded-2xl shadow-[0_18px_55px_rgba(0,0,0,.18)]">
         <div class="flex flex-col gap-3 border-b border-slate-800 p-4 sm:flex-row sm:items-center sm:justify-between">
             <div><h2 class="text-sm font-semibold text-white">智能追剧</h2><p class="mt-1 text-[11px] text-slate-500">监控指定分享源的新集，只在发现新资源后执行转存。</p></div>
             <div class="flex items-center gap-1 rounded-lg border border-slate-800 bg-slate-950 p-1 text-[11px]">
@@ -70,21 +70,21 @@
 
 <div id="task-drawer" class="fixed inset-0 z-[100] hidden">
     <div onclick="closeAddTask()" class="absolute inset-0 bg-black/60 backdrop-blur-sm"></div>
-    <aside class="absolute right-0 top-0 h-full w-full max-w-2xl overflow-y-auto border-l border-slate-800 bg-slate-900/75 backdrop-blur-2xl shadow-2xl">
+    <aside class="glass-panel absolute right-0 top-0 h-full w-full max-w-2xl overflow-y-auto border-l shadow-2xl">
         <div class="sticky top-0 z-10 flex items-center justify-between border-b border-slate-800 bg-slate-900/95 px-5 py-4 backdrop-blur">
             <div><div class="text-xs font-medium text-purple-400">NEW TASK</div><h2 class="mt-1 text-base font-semibold text-white">创建智能追剧任务</h2></div>
             <button onclick="closeAddTask()" class="rounded-md px-2 py-1 text-slate-400 hover:bg-slate-800 hover:text-white" aria-label="关闭"><i class="fa-solid fa-xmark"></i></button>
         </div>
         <div class="space-y-5 p-5">
-            <div class="rounded-xl border border-slate-800 bg-slate-950 p-4">
+            <div class="glass-panel rounded-xl p-4">
                 <label class="text-xs font-medium text-slate-300" for="task-title">剧名</label>
                 <div class="mt-2 flex gap-2"><input id="task-title" class="min-w-0 flex-1 rounded-lg border border-slate-700 bg-slate-900 px-3 py-2.5 text-sm text-slate-200 outline-none focus:border-purple-500" placeholder="例如：绝命毒师" onkeydown="if(event.key==='Enter') searchTaskCandidates()"><button onclick="searchTaskCandidates()" class="rounded-lg bg-purple-600 px-4 py-2 text-xs font-medium text-white hover:bg-purple-500">检索资源</button></div>
                 <p class="mt-2 text-[11px] text-slate-500">先找到稳定的分享源，再选择需要监控的集数。</p>
             </div>
             <div id="task-candidates" class="hidden space-y-3"><div class="flex items-center justify-between"><h3 class="text-xs font-semibold text-blue-400">选择监控源</h3><span id="candidate-hint" class="text-[11px] text-slate-500"></span></div><div id="task-candidate-list" class="space-y-3"></div></div>
             <div class="grid gap-4 sm:grid-cols-2">
-                <div class="rounded-xl border border-slate-800 bg-slate-950 p-4"><label class="text-xs font-medium text-slate-300" for="task-target-fid">存储目录</label><select id="task-target-fid" class="global-category-select mt-2 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2.5 text-xs text-slate-200 outline-none focus:border-amber-500"><option value="0">正在加载目录…</option></select><p class="mt-2 text-[11px] text-slate-500">系统会在此目录下创建剧名专属文件夹。</p></div>
-                <div class="rounded-xl border border-slate-800 bg-slate-950 p-4"><label class="text-xs font-medium text-slate-300" for="task-interval">检测频率</label><select id="task-interval" class="mt-2 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2.5 text-xs text-slate-200 outline-none focus:border-emerald-500"><option value="3">每 3 小时</option><option value="6" selected>每 6 小时</option><option value="9">每 9 小时</option><option value="12">每 12 小时</option></select><p class="mt-2 text-[11px] text-slate-500">异常会自动短退避重试，不会一直高频请求。</p></div>
+                <div class="glass-panel rounded-xl p-4"><label class="text-xs font-medium text-slate-300" for="task-target-fid">存储目录</label><select id="task-target-fid" class="global-category-select mt-2 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2.5 text-xs text-slate-200 outline-none focus:border-amber-500"><option value="0">正在加载目录…</option></select><p class="mt-2 text-[11px] text-slate-500">系统会在此目录下创建剧名专属文件夹。</p></div>
+                <div class="glass-panel rounded-xl p-4"><label class="text-xs font-medium text-slate-300" for="task-interval">检测频率</label><select id="task-interval" class="mt-2 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2.5 text-xs text-slate-200 outline-none focus:border-emerald-500"><option value="3">每 3 小时</option><option value="6" selected>每 6 小时</option><option value="9">每 9 小时</option><option value="12">每 12 小时</option></select><p class="mt-2 text-[11px] text-slate-500">异常会自动短退避重试，不会一直高频请求。</p></div>
             </div>
             <div class="flex items-center justify-between border-t border-slate-800 pt-4"><span id="task-form-status" class="text-xs text-slate-500"></span><button id="task-submit" onclick="createTask()" disabled class="rounded-lg bg-purple-600 px-5 py-2.5 text-xs font-medium text-white opacity-40 disabled:cursor-not-allowed">保存并启用</button></div>
         </div>
@@ -92,7 +92,7 @@
 </div>
 <div id="task-detail-drawer" class="fixed inset-0 z-[120] hidden">
     <div onclick="closeTaskDetail()" class="absolute inset-0 bg-black/65 backdrop-blur-sm"></div>
-    <aside class="absolute right-0 top-0 h-full w-full max-w-2xl overflow-y-auto border-l border-slate-800 bg-slate-900 shadow-2xl">
+    <aside class="glass-panel absolute right-0 top-0 h-full w-full max-w-2xl overflow-y-auto border-l shadow-2xl">
         <div class="sticky top-0 z-10 flex items-center justify-between border-b border-slate-800 bg-slate-900/95 px-5 py-4 backdrop-blur">
             <div><div class="text-[10px] font-medium uppercase tracking-widest text-purple-400">TASK DETAIL</div><h2 id="detail-title" class="mt-1 text-base font-semibold text-white">任务详情</h2></div>
             <button onclick="closeTaskDetail()" class="rounded-md px-2 py-1 text-slate-400 hover:bg-slate-800 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
