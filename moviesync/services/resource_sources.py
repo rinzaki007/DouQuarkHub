@@ -80,9 +80,37 @@ class TelegramResourceSource(ResourceSource):
         with ThreadPoolExecutor(
             max_workers=min(8, max(1, len(channels)))
         ) as executor:
-            results = list(executor.map(self.client.check_channel, channels))
+            results = list(
+                executor.map(
+                    self.client.check_channel_detail,
+                    channels,
+                )
+            )
 
-        valid_count = sum(bool(item) for item in results)
+        channel_results = []
+        for channel, detail in zip(channels, results):
+            channel_id = str(
+                channel.get("id", "")
+                if isinstance(channel, dict)
+                else channel
+            ).strip().lstrip("@")
+            channel_name = str(
+                channel.get("name", channel_id)
+                if isinstance(channel, dict)
+                else channel_id
+            ).strip() or channel_id
+            channel_results.append(
+                {
+                    "id": channel_id,
+                    "name": channel_name,
+                    **detail,
+                }
+            )
+
+        valid_count = sum(
+            item.get("status") == "healthy"
+            for item in channel_results
+        )
         total = len(channels)
         if valid_count == total:
             status = "healthy"
@@ -99,6 +127,7 @@ class TelegramResourceSource(ResourceSource):
             "message": message,
             "total": total,
             "valid_count": valid_count,
+            "channels": channel_results,
         }
 
 
