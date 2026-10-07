@@ -1720,32 +1720,60 @@
                 box.innerHTML = '<div class="glass-panel rounded-xl p-3 text-xs text-slate-500">暂无资源来源</div>';
                 return;
             }
+
+            const statusMeta = {
+                healthy: ["正常", "text-emerald-300", "fa-circle-check"],
+                degraded: ["部分可用", "text-amber-300", "fa-triangle-exclamation"],
+                unavailable: ["不可用", "text-rose-300", "fa-circle-xmark"],
+                disabled: ["已停用", "text-slate-500", "fa-circle-minus"],
+                unknown: ["未检查", "text-slate-400", "fa-circle-question"]
+            };
+
             box.innerHTML = sources.map((source) => {
                 const health = source.health || {};
                 const status = health.status || source.status || "unknown";
-                const label = status === "healthy" ? "正常" :
-                    status === "degraded" ? "部分可用" :
-                    status === "unavailable" ? "不可用" :
-                    status === "disabled" ? "已停用" : "未检查";
-                const cls = status === "healthy" ? "text-emerald-300" :
-                    status === "degraded" ? "text-amber-300" :
-                    status === "unavailable" ? "text-rose-300" :
-                    "text-slate-400";
+                const meta = statusMeta[status] || statusMeta.unknown;
                 const message = health.message || source.message || "尚未检查";
                 const checked = health.last_checked_at ?
                     new Date(health.last_checked_at * 1000).toLocaleString() : "—";
+                const channels = health.channels || source.channels || [];
+                const failed = channels.filter((item) => item.status !== "healthy");
+
                 return '<div class="glass-panel rounded-xl p-3">' +
                     '<div class="flex items-center justify-between gap-2">' +
                     '<div class="flex items-center gap-2 text-sm font-semibold text-slate-200"><i class="fa-solid fa-plug text-slate-400"></i>' +
                     escapeHtml(source.name || source.id || "未知来源") + '</div>' +
-                    '<span class="text-[11px] font-medium ' + cls + '">' + label + '</span>' +
+                    '<span class="text-[11px] font-medium ' + meta[1] + '"><i class="fa-solid ' + meta[2] + ' mr-1"></i>' +
+                    meta[0] + '</span>' +
                     '</div>' +
                     '<div class="mt-2 text-[11px] text-slate-400">' + escapeHtml(message) + '</div>' +
-                    '<div class="mt-1 text-[10px] text-slate-500">最近检查：' + checked + '</div>' +
+                    (channels.length ? (
+                        '<div class="mt-3 space-y-1.5">' +
+                        channels.map((channel) => {
+                            const ok = channel.status === "healthy";
+                            const partial = channel.status === "degraded";
+                            const color = ok ? "text-emerald-300" : partial ? "text-amber-300" : "text-rose-300";
+                            const icon = ok ? "fa-circle-check" : partial ? "fa-triangle-exclamation" : "fa-circle-xmark";
+                            const label = ok ? "正常" : partial ? "异常" : "不可用";
+                            return '<div class="flex items-start justify-between gap-3 rounded-lg border ' +
+                                (ok ? 'border-emerald-400/10 bg-emerald-400/5' : 'border-rose-400/15 bg-rose-400/5') +
+                                ' px-2.5 py-2">' +
+                                '<div class="min-w-0">' +
+                                '<div class="flex items-center gap-1.5 text-xs text-slate-200"><i class="fa-solid ' + icon + ' ' + color + '"></i>' +
+                                escapeHtml(channel.name || channel.id || "未命名频道") + '</div>' +
+                                '<div class="mt-0.5 text-[10px] text-slate-500">' +
+                                escapeHtml(channel.message || "未返回检测信息") + '</div>' +
+                                '</div>' +
+                                '<span class="shrink-0 text-[10px] font-medium ' + color + '">' + label + '</span>' +
+                                '</div>';
+                        }).join("") +
+                        '</div>'
+                    ) : '') +
+                    (failed.length ? '<div class="mt-2 text-[10px] font-medium text-rose-300">⚠ 有 ' + failed.length + ' 个频道异常，请检查频道配置。</div>' : '') +
+                    '<div class="mt-2 text-[10px] text-slate-500">最近检查：' + checked + '</div>' +
                     '</div>';
             }).join("");
         }
-
 
         /* ==========================================================
            账户安全 - 修改用户名
