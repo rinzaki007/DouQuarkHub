@@ -160,28 +160,62 @@ class QuarkClient:
 
         all_files: list[dict[str, Any]] = []
         visited: set[str] = set()
+        walk_error: str | None = None
 
         def walk(parent_fid: str, depth: int) -> None:
-            if depth > max_depth or len(all_files) >= max_files or parent_fid in visited:
+            nonlocal walk_error
+
+            if (
+                walk_error
+                or depth > max_depth
+                or len(all_files) >= max_files
+                or parent_fid in visited
+            ):
                 return
+
             visited.add(parent_fid)
             page = 1
-            while page <= 20 and len(all_files) < max_files:
+
+            while (
+                page <= 20
+                and len(all_files) < max_files
+                and not walk_error
+            ):
                 url = (
                     "https://drive.quark.cn/1/clouddrive/share/sharepage/detail"
                     f"?pr=ucpro&fr=pc&pwd_id={quote(pwd_id)}"
                     f"&stoken={quote(stoken, safe='')}"
                     f"&pdir_fid={quote(str(parent_fid))}&p={page}&num=200"
                 )
+
                 try:
-                    response, payload = self.http.request_json("GET", url, timeout=8, retries=1)
-                except ApiError:
+                    response, payload = self.http.request_json(
+                        "GET",
+                        url,
+                        timeout=8,
+                        retries=1,
+                    )
+                except ApiError as exc:
+                    walk_error = f"读取分享文件列表失败: {exc}"
                     return
+
                 if response.status_code != 200 or payload.get("code") != 0:
+                    walk_error = str(
+                        payload.get("message")
+                        or f"读取分享文件列表失败（HTTP {response.status_code}）"
+                    )
                     return
-                batch = payload.get("data", {}).get("list", []) or []
+
+                batch = (
+                    payload.get("data", {}).get("list", [])
+                    or []
+                )
+
                 for item in batch:
-                    if item.get("dir_file") is True or item.get("file_type") == 0:
+                    if (
+                        item.get("dir_file") is True
+                        or item.get("file_type") == 0
+                    ):
                         fid = item.get("fid")
                         if fid:
                             walk(str(fid), depth + 1)
@@ -189,11 +223,17 @@ class QuarkClient:
                         all_files.append(item)
                         if len(all_files) >= max_files:
                             return
+
                 if len(batch) < 200:
                     break
+
                 page += 1
 
         walk("0", 0)
+
+        if walk_error:
+            return None, None, walk_error
+
         return all_files, str(stoken), None
 
     def save_files(
@@ -210,16 +250,39 @@ class QuarkClient:
             return False, "缺少分享 Token"
         fid_list: list[str] = []
         seen: set[str] = set()
-        for item in files_to_save or []:
+
+        for item in (files_to_save or [])[:200]:
+            if not isinstance(item, dict):
+                continue
+
             fid = str(item.get("fid") or "").strip()
-            if fid and fid not in seen:
+
+            if (
+                fid
+                and len(fid) <= 128
+                and re.fullmatch(r"[A-Za-z0-9_-]+", fid)
+                and fid not in seen
+            ):
                 seen.add(fid)
                 fid_list.append(fid)
+
         if not fid_list:
-            return False, "没有可转存的文件"
+            return False, "没有可转存的有效文件"
+
+        target_fid = str(target_fid or "0").strip()
+        if (
+            len(target_fid) > 128
+            or not re.fullmatch(r"[A-Za-z0-9_-]+", target_fid)
+        ):
+            return False, "目标目录 FID 格式无效"
 
         url = "https://drive.quark.cn/1/clouddrive/share/sharepage/save?pr=ucpro&fr=pc"
-        payload = {"pwd_id": pwd_id, "stoken": stoken, "fid_list": fid_list, "to_pdir_fid": str(target_fid or "0")}
+        payload = {
+            "pwd_id": pwd_id,
+            "stoken": stoken,
+            "fid_list": fid_list,
+            "to_pdir_fid": target_fid,
+        }
         try:
             response, data = self.http.request_json("POST", url, timeout=10, retries=0, json=payload)
             if response.status_code == 200 and data.get("code") == 0:
