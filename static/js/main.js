@@ -622,64 +622,61 @@ function confirmBatchTransferForCandidate(mIdx, cIdx) {
 
 async function confirmTransferAndSave(movie, candidate, targetFid = '0') {
     closeCandidateModal();
-    
     toggleLogBox(true);
     clearLog();
     startLogTimer();
+    appendLogLine('[任务中心] 📥 正在创建转存任务…', 'info');
+    appendLogLine('  -> 目标频道: ' + candidate.channel, 'info');
+    appendLogLine('  -> 提取短码: ' + candidate.pwd_id, 'info');
 
-    appendLogLine(`[转存启动] 📥 正在为《${movie.title}》创建专属云端文件夹并转存选中版本...`, 'info');
-    appendLogLine(`  -> 目标频道: ${candidate.channel}`, 'info');
-    appendLogLine(`  -> 提取短码: ${candidate.pwd_id}`, 'info');
-
-    const startTime = Date.now();
     try {
         const response = await apiFetch('/api/transfer-selected', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({
-                movie: movie,
-                candidate: candidate,
-                target_fid: targetFid
-            })
+            body: JSON.stringify({movie, candidate, target_fid: targetFid})
         });
-
         const res = await response.json();
-        const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-        stopLogTimer();
+        if (!res.success) {
+            appendLogLine('[创建失败] ❌ ' + (res.message || '无法创建任务'), 'error');
+            stopLogTimer();
+            return;
+        }
 
-        if (res.success) {
-            appendLogLine(`[转存成功] 🎉 ${res.message} (耗时 ${elapsed}秒)`, 'success');
-            appendLogLine(`[系统提示] ⏳ 转存成功，日志将在 3 秒后自动收起...`, 'info');
-            
-            if (logAutoCloseTimer) clearInterval(logAutoCloseTimer);
-            let countdown = 3;
-            const badge = document.getElementById('log-timer-badge');
-            if (badge) badge.innerText = `成功 · ${countdown}s后收起`;
-            
-            logAutoCloseTimer = setInterval(() => {
-                countdown--;
-                if (badge) badge.innerText = `成功 · ${countdown}s后收起`;
-                if (countdown <= 0) {
-                    clearInterval(logAutoCloseTimer);
-                    logAutoCloseTimer = null;
-                    toggleLogBox(false);
-                }
-            }, 1000);
-        } else {
-            if (logAutoCloseTimer) {
-                clearInterval(logAutoCloseTimer);
-                logAutoCloseTimer = null;
+        const taskId = res.task?.id;
+        appendLogLine('[任务已创建] ⏳ 已进入任务中心，可关闭本窗口继续浏览。', 'success');
+        if (!taskId) {
+            appendLogLine('[异常] ❌ 服务端未返回任务 ID。', 'error');
+            stopLogTimer();
+            return;
+        }
+
+        let finished = false;
+        for (let i = 0; i < 120; i++) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            const statusResp = await apiFetch('/api/tasks');
+            const statusData = await statusResp.json();
+            const task = (statusData.tasks || []).find(item => item.id === taskId);
+            if (!task) continue;
+
+            if (task.status === 'running') {
+                appendLogLine('[执行中] ' + (task.progress || 0) + '% · ' + (task.message || ''), 'info');
             }
-            appendLogLine(`[转存失败] ❌ ${res.message} (耗时 ${elapsed}秒)`, 'error');
-            appendLogLine(`[系统提示] ⚠️ 转存发生错误，日志保持一直显示以便排查。`, 'warn');
+            if (task.status === 'success' || task.status === 'failed') {
+                finished = true;
+                appendLogLine(
+                    task.status === 'success'
+                        ? '[转存完成] 🎉 成功 ' + (task.success_count || 0) + '，跳过 ' + (task.skipped_count || 0)
+                        : '[转存失败] ❌ ' + (task.message || '执行失败'),
+                    task.status === 'success' ? 'success' : 'error'
+                );
+                break;
+            }
         }
+        if (!finished) appendLogLine('[任务仍在执行] ⏳ 已超过前台等待时间，请前往任务中心查看进度。', 'warn');
     } catch (err) {
+        appendLogLine('[异常捕获] ❌ ' + err.message, 'error');
+    } finally {
         stopLogTimer();
-        if (logAutoCloseTimer) {
-            clearInterval(logAutoCloseTimer);
-            logAutoCloseTimer = null;
-        }
-        appendLogLine(`[异常捕获] ❌ 转存请求发生异常: ${err.message}`, 'error');
-        appendLogLine(`[系统提示] ⚠️ 发生异常，日志保持一直显示。`, 'warn');
     }
 }
+
