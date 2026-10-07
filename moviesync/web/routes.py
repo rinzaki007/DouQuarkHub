@@ -277,16 +277,33 @@ def proxy_img():
     parsed = urlparse(target)
     if parsed.scheme != "https" or not parsed.hostname:
         return Response("Invalid URL", status=400)
+
     host = parsed.hostname.lower()
     if not (host.endswith(".doubanio.com") or host == "doubanio.com"):
         return Response("Host not allowed", status=403)
+
     try:
-        response = _services()["http"].session.get(target, timeout=8, stream=True)
+        response = _services()["http"].session.get(
+            target,
+            headers={
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0.0.0 Safari/537.36",
+                "Referer": "https://movie.douban.com/",
+            },
+            timeout=8,
+            stream=True,
+        )
+
         if response.status_code != 200:
             return Response("Image unavailable", status=404)
-        content_type = response.headers.get("Content-Type", "image/jpeg").split(";", 1)[0]
+
+        content_type = response.headers.get(
+            "Content-Type", "image/jpeg"
+        ).split(";", 1)[0]
+
         if not content_type.startswith("image/"):
             return Response("Not an image", status=415)
+
         return Response(response.content, mimetype=content_type)
+
     except Exception:
         return Response("Image unavailable", status=404)
