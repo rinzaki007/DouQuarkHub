@@ -1,3 +1,7 @@
+"""资源搜索服务单元测试。
+
+使用 Fake Telegram/Quark，验证多频道搜索结果按分享 ID 去重且顺序稳定，并确保 stoken 不泄露到候选结果。
+"""
 from moviesync.services.search import SearchService
 
 
