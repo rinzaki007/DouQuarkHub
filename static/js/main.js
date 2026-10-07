@@ -310,7 +310,7 @@ function renderGrid() {
                 <div class="truncate text-sm font-semibold text-slate-100 group-hover:text-blue-300" title="${escapeHtml(movie.title)}">${escapeHtml(movie.title)}</div>
                 <div class="mt-2 flex items-center justify-between gap-2">
                     <span class="text-[10px] text-slate-500">点击海报查看操作</span>
-                    <a href="${escapeHtml(movie.url || '#')}" target="_blank" rel="noopener noreferrer" class="rounded-lg border border-slate-700 bg-slate-950/80 px-2 py-1 text-[10px] text-slate-300 hover:border-blue-700 hover:text-blue-300">豆瓣 <i class="fa-solid fa-arrow-up-right-from-square ml-1"></i></a>
+                    <a href="${escapeHtml(movie.url || '#')}" target="_blank" rel="noopener noreferrer" class="douban-poster-btn" aria-label="打开豆瓣详情">豆瓣 <i class="fa-solid fa-arrow-up-right-from-square"></i></a>
                 </div>
             </div>`;
         const cover = card.querySelector('.movie-cover');
