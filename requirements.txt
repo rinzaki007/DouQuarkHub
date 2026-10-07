@@ -1,3 +1,5 @@
+# MovieSync 生产运行依赖
+# 用途：Docker 构建时安装 Flask、Gunicorn、requests、BeautifulSoup 等运行时依赖。
 Flask>=3.1,<4
 requests>=2.32,<3
 beautifulsoup4>=4.12,<5
