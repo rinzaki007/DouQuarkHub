@@ -13,7 +13,10 @@ from bs4 import BeautifulSoup
 from .http import ApiError, HttpClient
 
 CHANNEL_RE = re.compile(r"^[A-Za-z0-9_]{2,64}$")
-QUARK_RE = re.compile(r"(?:https?://)?(?:pan\.)?quark\.cn/s/([A-Za-z0-9]+)", re.IGNORECASE)
+QUARK_RE = re.compile(r"(?:https?://)?(?:pan\.)?quark\.cn/s/([A-Za-z0-9]{1,128})", re.IGNORECASE)
+
+MAX_SEARCH_MESSAGES = 100
+MAX_SHARES_PER_CHANNEL = 20
 TG_HEADERS = {"User-Agent": "Mozilla/5.0"}
 
 
@@ -56,7 +59,7 @@ class TelegramClient:
         soup = BeautifulSoup(response.text, "html.parser")
         results: list[dict] = []
         simple_target = self._simplify(title)
-        for message in soup.select("div.tgme_widget_message_text"):
+        for message in soup.select("div.tgme_widget_message_text")[:MAX_SEARCH_MESSAGES]:
             plain_text = message.get_text(" ", strip=True)
             simple_plain = self._simplify(plain_text)
             if title not in plain_text and (not simple_target or simple_target not in simple_plain):
@@ -73,6 +76,8 @@ class TelegramClient:
                         pwd_ids.append(pwd_id)
             for pwd_id in pwd_ids:
                 results.append({"channel": channel_name, "pwd_id": pwd_id})
+                if len(results) >= MAX_SHARES_PER_CHANNEL:
+                    return results
         return results
 
     @staticmethod
