@@ -12,7 +12,6 @@ from typing import Any
 from ..clients.quark import VIDEO_EXTENSIONS, QuarkClient, sanitize_pwd_id
 from .resource_sources import ResourceSourceManager
 
-
 MAX_VIDEO_FILES_PER_CANDIDATE = 200
 MAX_CANDIDATES_PER_MOVIE = 20
 
