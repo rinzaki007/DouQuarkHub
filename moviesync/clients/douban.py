@@ -6,7 +6,7 @@ from urllib.parse import quote
 from .http import ApiError, HttpClient
 
 DOUBAN_HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36",
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0.0.0 Safari/537.36",
     "Referer": "https://movie.douban.com/explore",
     "Accept": "application/json, text/plain, */*",
     "Accept-Language": "zh-CN,zh;q=0.9",
@@ -20,77 +20,133 @@ class DoubanClient:
     def get_movies(self, tag: str, sort_type: str) -> list[dict]:
         tag = tag if tag in {"电影", "电视剧", "综艺", "动漫"} else "电影"
         sort_type = sort_type if sort_type in {"U", "T", "R"} else "U"
+
         if tag == "电影":
-            url = "https://m.douban.com/rexxar/api/v2/subject/recent_hot/movie"
-            params = {
-                "start": "0",
-                "limit": "100",
-                "category": "最新" if sort_type in {"T", "R"} else "热门",
-                "type": "全部",
-            }
+            items = self._get_movie_items(sort_type)
         else:
-            url = "https://m.douban.com/rexxar/api/v2/tv/recommend"
-            cat_map = {
-                "动漫": {"类型": "动画", "形式": "电视剧"},
-                "综艺": {"类型": "", "形式": "综艺"},
-                "电视剧": {"类型": "", "形式": "电视剧"},
-            }
-            params = {
-                "refresh": "0",
-                "start": "0",
-                "count": "100",
-                "selected_categories": json.dumps(cat_map[tag], ensure_ascii=False),
-                "tags": tag,
-                "sort": "R" if sort_type in {"T", "R"} else "U",
-            }
-        response, payload = self.http.request_json(
-            "GET",
-            url,
-            timeout=10,
-            retries=1,
-            params=params,
-        )
+            items = self._get_tv_items(tag, sort_type)
 
-        if response.status_code != 200:
-            raise ApiError(f"豆瓣返回 HTTP {response.status_code}")
+        movies = []
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            normalized = self._normalize_item(item)
+            if normalized["title"]:
+                movies.append(normalized)
 
-        items = self._extract_items(payload)
+        return movies
 
-        # 豆瓣移动端接口偶尔会调整 recent_hot 的响应或直接拒绝请求。
-        # 电影列表失败时，回退到仍在使用的 movie/recommend 接口。
-        if not items and tag == "电影":
-            fallback_params = {
-                "refresh": "0",
-                "start": "0",
-                "count": "100",
-                "selected_categories": json.dumps(
-                    {"类型": ""},
-                    ensure_ascii=False,
-                ),
-                "uncollect": "false",
-                "tags": "",
-            }
-            fallback_response, fallback_payload = self.http.request_json(
+    def _get_movie_items(self, sort_type: str) -> list[dict]:
+        # 优先使用移动端推荐接口。
+        try:
+            response, payload = self.http.request_json(
+                "GET",
+                "https://m.douban.com/rexxar/api/v2/subject/recent_hot/movie",
+                timeout=10,
+                retries=1,
+                params={
+                    "start": "0",
+                    "limit": "100",
+                    "category": "最新" if sort_type in {"T", "R"} else "热门",
+                    "type": "全部",
+                },
+            )
+            if response.status_code == 200:
+                items = self._extract_items(payload)
+                if items:
+                    return items
+        except ApiError:
+            pass
+
+        # 第二个移动端接口，响应结构和 recent_hot 不完全一致。
+        try:
+            response, payload = self.http.request_json(
                 "GET",
                 "https://m.douban.com/rexxar/api/v2/movie/recommend",
                 timeout=10,
                 retries=1,
-                params=fallback_params,
+                params={
+                    "refresh": "0",
+                    "start": "0",
+                    "count": "100",
+                    "selected_categories": json.dumps(
+                        {"类型": ""},
+                        ensure_ascii=False,
+                    ),
+                    "uncollect": "false",
+                    "tags": "",
+                },
             )
-            if fallback_response.status_code == 200:
-                items = self._extract_items(fallback_payload)
+            if response.status_code == 200:
+                items = self._extract_items(payload)
+                if items:
+                    return items
+        except ApiError:
+            pass
 
-        return [
-            self._normalize_item(item)
-            for item in items
-            if isinstance(item, dict) and item.get("title")
-        ]
+        # 最后使用网页版搜索接口。这个接口返回 subjects，字段更稳定，
+        # 也直接提供海报 img，是首页无法显示时的重要兜底。
+        try:
+            response, payload = self.http.request_json(
+                "GET",
+                "https://movie.douban.com/j/search_subjects",
+                timeout=10,
+                retries=1,
+                params={
+                    "type": "movie",
+                    "tag": "热门" if sort_type == "U" else "最新",
+                    "sort": "recommend" if sort_type == "U" else "time",
+                    "page_limit": "100",
+                    "page_start": "0",
+                },
+            )
+            if response.status_code == 200:
+                return self._extract_items(payload)
+        except ApiError:
+            pass
+
+        return []
+
+    def _get_tv_items(self, tag: str, sort_type: str) -> list[dict]:
+        cat_map = {
+            "动漫": {"类型": "动画", "形式": "电视剧"},
+            "综艺": {"类型": "", "形式": "综艺"},
+            "电视剧": {"类型": "", "形式": "电视剧"},
+        }
+
+        try:
+            response, payload = self.http.request_json(
+                "GET",
+                "https://m.douban.com/rexxar/api/v2/tv/recommend",
+                timeout=10,
+                retries=1,
+                params={
+                    "refresh": "0",
+                    "start": "0",
+                    "count": "100",
+                    "selected_categories": json.dumps(
+                        cat_map[tag],
+                        ensure_ascii=False,
+                    ),
+                    "tags": tag,
+                    "sort": "R" if sort_type in {"T", "R"} else "U",
+                },
+            )
+            if response.status_code == 200:
+                items = self._extract_items(payload)
+                if items:
+                    return items
+        except ApiError:
+            pass
+
+        return []
 
     @staticmethod
     def _extract_items(payload: object) -> list[dict]:
         if isinstance(payload, list):
             return [
-                item for item in payload
+                item
+                for item in payload
                 if isinstance(item, dict)
             ]
 
@@ -106,7 +162,8 @@ class DoubanClient:
             value = payload.get(key)
             if isinstance(value, list):
                 return [
-                    item for item in value
+                    item
+                    for item in value
                     if isinstance(item, dict)
                 ]
 
@@ -116,20 +173,27 @@ class DoubanClient:
         query = str(query or "").strip()
         if not query:
             return []
+
         response, payload = self.http.request_json(
             "GET",
             f"https://movie.douban.com/j/subject_suggest?q={quote(query)}",
             timeout=8,
             retries=1,
         )
+
         if response.status_code != 200 or not isinstance(payload, list):
-            raise ApiError(f"豆瓣搜索失败（HTTP {response.status_code}）")
+            raise ApiError(
+                f"豆瓣搜索失败（HTTP {response.status_code}）"
+            )
+
         return [
             {
                 "title": item.get("title"),
                 "cover": item.get("img", ""),
                 "rate": item.get("year", "搜索"),
-                "url": f"https://movie.douban.com/subject/{item.get('id')}/",
+                "url": (
+                    f"https://movie.douban.com/subject/{item.get('id')}/"
+                ),
             }
             for item in payload
             if item.get("title") and item.get("id")
@@ -137,20 +201,79 @@ class DoubanClient:
 
     @staticmethod
     def _normalize_item(item: dict) -> dict:
-        subject_id = item.get("id") or (item.get("target") or {}).get("id")
-        rating = (item.get("rating") or {}).get("value", "暂无")
-        pic = item.get("pic") or {}
-        cover_data = item.get("cover") or {}
+        target = item.get("target")
+        if not isinstance(target, dict):
+            target = {}
+
+        subject_id = (
+            item.get("id")
+            or target.get("id")
+            or item.get("subject_id")
+        )
+
+        title = (
+            item.get("title")
+            or target.get("title")
+            or item.get("name")
+            or target.get("name")
+            or ""
+        )
+
+        rating_data = item.get("rating")
+        if not isinstance(rating_data, dict):
+            rating_data = {}
+
+        target_rating = target.get("rating")
+        if not isinstance(target_rating, dict):
+            target_rating = {}
+
+        rating = (
+            rating_data.get("value")
+            or target_rating.get("value")
+            or item.get("rate")
+            or target.get("rate")
+            or "暂无"
+        )
+
+        pic = item.get("pic")
+        if not isinstance(pic, dict):
+            pic = {}
+
+        target_pic = target.get("pic")
+        if not isinstance(target_pic, dict):
+            target_pic = {}
+
+        cover_data = item.get("cover")
+        if not isinstance(cover_data, dict):
+            cover_data = {}
+
+        target_cover = target.get("cover")
+        if not isinstance(target_cover, dict):
+            target_cover = {}
+
         cover = (
             pic.get("normal")
             or pic.get("large")
+            or pic.get("url")
+            or target_pic.get("normal")
+            or target_pic.get("large")
+            or target_pic.get("url")
             or cover_data.get("url")
-            or item.get("cover_url", "")
+            or target_cover.get("url")
+            or item.get("cover_url")
+            or target.get("cover_url")
+            or item.get("img")
+            or target.get("img")
             or ""
         )
+
         return {
-            "title": item.get("title"),
+            "title": title,
             "cover": cover,
             "rate": str(rating),
-            "url": f"https://movie.douban.com/subject/{subject_id}/" if subject_id else "https://movie.douban.com/",
+            "url": (
+                f"https://movie.douban.com/subject/{subject_id}/"
+                if subject_id
+                else "https://movie.douban.com/"
+            ),
         }
