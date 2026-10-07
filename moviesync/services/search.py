@@ -79,7 +79,11 @@ class SearchService:
                             "channel": source["channel"],
                             "pwd_id": pwd_id,
                             "files": videos,
-                            "summary": f"频道: [{source['channel']}] | 包含 {len(videos)} 个视频 | 示例: {videos[0]['file_name']}",
+                            "summary": (
+                                f"频道: [{source['channel']}] | "
+                                f"包含 {len(videos)} 个视频 | "
+                                f"示例: {videos[0]['file_name']}"
+                            ),
                         })
             except Exception as exc:
                 self.logger.exception("频道 %s 搜索异常", channel.get("name") or channel.get("id"), exc_info=exc)
@@ -109,12 +113,22 @@ class SearchService:
         self.logger.info("《%s》检索完成，有效候选=%s", title, len(candidates))
         return candidates
 
-    def transfer_selected_resource(self, movie: object, candidate: dict, target_fid: str = "0", category_fids: dict | None = None) -> tuple[bool, str]:
+    def transfer_selected_resource(
+        self,
+        movie: object,
+        candidate: dict,
+        target_fid: str = "0",
+        category_fids: dict | None = None,
+    ) -> tuple[bool, str]:
         title, _ = self._title(movie)
         tag = str(movie.get("tag", "电影")) if isinstance(movie, dict) else "电影"
         parent_fid = (category_fids or {}).get(tag, target_fid) or "0"
         pwd_id = sanitize_pwd_id(candidate.get("pwd_id"))
-        selected_fids = [str(item.get("fid")) for item in candidate.get("files", []) if isinstance(item, dict) and item.get("fid")]
+        selected_fids = [
+            str(item.get("fid"))
+            for item in candidate.get("files", [])
+            if isinstance(item, dict) and item.get("fid")
+        ]
         selected_fids = list(dict.fromkeys(selected_fids))
         if not pwd_id or not selected_fids:
             return False, "候选资源参数无效"
