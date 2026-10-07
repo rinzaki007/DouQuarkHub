@@ -100,6 +100,11 @@ class SearchService:
                     seen_pwd_ids.add(candidate["pwd_id"])
                     candidates.append(candidate)
                     if len(candidates) >= MAX_CANDIDATES_PER_MOVIE:
+                        self.logger.info(
+                            "《%s》检索完成，有效候选=%s（已达到结果上限）",
+                            title,
+                            len(candidates),
+                        )
                         return candidates
         self.logger.info("《%s》检索完成，有效候选=%s", title, len(candidates))
         return candidates
