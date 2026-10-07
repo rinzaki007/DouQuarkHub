@@ -403,8 +403,31 @@
 
                 <div class="space-y-3 pt-4 border-t border-slate-800">
 
-                    <h3 class="text-xs font-bold text-slate-300">
-                        TG 检索频道配置管理:
+                    <div class="flex items-center justify-between gap-3">
+                        <h3 class="text-xs font-bold text-slate-300">
+                            资源来源
+                        </h3>
+                        <button
+                            type="button"
+                            onclick="checkResourceSources()"
+                            class="glass-btn bg-slate-800/70 hover:bg-slate-700 text-slate-200 text-[11px] px-3 py-1.5 rounded-lg flex items-center gap-1.5"
+                        >
+                            <i class="fa-solid fa-heart-pulse"></i>
+                            检查来源
+                        </button>
+                    </div>
+
+                    <div
+                        id="resource-source-health"
+                        class="grid gap-2 sm:grid-cols-2"
+                    >
+                        <div class="glass-panel rounded-xl p-3 text-xs text-slate-500">
+                            正在读取资源来源状态…
+                        </div>
+                    </div>
+
+                    <h3 class="text-xs font-bold text-slate-300 pt-2">
+                        Telegram 频道
                     </h3>
 
 
@@ -933,6 +956,10 @@
 
                     const cfg =
                         res.config;
+
+                    renderResourceSourceHealth(
+                        cfg.resource_sources || []
+                    );
 
 
                     const cookieInput =
@@ -1664,6 +1691,59 @@
 
             input.click();
 
+        }
+
+
+        async function checkResourceSources() {
+            const box = document.getElementById("resource-source-health");
+            if (box) {
+                box.innerHTML = '<div class="glass-panel rounded-xl p-3 text-xs text-slate-400">正在检查资源来源…</div>';
+            }
+            try {
+                const response = await apiFetch("/api/check-channels");
+                const result = await response.json();
+                if (!result.success) {
+                    throw new Error(result.message || "检查失败");
+                }
+                renderResourceSourceHealth(result.resource_sources || []);
+            } catch (error) {
+                if (box) {
+                    box.innerHTML = '<div class="glass-panel rounded-xl p-3 text-xs text-rose-300">检查失败：' + escapeHtml(String(error.message || error)) + '</div>';
+                }
+            }
+        }
+
+        function renderResourceSourceHealth(sources) {
+            const box = document.getElementById("resource-source-health");
+            if (!box) return;
+            if (!sources.length) {
+                box.innerHTML = '<div class="glass-panel rounded-xl p-3 text-xs text-slate-500">暂无资源来源</div>';
+                return;
+            }
+            box.innerHTML = sources.map((source) => {
+                const health = source.health || {};
+                const status = health.status || source.status || "unknown";
+                const label = status === "healthy" ? "正常" :
+                    status === "degraded" ? "部分可用" :
+                    status === "unavailable" ? "不可用" :
+                    status === "disabled" ? "已停用" : "未检查";
+                const cls = status === "healthy" ? "text-emerald-300" :
+                    status === "degraded" ? "text-amber-300" :
+                    status === "unavailable" ? "text-rose-300" :
+                    "text-slate-400";
+                const message = health.message || source.message || "尚未检查";
+                const checked = health.last_checked_at ?
+                    new Date(health.last_checked_at * 1000).toLocaleString() : "—";
+                return '<div class="glass-panel rounded-xl p-3">' +
+                    '<div class="flex items-center justify-between gap-2">' +
+                    '<div class="flex items-center gap-2 text-sm font-semibold text-slate-200"><i class="fa-solid fa-plug text-slate-400"></i>' +
+                    escapeHtml(source.name || source.id || "未知来源") + '</div>' +
+                    '<span class="text-[11px] font-medium ' + cls + '">' + label + '</span>' +
+                    '</div>' +
+                    '<div class="mt-2 text-[11px] text-slate-400">' + escapeHtml(message) + '</div>' +
+                    '<div class="mt-1 text-[10px] text-slate-500">最近检查：' + checked + '</div>' +
+                    '</div>';
+            }).join("");
         }
 
 
