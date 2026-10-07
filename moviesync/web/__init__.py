@@ -1,4 +1,4 @@
-"""MovieSync Web 层。
+""""MovieSync Web 层。
 
 用途：提供登录限流、认证前置检查、安全响应头和 Blueprint 注册。
 维护说明：所有需要登录的 API 会在 before_request 阶段拦截；具体写接口再由路由装饰器执行 CSRF 校验。
@@ -80,18 +80,42 @@ def register_web(app, services):
             return None
         auth = services["auth"]
         if not auth.is_initialized():
-            if request.path not in {"/setup", "/api/setup", "/login", "/api/login", "/api/login-backdrop", "/api/proxy-img", "/healthz"}:
+            public_paths = {
+                "/setup",
+                "/api/setup",
+                "/login",
+                "/api/login",
+                "/api/login-backdrop",
+                "/api/proxy-img",
+                "/healthz",
+            }
+            if request.path not in public_paths:
                 if request.path.startswith("/api/"):
-                    return jsonify({"success": False, "message": "需要先完成初始化", "need_setup": True}), 401
+                    return jsonify(
+                        {
+                            "success": False,
+                            "message": "需要先完成初始化",
+                            "need_setup": True,
+                        }
+                    ), 401
                 return redirect("/setup")
             return None
         if request.path in {"/setup", "/api/setup"}:
             return redirect("/login")
         if request.path not in {"/login", "/api/login"} and not session.get("logged_in"):
             if request.path.startswith("/api/"):
-                return jsonify({"success": False, "message": "未登录", "need_login": True}), 401
+                return jsonify(
+                    {
+                        "success": False,
+                        "message": "未登录",
+                        "need_login": True,
+                    }
+                ), 401
             return redirect("/login")
-        if request.method in {"POST", "PUT", "PATCH", "DELETE"} and request.path not in {"/api/login", "/api/setup"}:
+        if request.method in {"POST", "PUT", "PATCH", "DELETE"} and request.path not in {
+            "/api/login",
+            "/api/setup",
+        }:
             # Routes also validate this decorator; this early check keeps accidental mutation endpoints protected.
             token = session.get("csrf_token")
             if not token:
