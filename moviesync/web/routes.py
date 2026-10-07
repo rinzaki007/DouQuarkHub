@@ -68,7 +68,8 @@ def login_page():
     return render_template("login.html", is_setup=False)
 
 
-@pages.get("/logout")
+@pages.post("/logout")
+@require_csrf
 def logout():
     session.clear()
     return redirect("/login")
@@ -91,6 +92,8 @@ def setup():
         _services()["auth"].setup(str(data.get("username", "")), str(data.get("password", "")))
     except ValueError as exc:
         return _json_error(str(exc))
+    session.clear()
+    session.permanent = True
     session["logged_in"] = True
     session["username"] = str(data.get("username", "")).strip()
     session["csrf_token"] = _services()["csrf"]()
@@ -113,6 +116,7 @@ def login():
         return _json_error("用户名或密码错误", 401)
     services["login_limiter"].record_success(remote_addr)
     session.clear()
+    session.permanent = True
     session["logged_in"] = True
     session["username"] = username
     session["csrf_token"] = services["csrf"]()
