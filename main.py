@@ -3,7 +3,6 @@
 # 维护说明：当前版本将实际应用创建集中到 moviesync.app.create_app；此文件只负责启动，不承载业务逻辑。
 from moviesync.app import create_app
 
-
 app = create_app()
 
 
