@@ -195,7 +195,8 @@ class DoubanClient:
             {
                 "title": item.get("title"),
                 "cover": item.get("img", ""),
-                "rate": item.get("year", "搜索"),
+                "rate": item.get("rate") or item.get("rating") or "暂无",
+                "year": item.get("year", ""),
                 "url": (
                     f"https://movie.douban.com/subject/{item.get('id')}/"
                 ),
