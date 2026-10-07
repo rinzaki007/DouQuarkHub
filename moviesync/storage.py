@@ -1,3 +1,8 @@
+"""MovieSync JSON 持久化基础层。
+
+用途：为认证、配置和订阅提供线程安全的 JSON 读写。
+维护说明：写入采用临时文件 + fsync + os.replace，尽量避免程序中断造成半写入文件。
+"""
 from __future__ import annotations
 
 import json
