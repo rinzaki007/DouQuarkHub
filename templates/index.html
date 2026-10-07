@@ -15,11 +15,11 @@
 <body class="min-h-screen flex flex-col">
 
     <!-- 顶栏：左侧分类/功能，中间搜索框，右侧系统状态与设置（吸顶 + 毛玻璃） -->
-    <header class="bg-slate-900/80 backdrop-blur-md border-b border-slate-800/80 sticky top-0 z-40 px-4 py-3">
-        <div class="max-w-7xl mx-auto flex items-center justify-between gap-4">
+    <header class="bg-slate-900/90 backdrop-blur-md border-b border-slate-800/80 sticky top-0 z-40 px-3 sm:px-4 py-2.5">
+        <div class="max-w-screen-2xl mx-auto flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 sm:gap-4">
             
             <!-- 左侧：分类与功能入口 -->
-            <div class="flex items-center space-x-2 shrink-0">
+            <div class="flex items-center space-x-1.5 shrink-0 overflow-x-auto max-w-full">
                 <button onclick="changeTag('电影')" class="nav-tag px-3.5 py-1.5 rounded text-sm font-medium transition bg-blue-600 text-white shadow-md" data-tag="电影">电影</button>
                 <button onclick="changeTag('电视剧')" class="nav-tag px-3.5 py-1.5 rounded text-sm font-medium transition bg-slate-800/80 text-slate-300 hover:bg-slate-700" data-tag="电视剧">电视剧</button>
                 <button onclick="changeTag('综艺')" class="nav-tag px-3.5 py-1.5 rounded text-sm font-medium transition bg-slate-800/80 text-slate-300 hover:bg-slate-700" data-tag="综艺">综艺</button>
@@ -37,7 +37,7 @@
             </div>
 
             <!-- 中间：搜索框 -->
-            <div class="flex-1 max-w-md mx-4 relative">
+            <div class="order-last lg:order-none w-full lg:flex-1 lg:max-w-xl lg:mx-2 relative">
                 <input type="text" id="search-input" placeholder="搜索豆瓣影视资源..." 
                        class="w-full bg-slate-950/80 border border-slate-700/80 rounded-lg px-3.5 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-blue-500 shadow-inner"
                        onkeydown="if(event.key==='Enter') doSearch()">
@@ -47,7 +47,7 @@
             </div>
 
             <!-- 右侧：Cookie状态、频道检测、运行日志、设置 -->
-            <div class="flex items-center space-x-2 shrink-0">
+            <div class="hidden sm:flex items-center space-x-2 shrink-0">
                 <div id="cookie-status-badge" class="px-2 py-1 text-xs rounded bg-slate-800/80 text-slate-400 border border-slate-700/80 flex items-center gap-1">
                     <span class="w-2 h-2 rounded-full bg-slate-500 animate-pulse"></span>
                     <span>检测中</span>
@@ -109,13 +109,24 @@
     </div>
 
     <!-- 主展示网格 -->
-    <main class="flex-1 max-w-7xl w-full mx-auto p-4">
+    <main class="flex-1 max-w-screen-2xl w-full mx-auto p-3 sm:p-4">
         <div id="loading" class="text-center py-20 text-slate-400">
             <i class="fa-solid fa-spinner fa-spin text-3xl mb-3 text-blue-500"></i>
             <p class="text-sm">正在获取豆瓣数据...</p>
         </div>
-        <div id="movie-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 hidden"></div>
+        <div id="movie-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7 2xl:grid-cols-8 gap-3 sm:gap-4 hidden"></div>
+        <div id="empty-state" class="hidden min-h-[45vh] flex items-center justify-center">
+            <div class="text-center max-w-sm">
+                <div class="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-900 border border-slate-800 text-slate-500">
+                    <i class="fa-solid fa-film text-xl"></i>
+                </div>
+                <h2 class="text-sm font-semibold text-slate-200">没有找到影视内容</h2>
+                <p class="mt-2 text-xs leading-6 text-slate-500">可以换一个关键词，或者切换“热门推荐 / 最近最新”再试试。</p>
+            </div>
+        </div>
     </main>
+
+    <div id="toast-container" class="fixed right-3 top-20 z-[200] flex w-[min(360px,calc(100vw-24px))] flex-col gap-2 pointer-events-none"></div>
 
     <!-- 智能追剧管理弹窗 -->
     <div id="chase-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-[100] flex items-center justify-center hidden">
