@@ -11,11 +11,7 @@ from datetime import datetime
 from threading import Event, RLock, Thread
 from typing import Callable
 
-from ..clients.quark import (
-    QuarkClient,
-    clean_tv_filename,
-    sanitize_pwd_id,
-)
+from ..clients.quark import QuarkClient, clean_tv_filename, sanitize_pwd_id
 from ..storage import JsonStore
 
 
