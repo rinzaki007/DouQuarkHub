@@ -206,6 +206,8 @@ class TaskManager:
         old = self._get(str(task_id))
         if not old or old.get("type") != "transfer":
             return None
+        if old.get("status") != "failed":
+            return None
         with self.lock:
             items = self.list_tasks()
             new = dict(old)
