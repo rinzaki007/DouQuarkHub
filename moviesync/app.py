@@ -1,3 +1,8 @@
+"""MovieSync 应用组装层。
+
+用途：加载设置、初始化认证/配置/豆瓣/Telegram/夸克/订阅等组件，组装 Flask 应用并注册 Web 路由。
+维护说明：这里主要负责依赖注入和应用生命周期，不建议在此直接堆业务逻辑。
+"""
 from __future__ import annotations
 
 import secrets
