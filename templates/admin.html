@@ -62,14 +62,22 @@
 
 <body class="min-h-screen flex flex-col bg-slate-950 text-slate-100">
 
-    <!-- 顶栏 -->
+    <!-- ==========================================================
+         顶栏
+         ========================================================== -->
+
     <header
         class="bg-slate-900 border-b border-slate-800 px-6 py-3.5 flex justify-between items-center shrink-0 sticky top-0 z-50"
     >
+
         <div class="flex items-center gap-2 text-lg font-bold text-white">
+
             <i class="fa-solid fa-gear text-blue-500"></i>
+
             MovieSync 后台控制中心
+
         </div>
+
 
         <div class="flex gap-2 items-center">
 
@@ -81,12 +89,19 @@
                 返回前台首页
             </a>
 
-            <form action="/logout" method="post" class="m-0">
+
+            <form
+                action="/logout"
+                method="post"
+                class="m-0"
+            >
+
                 <input
                     type="hidden"
                     name="csrf_token"
                     value="{{ csrf_token }}"
                 >
+
 
                 <button
                     type="submit"
@@ -95,16 +110,25 @@
                     <i class="fa-solid fa-right-from-bracket"></i>
                     退出登录
                 </button>
+
             </form>
 
         </div>
+
     </header>
 
 
-    <!-- 侧边栏 + 内容区 -->
+    <!-- ==========================================================
+         侧边栏 + 内容区
+         ========================================================== -->
+
     <div class="flex-1 flex overflow-hidden">
 
-        <!-- 侧边栏 -->
+
+        <!-- ======================================================
+             侧边栏
+             ====================================================== -->
+
         <aside
             class="w-60 bg-slate-900/90 border-r border-slate-800 p-4 shrink-0 flex flex-col gap-2"
         >
@@ -118,6 +142,7 @@
                 全局系统参数设置
             </button>
 
+
             <button
                 onclick="switchTab('security')"
                 id="tab-btn-security"
@@ -126,6 +151,7 @@
                 <i class="fa-solid fa-shield-halved"></i>
                 账户安全
             </button>
+
 
             <button
                 onclick="switchTab('logs')"
@@ -139,13 +165,16 @@
         </aside>
 
 
-        <!-- 右侧内容 -->
+        <!-- ======================================================
+             右侧内容
+             ====================================================== -->
+
         <main class="flex-1 overflow-y-auto p-6 bg-slate-950">
 
 
-            <!-- ================================================== -->
-            <!-- 1. 全局系统参数设置 -->
-            <!-- ================================================== -->
+            <!-- ==================================================
+                 1. 全局系统参数设置
+                 ================================================== -->
 
             <div
                 id="panel-global"
@@ -161,11 +190,16 @@
 
 
                 <!-- Cookie -->
+
                 <div class="space-y-1.5">
 
-                    <label class="block text-xs text-slate-400 font-semibold">
+                    <label
+                        for="quark-cookie"
+                        class="block text-xs text-slate-400 font-semibold"
+                    >
                         夸克网盘 Cookie (ck)：由服务端安全保存
                     </label>
+
 
                     <textarea
                         id="quark-cookie"
@@ -178,13 +212,18 @@
 
 
                 <!-- 默认全局存储与 OpenList -->
+
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
 
                     <div class="space-y-1">
 
-                        <label class="block text-xs text-slate-400 font-semibold">
+                        <label
+                            for="fid-default"
+                            class="block text-xs text-slate-400 font-semibold"
+                        >
                             默认全局存储目录 FID:
                         </label>
+
 
                         <input
                             type="text"
@@ -198,9 +237,13 @@
 
                     <div class="space-y-1">
 
-                        <label class="block text-xs text-slate-400 font-semibold">
+                        <label
+                            for="openlist-url"
+                            class="block text-xs text-slate-400 font-semibold"
+                        >
                             OpenList 访问地址:
                         </label>
+
 
                         <input
                             type="text"
@@ -215,69 +258,99 @@
 
 
                 <!-- 各分类 FID -->
+
                 <div class="space-y-2 pt-2">
 
                     <h3 class="text-xs font-bold text-amber-400 flex items-center gap-1">
+
                         <i class="fa-solid fa-folder"></i>
+
                         各分类专属存储目录 FID
+
                         （未设定则自动使用默认全局 FID）
+
                     </h3>
+
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
 
                         <div>
-                            <label class="block text-xs text-slate-400 mb-1">
+
+                            <label
+                                for="fid-movie"
+                                class="block text-xs text-slate-400 mb-1"
+                            >
                                 🎬 电影目录 FID:
                             </label>
+
 
                             <input
                                 type="text"
                                 id="fid-movie"
                                 value=""
-                                class="w-full bg-slate-900 border border-slate-800 rounded px-3 py-1.5 text-xs text-slate-200"
+                                class="w-full bg-slate-900 border border-slate-800 rounded px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-blue-500"
                             >
+
                         </div>
 
 
                         <div>
-                            <label class="block text-xs text-slate-400 mb-1">
+
+                            <label
+                                for="fid-tv"
+                                class="block text-xs text-slate-400 mb-1"
+                            >
                                 📺 电视剧目录 FID:
                             </label>
+
 
                             <input
                                 type="text"
                                 id="fid-tv"
                                 value=""
-                                class="w-full bg-slate-900 border border-slate-800 rounded px-3 py-1.5 text-xs text-slate-200"
+                                class="w-full bg-slate-900 border border-slate-800 rounded px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-blue-500"
                             >
+
                         </div>
 
 
                         <div>
-                            <label class="block text-xs text-slate-400 mb-1">
+
+                            <label
+                                for="fid-show"
+                                class="block text-xs text-slate-400 mb-1"
+                            >
                                 🎤 综艺目录 FID:
                             </label>
+
 
                             <input
                                 type="text"
                                 id="fid-show"
                                 value=""
-                                class="w-full bg-slate-900 border border-slate-800 rounded px-3 py-1.5 text-xs text-slate-200"
+                                class="w-full bg-slate-900 border border-slate-800 rounded px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-blue-500"
                             >
+
                         </div>
 
 
                         <div>
-                            <label class="block text-xs text-slate-400 mb-1">
+
+                            <label
+                                for="fid-anime"
+                                class="block text-xs text-slate-400 mb-1"
+                            >
                                 🎨 动漫目录 FID:
                             </label>
+
 
                             <input
                                 type="text"
                                 id="fid-anime"
                                 value=""
-                                class="w-full bg-slate-900 border border-slate-800 rounded px-3 py-1.5 text-xs text-slate-200"
+                                class="w-full bg-slate-900 border border-slate-800 rounded px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-blue-500"
                             >
+
                         </div>
 
                     </div>
@@ -286,6 +359,7 @@
 
 
                 <!-- TG 检索频道 -->
+
                 <div class="space-y-3 pt-4 border-t border-slate-800">
 
                     <h3 class="text-xs font-bold text-slate-300">
@@ -302,6 +376,7 @@
 
 
                     <!-- 添加频道 -->
+
                     <div
                         class="flex flex-wrap items-center gap-2 pt-2 p-3 bg-slate-900/40 rounded-lg border border-slate-800/80"
                     >
@@ -313,6 +388,7 @@
                             class="bg-slate-900 border border-slate-800 rounded px-3 py-1.5 text-xs flex-1 min-w-[150px] text-slate-200 focus:outline-none focus:border-blue-500"
                         >
 
+
                         <input
                             type="text"
                             id="new-ch-id"
@@ -320,7 +396,9 @@
                             class="bg-slate-900 border border-slate-800 rounded px-3 py-1.5 text-xs flex-1 min-w-[150px] text-slate-200 focus:outline-none focus:border-blue-500"
                         >
 
+
                         <button
+                            type="button"
                             onclick="addTGChannel()"
                             class="bg-blue-600 hover:bg-blue-500 text-white text-xs px-4 py-1.5 rounded font-medium shrink-0"
                         >
@@ -333,6 +411,7 @@
 
 
                 <!-- 保存按钮 -->
+
                 <div
                     class="border-t border-slate-800 pt-6 flex flex-wrap justify-between items-center gap-3 mb-10"
                 >
@@ -340,6 +419,7 @@
                     <div class="flex gap-2">
 
                         <button
+                            type="button"
                             onclick="exportConfig()"
                             class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-3.5 py-2 rounded flex items-center gap-1 border border-slate-700"
                         >
@@ -349,6 +429,7 @@
 
 
                         <button
+                            type="button"
                             onclick="importConfig()"
                             class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-3.5 py-2 rounded flex items-center gap-1 border border-slate-700"
                         >
@@ -360,6 +441,7 @@
 
 
                     <button
+                        type="button"
                         onclick="saveAllSettings()"
                         class="bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs px-6 py-2.5 rounded flex items-center gap-2 shadow-lg"
                     >
@@ -372,9 +454,9 @@
             </div>
 
 
-            <!-- ================================================== -->
-            <!-- 2. 账户安全 -->
-            <!-- ================================================== -->
+            <!-- ==================================================
+                 2. 账户安全
+                 ================================================== -->
 
             <div
                 id="panel-security"
@@ -390,17 +472,20 @@
 
 
                 <!-- 安全说明 -->
+
                 <div class="bg-slate-900/60 border border-slate-800 rounded-lg p-4">
 
                     <div class="flex items-start gap-3">
 
                         <i class="fa-solid fa-circle-info text-blue-400 mt-0.5"></i>
 
+
                         <div>
 
                             <div class="text-sm font-semibold text-slate-200">
                                 管理员账户安全
                             </div>
+
 
                             <div class="text-xs text-slate-500 mt-1 leading-5">
                                 修改用户名或密码后，当前登录会话将失效，需要重新登录。
@@ -413,22 +498,56 @@
                 </div>
 
 
-                <!-- 修改用户名 -->
-                <div class="bg-slate-900/40 border border-slate-800 rounded-lg p-5 space-y-4">
+                <!-- ==================================================
+                     修改用户名
+                     ================================================== -->
+
+                <div
+                    class="bg-slate-900/40 border border-slate-800 rounded-lg p-5 space-y-4"
+                >
 
                     <div>
 
                         <h3 class="text-sm font-bold text-white flex items-center gap-2">
+
                             <i class="fa-solid fa-user-pen text-blue-400"></i>
+
                             修改管理员用户名
+
                         </h3>
 
+
                         <p class="text-xs text-slate-500 mt-1">
-                            建议使用 3～64 个字符的用户名。
+                            用户名长度为 2～64 个字符，修改时需要验证当前密码。
                         </p>
 
                     </div>
 
+
+                    <!-- 当前密码 -->
+
+                    <div class="space-y-2">
+
+                        <label
+                            for="security-username-current-password"
+                            class="block text-xs text-slate-400 font-semibold"
+                        >
+                            当前密码
+                        </label>
+
+
+                        <input
+                            type="password"
+                            id="security-username-current-password"
+                            autocomplete="current-password"
+                            placeholder="请输入当前密码"
+                            class="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2.5 text-xs text-slate-200 focus:outline-none focus:border-blue-500"
+                        >
+
+                    </div>
+
+
+                    <!-- 新用户名 -->
 
                     <div class="space-y-2">
 
@@ -439,10 +558,11 @@
                             新用户名
                         </label>
 
+
                         <input
                             type="text"
                             id="new-username"
-                            minlength="3"
+                            minlength="2"
                             maxlength="64"
                             autocomplete="username"
                             placeholder="请输入新的管理员用户名"
@@ -464,15 +584,24 @@
                 </div>
 
 
-                <!-- 修改密码 -->
-                <div class="bg-slate-900/40 border border-slate-800 rounded-lg p-5 space-y-4">
+                <!-- ==================================================
+                     修改密码
+                     ================================================== -->
+
+                <div
+                    class="bg-slate-900/40 border border-slate-800 rounded-lg p-5 space-y-4"
+                >
 
                     <div>
 
                         <h3 class="text-sm font-bold text-white flex items-center gap-2">
+
                             <i class="fa-solid fa-key text-amber-400"></i>
+
                             修改管理员密码
+
                         </h3>
+
 
                         <p class="text-xs text-slate-500 mt-1">
                             为了安全，修改密码时需要验证当前密码。
@@ -480,6 +609,8 @@
 
                     </div>
 
+
+                    <!-- 当前密码 -->
 
                     <div class="space-y-2">
 
@@ -489,6 +620,7 @@
                         >
                             当前密码
                         </label>
+
 
                         <input
                             type="password"
@@ -501,6 +633,8 @@
                     </div>
 
 
+                    <!-- 新密码 + 确认密码 -->
+
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
 
                         <div class="space-y-2">
@@ -511,6 +645,7 @@
                             >
                                 新密码
                             </label>
+
 
                             <input
                                 type="password"
@@ -533,6 +668,7 @@
                             >
                                 确认新密码
                             </label>
+
 
                             <input
                                 type="password"
@@ -563,9 +699,9 @@
             </div>
 
 
-            <!-- ================================================== -->
-            <!-- 3. 系统运行日志 -->
-            <!-- ================================================== -->
+            <!-- ==================================================
+                 3. 系统运行日志
+                 ================================================== -->
 
             <div
                 id="panel-logs"
@@ -577,14 +713,18 @@
                 >
 
                     <h2 class="text-base font-bold text-white flex items-center gap-2">
+
                         <i class="fa-solid fa-terminal text-emerald-400"></i>
+
                         后台系统实时控制台日志
+
                     </h2>
 
 
                     <div class="flex gap-2">
 
                         <button
+                            type="button"
                             onclick="fetchAdminLogs()"
                             class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-3 py-1.5 rounded border border-slate-700 flex items-center gap-1"
                         >
@@ -594,6 +734,7 @@
 
 
                         <button
+                            type="button"
                             onclick="clearAdminLogs()"
                             class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs px-3 py-1.5 rounded border border-slate-700"
                         >
@@ -619,13 +760,22 @@
     </div>
 
 
+    <!-- ==========================================================
+         JavaScript
+         ========================================================== -->
+
     <script>
 
         let tgChannels = [];
         let logPollTimer = null;
 
 
+        /* ==========================================================
+           HTML 转义
+           ========================================================== */
+
         function escapeHtml(value) {
+
             return String(value ?? '').replace(
                 /[&<>\"']/g,
                 char => ({
@@ -636,8 +786,13 @@
                     "'": '&#39;'
                 }[char])
             );
+
         }
 
+
+        /* ==========================================================
+           API 请求封装
+           ========================================================== */
 
         async function apiFetch(url, options = {}) {
 
@@ -646,35 +801,66 @@
                 credentials: 'same-origin'
             };
 
-            const method = (init.method || 'GET').toUpperCase();
 
-            const headers = new Headers(init.headers || {});
+            const method =
+                (init.method || 'GET').toUpperCase();
 
-            if (!['GET', 'HEAD', 'OPTIONS'].includes(method)) {
 
-                const token = document.querySelector(
-                    'meta[name=csrf-token]'
-                )?.content;
+            const headers =
+                new Headers(init.headers || {});
+
+
+            if (
+                !['GET', 'HEAD', 'OPTIONS'].includes(method)
+            ) {
+
+                const token =
+                    document.querySelector(
+                        'meta[name=csrf-token]'
+                    )?.content;
+
 
                 if (token) {
-                    headers.set('X-CSRF-Token', token);
+
+                    headers.set(
+                        'X-CSRF-Token',
+                        token
+                    );
+
                 }
+
             }
+
 
             init.headers = headers;
 
-            const response = await window.fetch(url, init);
+
+            const response =
+                await window.fetch(
+                    url,
+                    init
+                );
+
 
             if (response.status === 401) {
-                window.location.href = '/login';
+
+                window.location.href =
+                    '/login';
+
             }
 
+
             return response;
+
         }
 
 
+        /* ==========================================================
+           页面初始化
+           ========================================================== */
+
         document.addEventListener(
-            "DOMContentLoaded",
+            'DOMContentLoaded',
             () => {
                 loadConfigFromBackend();
             }
@@ -689,48 +875,93 @@
 
             try {
 
-                const resp = await apiFetch('/api/config');
-                const res = await resp.json();
+                const resp =
+                    await apiFetch(
+                        '/api/config'
+                    );
 
-                if (res.success && res.config) {
 
-                    const cfg = res.config;
+                const res =
+                    await resp.json();
 
-                    document.getElementById('quark-cookie').value = '';
 
-                    document.getElementById('quark-cookie').placeholder =
+                if (
+                    res.success &&
+                    res.config
+                ) {
+
+                    const cfg =
+                        res.config;
+
+
+                    const cookieInput =
+                        document.getElementById(
+                            'quark-cookie'
+                        );
+
+
+                    cookieInput.value =
+                        '';
+
+
+                    cookieInput.placeholder =
                         cfg.has_quark_cookie
                             ? 'Cookie 已安全保存；需要更换时再粘贴新的 Cookie'
                             : '请粘贴夸克网盘 Cookie...';
 
-                    document.getElementById('fid-default').value =
-                        cfg.default_fid || '0';
 
-                    document.getElementById('openlist-url').value =
+                    document.getElementById(
+                        'fid-default'
+                    ).value =
+                        cfg.default_fid ||
+                        '0';
+
+
+                    document.getElementById(
+                        'openlist-url'
+                    ).value =
                         cfg.openlist_url ||
                         'https://openlist.88888807.xyz:8807/';
 
 
-                    const catFids = cfg.category_fids || {};
+                    const catFids =
+                        cfg.category_fids ||
+                        {};
 
-                    document.getElementById('fid-movie').value =
+
+                    document.getElementById(
+                        'fid-movie'
+                    ).value =
                         catFids['电影'] ||
                         '3ef79d1b370a4b27bd334b7bbba7e6e1';
 
-                    document.getElementById('fid-tv').value =
+
+                    document.getElementById(
+                        'fid-tv'
+                    ).value =
                         catFids['电视剧'] ||
                         'fe24e17d8d254997b21710c73b22b6e7';
 
-                    document.getElementById('fid-show').value =
+
+                    document.getElementById(
+                        'fid-show'
+                    ).value =
                         catFids['综艺'] ||
                         '6999ba53a9384525881f785976bd09f1';
 
-                    document.getElementById('fid-anime').value =
+
+                    document.getElementById(
+                        'fid-anime'
+                    ).value =
                         catFids['动漫'] ||
                         '55a44b99fac641679e1ebf55dcb38be9';
 
 
-                    tgChannels = cfg.channels || [];
+                    tgChannels =
+                        Array.isArray(cfg.channels)
+                            ? cfg.channels
+                            : [];
+
 
                     renderTGChannels();
 
@@ -739,7 +970,7 @@
             } catch (err) {
 
                 console.error(
-                    "加载全局配置失败:",
+                    '加载全局配置失败:',
                     err
                 );
 
@@ -754,45 +985,61 @@
 
         function switchTab(tabName) {
 
-            document.querySelectorAll('.tab-btn').forEach(btn => {
+            document.querySelectorAll(
+                '.tab-btn'
+            ).forEach(btn => {
 
                 btn.className =
-                    "tab-btn w-full text-left bg-slate-800/80 hover:bg-slate-700 text-slate-300 px-3.5 py-2.5 rounded text-xs font-semibold flex items-center gap-2 transition";
+                    'tab-btn w-full text-left bg-slate-800/80 hover:bg-slate-700 text-slate-300 px-3.5 py-2.5 rounded text-xs font-semibold flex items-center gap-2 transition';
 
             });
 
 
-            document.querySelectorAll('.panel-content').forEach(panel => {
+            document.querySelectorAll(
+                '.panel-content'
+            ).forEach(panel => {
 
-                panel.classList.add('hidden');
+                panel.classList.add(
+                    'hidden'
+                );
 
             });
 
 
             const activeBtn =
-                document.getElementById(`tab-btn-${tabName}`);
+                document.getElementById(
+                    `tab-btn-${tabName}`
+                );
+
 
             if (activeBtn) {
 
                 activeBtn.className =
-                    "tab-btn w-full text-left bg-blue-600 text-white px-3.5 py-2.5 rounded text-xs font-semibold flex items-center gap-2 transition";
+                    'tab-btn w-full text-left bg-blue-600 text-white px-3.5 py-2.5 rounded text-xs font-semibold flex items-center gap-2 transition';
 
             }
 
 
             const activePanel =
-                document.getElementById(`panel-${tabName}`);
+                document.getElementById(
+                    `panel-${tabName}`
+                );
+
 
             if (activePanel) {
 
-                activePanel.classList.remove('hidden');
+                activePanel.classList.remove(
+                    'hidden'
+                );
 
             }
 
 
             if (logPollTimer) {
 
-                clearInterval(logPollTimer);
+                clearInterval(
+                    logPollTimer
+                );
 
                 logPollTimer = null;
 
@@ -803,8 +1050,12 @@
 
                 fetchAdminLogs();
 
+
                 logPollTimer =
-                    setInterval(fetchAdminLogs, 3000);
+                    setInterval(
+                        fetchAdminLogs,
+                        3000
+                    );
 
             }
 
@@ -822,36 +1073,46 @@
                     'tg-channels-container'
                 );
 
-            container.innerHTML = '';
+
+            container.innerHTML =
+                '';
 
 
-            tgChannels.forEach((ch, idx) => {
+            tgChannels.forEach(
+                (ch, idx) => {
 
-                const badge =
-                    document.createElement('div');
-
-                badge.className =
-                    "bg-slate-800 border border-slate-700 rounded-md px-2.5 py-1.5 flex items-center gap-2 text-xs text-slate-200 shrink-0";
-
-
-                badge.innerHTML = `
-                    <span>
-                        <strong>${escapeHtml(ch.name || ch.id)}</strong>
-                        (${escapeHtml(ch.id)})
-                    </span>
-
-                    <button
-                        onclick="removeTGChannel(${idx})"
-                        class="text-slate-400 hover:text-rose-400 font-bold ml-1"
-                    >
-                        ✕
-                    </button>
-                `;
+                    const badge =
+                        document.createElement(
+                            'div'
+                        );
 
 
-                container.appendChild(badge);
+                    badge.className =
+                        'bg-slate-800 border border-slate-700 rounded-md px-2.5 py-1.5 flex items-center gap-2 text-xs text-slate-200 shrink-0';
 
-            });
+
+                    badge.innerHTML = `
+                        <span>
+                            <strong>${escapeHtml(ch.name || ch.id)}</strong>
+                            (${escapeHtml(ch.id)})
+                        </span>
+
+                        <button
+                            type="button"
+                            onclick="removeTGChannel(${idx})"
+                            class="text-slate-400 hover:text-rose-400 font-bold ml-1"
+                        >
+                            ✕
+                        </button>
+                    `;
+
+
+                    container.appendChild(
+                        badge
+                    );
+
+                }
+            );
 
         }
 
@@ -867,7 +1128,9 @@
             const id =
                 document.getElementById(
                     'new-ch-id'
-                ).value.trim().replace('@', '');
+                ).value
+                    .trim()
+                    .replace('@', '');
 
 
             if (!name || !id) {
@@ -877,6 +1140,7 @@
                 );
 
                 return;
+
             }
 
 
@@ -888,12 +1152,14 @@
 
             document.getElementById(
                 'new-ch-name'
-            ).value = '';
+            ).value =
+                '';
 
 
             document.getElementById(
                 'new-ch-id'
-            ).value = '';
+            ).value =
+                '';
 
 
             renderTGChannels();
@@ -903,7 +1169,11 @@
 
         function removeTGChannel(idx) {
 
-            tgChannels.splice(idx, 1);
+            tgChannels.splice(
+                idx,
+                1
+            );
+
 
             renderTGChannels();
 
@@ -919,21 +1189,29 @@
             try {
 
                 const resp =
-                    await apiFetch('/api/admin/logs');
+                    await apiFetch(
+                        '/api/admin/logs'
+                    );
+
 
                 const res =
                     await resp.json();
 
 
-                if (res.success && res.logs) {
+                if (
+                    res.success &&
+                    res.logs
+                ) {
 
                     const logBox =
                         document.getElementById(
                             'admin-log-box'
                         );
 
+
                     logBox.innerText =
                         res.logs.join('\n');
+
 
                     logBox.scrollTop =
                         logBox.scrollHeight;
@@ -943,7 +1221,7 @@
             } catch (err) {
 
                 console.error(
-                    "拉取后台日志失败:",
+                    '拉取后台日志失败:',
                     err
                 );
 
@@ -976,17 +1254,21 @@
 
             const payload = {
 
-                quark_cookie: cookieVal,
+                quark_cookie:
+                    cookieVal,
+
 
                 default_fid:
                     document.getElementById(
                         'fid-default'
                     ).value.trim(),
 
+
                 openlist_url:
                     document.getElementById(
                         'openlist-url'
                     ).value.trim(),
+
 
                 category_fids: {
 
@@ -1012,7 +1294,9 @@
 
                 },
 
-                channels: tgChannels
+
+                channels:
+                    tgChannels
 
             };
 
@@ -1024,10 +1308,12 @@
                         '/api/config',
                         {
                             method: 'POST',
+
                             headers: {
                                 'Content-Type':
                                     'application/json'
                             },
+
                             body:
                                 JSON.stringify(
                                     payload
@@ -1050,7 +1336,10 @@
 
                     alert(
                         '保存配置失败: ' +
-                        res.message
+                        (
+                            res.message ||
+                            '未知错误'
+                        )
                     );
 
                 }
@@ -1080,10 +1369,12 @@
                         'fid-default'
                     ).value.trim(),
 
+
                 openlist_url:
                     document.getElementById(
                         'openlist-url'
                     ).value.trim(),
+
 
                 category_fids: {
 
@@ -1109,13 +1400,15 @@
 
                 },
 
-                channels: tgChannels
+
+                channels:
+                    tgChannels
 
             };
 
 
             const dataStr =
-                "data:text/json;charset=utf-8," +
+                'data:text/json;charset=utf-8,' +
                 encodeURIComponent(
                     JSON.stringify(
                         payload,
@@ -1126,18 +1419,20 @@
 
 
             const downloadAnchor =
-                document.createElement('a');
+                document.createElement(
+                    'a'
+                );
 
 
             downloadAnchor.setAttribute(
-                "href",
+                'href',
                 dataStr
             );
 
 
             downloadAnchor.setAttribute(
-                "download",
-                "moviesync_config.json"
+                'download',
+                'moviesync_config.json'
             );
 
 
@@ -1147,6 +1442,7 @@
 
 
             downloadAnchor.click();
+
 
             downloadAnchor.remove();
 
@@ -1160,130 +1456,169 @@
         function importConfig() {
 
             const input =
-                document.createElement('input');
-
-            input.type = 'file';
-            input.accept = 'application/json';
-
-
-            input.onchange = e => {
-
-                const file =
-                    e.target.files[0];
-
-                if (!file) {
-                    return;
-                }
-
-
-                const reader =
-                    new FileReader();
-
-
-                reader.readAsText(
-                    file,
-                    'UTF-8'
+                document.createElement(
+                    'input'
                 );
 
 
-                reader.onload =
-                    readerEvent => {
+            input.type =
+                'file';
 
-                        try {
 
-                            const cfg =
-                                JSON.parse(
-                                    readerEvent
-                                        .target
-                                        .result
+            input.accept =
+                'application/json';
+
+
+            input.onchange =
+                event => {
+
+                    const file =
+                        event.target.files[0];
+
+
+                    if (!file) {
+
+                        return;
+
+                    }
+
+
+                    const reader =
+                        new FileReader();
+
+
+                    reader.readAsText(
+                        file,
+                        'UTF-8'
+                    );
+
+
+                    reader.onload =
+                        readerEvent => {
+
+                            try {
+
+                                const cfg =
+                                    JSON.parse(
+                                        readerEvent
+                                            .target
+                                            .result
+                                    );
+
+
+                                if (!cfg) {
+
+                                    return;
+
+                                }
+
+
+                                if (
+                                    cfg.quark_cookie
+                                ) {
+
+                                    document.getElementById(
+                                        'quark-cookie'
+                                    ).value =
+                                        cfg.quark_cookie;
+
+                                }
+
+
+                                if (
+                                    cfg.default_fid
+                                ) {
+
+                                    document.getElementById(
+                                        'fid-default'
+                                    ).value =
+                                        cfg.default_fid;
+
+                                }
+
+
+                                if (
+                                    cfg.openlist_url
+                                ) {
+
+                                    document.getElementById(
+                                        'openlist-url'
+                                    ).value =
+                                        cfg.openlist_url;
+
+                                }
+
+
+                                if (
+                                    cfg.category_fids
+                                ) {
+
+                                    document.getElementById(
+                                        'fid-movie'
+                                    ).value =
+                                        cfg.category_fids['电影'] ||
+                                        '';
+
+
+                                    document.getElementById(
+                                        'fid-tv'
+                                    ).value =
+                                        cfg.category_fids['电视剧'] ||
+                                        '';
+
+
+                                    document.getElementById(
+                                        'fid-show'
+                                    ).value =
+                                        cfg.category_fids['综艺'] ||
+                                        '';
+
+
+                                    document.getElementById(
+                                        'fid-anime'
+                                    ).value =
+                                        cfg.category_fids['动漫'] ||
+                                        '';
+
+                                }
+
+
+                                if (
+                                    Array.isArray(
+                                        cfg.channels
+                                    )
+                                ) {
+
+                                    tgChannels =
+                                        cfg.channels;
+
+
+                                    renderTGChannels();
+
+                                }
+
+
+                                alert(
+                                    '配置成功导入！请点击右下角【保存全部设置】。'
+                                );
+
+                            } catch (err) {
+
+                                console.error(
+                                    '导入配置失败:',
+                                    err
                                 );
 
 
-                            if (!cfg) {
-                                return;
-                            }
-
-
-                            if (cfg.quark_cookie) {
-
-                                document.getElementById(
-                                    'quark-cookie'
-                                ).value =
-                                    cfg.quark_cookie;
+                                alert(
+                                    '读取配置文件失败: JSON 格式非法'
+                                );
 
                             }
 
+                        };
 
-                            if (cfg.default_fid) {
-
-                                document.getElementById(
-                                    'fid-default'
-                                ).value =
-                                    cfg.default_fid;
-
-                            }
-
-
-                            if (cfg.openlist_url) {
-
-                                document.getElementById(
-                                    'openlist-url'
-                                ).value =
-                                    cfg.openlist_url;
-
-                            }
-
-
-                            if (cfg.category_fids) {
-
-                                document.getElementById(
-                                    'fid-movie'
-                                ).value =
-                                    cfg.category_fids['电影'] || '';
-
-                                document.getElementById(
-                                    'fid-tv'
-                                ).value =
-                                    cfg.category_fids['电视剧'] || '';
-
-                                document.getElementById(
-                                    'fid-show'
-                                ).value =
-                                    cfg.category_fids['综艺'] || '';
-
-                                document.getElementById(
-                                    'fid-anime'
-                                ).value =
-                                    cfg.category_fids['动漫'] || '';
-
-                            }
-
-
-                            if (cfg.channels) {
-
-                                tgChannels =
-                                    cfg.channels;
-
-                                renderTGChannels();
-
-                            }
-
-
-                            alert(
-                                '配置成功导入！请点击右下角【保存全部设置】。'
-                            );
-
-                        } catch (err) {
-
-                            alert(
-                                '读取配置文件失败: JSON 格式非法'
-                            );
-
-                        }
-
-                    };
-
-            };
+                };
 
 
             input.click();
@@ -1292,19 +1627,32 @@
 
 
         /* ==========================================================
-           账户安全
-           
-           注意：
-           当前先保留前端函数。
-           后端 API 尚未接入前，不会真正修改账户。
+           账户安全 - 修改用户名
            ========================================================== */
 
         async function changeAdminUsername() {
+
+            const currentPassword =
+                document.getElementById(
+                    'security-username-current-password'
+                ).value;
+
 
             const newUsername =
                 document.getElementById(
                     'new-username'
                 ).value.trim();
+
+
+            if (!currentPassword) {
+
+                alert(
+                    '请输入当前密码。'
+                );
+
+                return;
+
+            }
 
 
             if (!newUsername) {
@@ -1314,28 +1662,95 @@
                 );
 
                 return;
+
             }
 
 
             if (
-                newUsername.length < 3 ||
+                newUsername.length < 2 ||
                 newUsername.length > 64
             ) {
 
                 alert(
-                    '用户名长度必须为 3～64 个字符。'
+                    '用户名长度必须为 2～64 个字符。'
                 );
 
                 return;
+
             }
 
 
-            alert(
-                '账户修改接口尚未接入，请先完成后端账户安全 API。'
-            );
+            try {
+
+                const response =
+                    await apiFetch(
+                        '/api/change-username',
+                        {
+                            method: 'POST',
+
+                            headers: {
+                                'Content-Type':
+                                    'application/json'
+                            },
+
+                            body:
+                                JSON.stringify({
+                                    current_password:
+                                        currentPassword,
+
+                                    new_username:
+                                        newUsername
+                                })
+                        }
+                    );
+
+
+                const result =
+                    await response.json();
+
+
+                if (!result.success) {
+
+                    alert(
+                        result.message ||
+                        '修改用户名失败'
+                    );
+
+                    return;
+
+                }
+
+
+                alert(
+                    result.message ||
+                    '用户名修改成功，请重新登录。'
+                );
+
+
+                window.location.href =
+                    '/login';
+
+            } catch (error) {
+
+                console.error(
+                    '修改用户名失败:',
+                    error
+                );
+
+
+                alert(
+                    '修改用户名失败：' +
+                    error.message
+                );
+
+            }
 
         }
 
+
+        /* ==========================================================
+           账户安全 - 修改密码
+           ========================================================== */
 
         async function changeAdminPassword() {
 
@@ -1364,6 +1779,7 @@
                 );
 
                 return;
+
             }
 
 
@@ -1374,32 +1790,102 @@
                 );
 
                 return;
+
             }
 
 
-            if (newPassword.length < 8) {
+            if (
+                newPassword.length < 8 ||
+                newPassword.length > 128
+            ) {
 
                 alert(
-                    '新密码至少需要 8 位。'
+                    '新密码长度必须为 8～128 个字符。'
                 );
 
                 return;
+
             }
 
 
-            if (newPassword !== confirmPassword) {
+            if (
+                newPassword !==
+                confirmPassword
+            ) {
 
                 alert(
                     '两次输入的新密码不一致。'
                 );
 
                 return;
+
             }
 
 
-            alert(
-                '账户修改接口尚未接入，请先完成后端账户安全 API。'
-            );
+            try {
+
+                const response =
+                    await apiFetch(
+                        '/api/change-password',
+                        {
+                            method: 'POST',
+
+                            headers: {
+                                'Content-Type':
+                                    'application/json'
+                            },
+
+                            body:
+                                JSON.stringify({
+                                    current_password:
+                                        currentPassword,
+
+                                    new_password:
+                                        newPassword
+                                })
+                        }
+                    );
+
+
+                const result =
+                    await response.json();
+
+
+                if (!result.success) {
+
+                    alert(
+                        result.message ||
+                        '修改密码失败'
+                    );
+
+                    return;
+
+                }
+
+
+                alert(
+                    result.message ||
+                    '密码修改成功，请重新登录。'
+                );
+
+
+                window.location.href =
+                    '/login';
+
+            } catch (error) {
+
+                console.error(
+                    '修改密码失败:',
+                    error
+                );
+
+
+                alert(
+                    '修改密码失败：' +
+                    error.message
+                );
+
+            }
 
         }
 
