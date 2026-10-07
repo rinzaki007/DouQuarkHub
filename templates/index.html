@@ -174,7 +174,7 @@
 
     <!-- 批量转存资源弹窗 -->
     <div id="candidate-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-[100] flex items-center justify-center hidden">
-        <div class="bg-slate-900 border border-slate-800 rounded-lg w-full max-w-4xl p-6 shadow-2xl space-y-4 max-h-[90vh] flex flex-col">
+        <div class="candidate-modal-shell bg-slate-900/95 border border-slate-700/80 rounded-2xl w-full max-w-5xl p-4 sm:p-5 shadow-2xl space-y-4 max-h-[92vh] flex flex-col backdrop-blur-xl">
             <div class="flex items-center justify-between border-b border-slate-800 pb-3">
                 <div class="flex items-center gap-3">
                     <h3 class="text-base font-medium text-white flex items-center gap-2">
@@ -184,12 +184,12 @@
                 <button onclick="closeCandidateModal()" class="text-slate-400 hover:text-white text-lg">✕</button>
             </div>
 
-            <div class="bg-slate-950 border border-slate-800 rounded-lg p-3 flex items-center gap-3">
+            <div class="target-folder-bar bg-slate-950/80 border border-slate-800 rounded-xl p-3 flex flex-col sm:flex-row sm:items-center gap-2.5">
                 <span class="text-xs font-semibold text-amber-400 shrink-0"><i class="fa-solid fa-folder-tree"></i> 目标存储目录:</span>
                 <select id="batch-target-fid" class="global-category-select flex-1 bg-slate-900 border border-slate-700 rounded px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-amber-500">
                     <option value="0">正在加载后台分类目录配置...</option>
                 </select>
-                <span class="text-[11px] text-slate-400 shrink-0">(将自动在此目录下新建影片专属文件夹)</span>
+                <span class="text-[10px] text-slate-500 shrink-0">每部影片会自动建立专属文件夹</span>
             </div>
 
             <div id="candidate-content" class="flex-1 overflow-y-auto space-y-4 pr-1"></div>
