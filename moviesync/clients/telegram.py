@@ -29,15 +29,55 @@ class TelegramClient:
     def __init__(self):
         self.http = HttpClient(TG_HEADERS)
 
-    def check_channel(self, channel: object) -> bool:
-        channel_id = normalize_channel_id(channel.get("id", "") if isinstance(channel, dict) else channel)
+    def check_channel_detail(self, channel: object) -> dict:
+        channel_id = normalize_channel_id(
+            channel.get("id", "") if isinstance(channel, dict) else channel
+        )
         if not channel_id:
-            return False
+            return {
+                "status": "unavailable",
+                "message": "频道 ID 格式无效",
+            }
+
         try:
-            response = self.http.session.get(f"https://t.me/s/{quote(channel_id)}", timeout=4)
-            return response.status_code == 200 and "tgme_channel_info" in response.text
-        except Exception:
-            return False
+            response = self.http.session.get(
+                f"https://t.me/s/{quote(channel_id)}",
+                timeout=4,
+            )
+        except Exception as exc:
+            return {
+                "status": "unavailable",
+                "message": f"连接失败：{type(exc).__name__}",
+            }
+
+        if response.status_code == 404:
+            return {
+                "status": "unavailable",
+                "message": "频道不存在或无法访问",
+            }
+        if response.status_code == 403:
+            return {
+                "status": "unavailable",
+                "message": "访问被拒绝，可能无法公开访问",
+            }
+        if response.status_code != 200:
+            return {
+                "status": "unavailable",
+                "message": f"Telegram 返回 HTTP {response.status_code}",
+            }
+        if "tgme_channel_info" not in response.text:
+            return {
+                "status": "degraded",
+                "message": "页面可访问，但未识别为公开频道",
+            }
+
+        return {
+            "status": "healthy",
+            "message": "频道连接正常",
+        }
+
+    def check_channel(self, channel: object) -> bool:
+        return self.check_channel_detail(channel)["status"] == "healthy"
 
     def search_channel(self, channel: object, title: str) -> list[dict]:
         if isinstance(channel, dict):
