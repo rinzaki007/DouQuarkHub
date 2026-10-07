@@ -19,6 +19,9 @@ from ..clients.quark import (
 from ..storage import JsonStore
 
 
+SUBSCRIPTION_SCHEMA_VERSION = 2
+
+
 def _normalize_fid(value: object) -> str:
     fid = str(
         value or ""
@@ -66,6 +69,7 @@ class SubscriptionManager:
         self.running_ids: set[str] = set()
         self.stop_event = Event()
         self.worker: Thread | None = None
+        self.schema_version = SUBSCRIPTION_SCHEMA_VERSION
 
     @staticmethod
     def _now_string() -> str:
@@ -73,13 +77,59 @@ class SubscriptionManager:
             "%Y-%m-%d %H:%M"
         )
 
+    def _load_subscriptions(self) -> list[dict]:
+        data = self.store.read()
+
+        if not isinstance(data, list):
+            data = []
+
+        changed = False
+        normalized = []
+
+        for item in data:
+            if not isinstance(item, dict):
+                changed = True
+                continue
+
+            item = dict(item)
+
+            try:
+                version = int(
+                    item.get(
+                        "schema_version",
+                        1,
+                    )
+                )
+            except (TypeError, ValueError):
+                version = 1
+
+            if version < 2:
+                item.setdefault("retry_count", 0)
+                item.setdefault("pending_save_keys", [])
+                changed = True
+
+            item["schema_version"] = SUBSCRIPTION_SCHEMA_VERSION
+            item["pending_save_keys"] = [
+                str(key)
+                for key in (
+                    item.get("pending_save_keys", [])
+                    or []
+                )
+                if str(key).strip()
+            ][:200]
+
+            normalized.append(item)
+
+        if changed or normalized != data:
+            self.store.write(normalized)
+
+        return normalized
+
     def get_subscriptions(
         self,
     ) -> list[dict]:
         with self.lock:
-            return list(
-                self.store.read()
-            )
+            return list(self._load_subscriptions())
 
     def add_subscription(
         self,
@@ -180,12 +230,15 @@ class SubscriptionManager:
             "next_run_at": time.time(),
             "last_error": "",
             "retry_count": 0,
+            "pending_save_keys": [],
+            "schema_version": SUBSCRIPTION_SCHEMA_VERSION,
         }
 
         with self.lock:
-            subscriptions = (
-                self.store.read()
-            )
+            subscriptions = self._load_subscriptions()
+
+            subscription["schema_version"] = SUBSCRIPTION_SCHEMA_VERSION
+            subscription["pending_save_keys"] = []
 
             subscriptions.append(
                 subscription
@@ -202,9 +255,7 @@ class SubscriptionManager:
         sub_id: str,
     ) -> bool:
         with self.lock:
-            subscriptions = (
-                self.store.read()
-            )
+            subscriptions = self._load_subscriptions()
 
             new_subscriptions = [
                 item
@@ -230,9 +281,7 @@ class SubscriptionManager:
         sub_id: str,
     ) -> tuple[bool, str]:
         with self.lock:
-            subscriptions = (
-                self.store.read()
-            )
+            subscriptions = self._load_subscriptions()
 
             subscription = next(
                 (
@@ -464,6 +513,27 @@ class SubscriptionManager:
                 ),
             )
 
+        pending_keys = list(
+            dict.fromkeys(
+                str(key)
+                for key in found_keys
+            )
+        )[:200]
+
+        with self.lock:
+            subscriptions = self._load_subscriptions()
+            current = next(
+                (
+                    item
+                    for item in subscriptions
+                    if item.get("id") == sub.get("id")
+                ),
+                None,
+            )
+            if current is not None:
+                current["pending_save_keys"] = pending_keys
+                self.store.write(subscriptions)
+
         ok, msg = engine.save_files(
             sub.get("pwd_id"),
             selected,
@@ -502,9 +572,7 @@ class SubscriptionManager:
         )
 
         with self.lock:
-            subscriptions = (
-                self.store.read()
-            )
+            subscriptions = self._load_subscriptions()
 
             current = next(
                 (
