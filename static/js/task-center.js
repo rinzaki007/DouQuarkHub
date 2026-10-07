@@ -5,6 +5,8 @@ let selectedCandidate = null;
 document.addEventListener('DOMContentLoaded', () => {
     loadTasks();
     loadTaskCategories();
+    const presetTitle = new URLSearchParams(window.location.search).get('title');
+    if (presetTitle) setTimeout(() => openAddTask(), 120);
 });
 
 async function apiFetchTask(url, options = {}) {
