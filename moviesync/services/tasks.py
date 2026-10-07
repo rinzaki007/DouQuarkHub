@@ -227,5 +227,26 @@ class TaskManager:
         self.executor.submit(self._run_transfer, new["id"], runner)
         return new
 
+    def delete_task(self, task_id):
+        task_id = str(task_id)
+        with self.lock:
+            items = self.list_tasks()
+            target = next((x for x in items if str(x.get("id")) == task_id), None)
+            if not target:
+                return False, "任务不存在"
+            if target.get("status") in {"queued", "running"}:
+                return False, "执行中的任务不能删除，请等待任务结束"
+            items = [x for x in items if str(x.get("id")) != task_id]
+            self._save(items)
+        return True, "任务已删除"
+
+    def clear_history(self):
+        with self.lock:
+            items = self.list_tasks()
+            kept = [x for x in items if x.get("status") in {"queued", "running"}]
+            removed = len(items) - len(kept)
+            self._save(kept)
+        return removed
+
     def shutdown(self):
         self.executor.shutdown(wait=False, cancel_futures=True)
