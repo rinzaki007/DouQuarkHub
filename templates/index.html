@@ -15,23 +15,23 @@
 <body class="min-h-screen flex flex-col">
 
     <!-- 顶栏：左侧分类/功能，中间搜索框，右侧系统状态与设置（吸顶 + 毛玻璃） -->
-    <header class="bg-slate-900/90 backdrop-blur-md border-b border-slate-800/80 sticky top-0 z-40 px-3 sm:px-4 py-2.5">
+    <header class="glass-nav backdrop-blur-xl border-b border-slate-800/70 sticky top-0 z-40 px-3 sm:px-4 py-2.5">
         <div class="max-w-screen-2xl mx-auto flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 sm:gap-4">
             
             <!-- 左侧：分类与功能入口 -->
             <div class="flex items-center space-x-1.5 shrink-0 overflow-x-auto max-w-full">
-                <button onclick="changeTag('电影')" class="nav-tag px-3.5 py-1.5 rounded text-sm font-medium transition bg-blue-600 text-white shadow-md" data-tag="电影">电影</button>
-                <button onclick="changeTag('电视剧')" class="nav-tag px-3.5 py-1.5 rounded text-sm font-medium transition bg-slate-800/80 text-slate-300 hover:bg-slate-700" data-tag="电视剧">电视剧</button>
+                <button onclick="changeTag('电影')" class="nav-tag px-3.5 py-1.5 glass-tab rounded-xl text-sm font-medium transition bg-blue-600/90 text-white shadow-lg shadow-blue-600/10" data-tag="电影">电影</button>
+                <button onclick="changeTag('电视剧')" class="nav-tag px-3.5 py-1.5 glass-tab rounded-xl text-sm font-medium transition bg-slate-900/50 text-slate-300 hover:bg-slate-800/80" data-tag="电视剧">电视剧</button>
                 <button onclick="changeTag('综艺')" class="nav-tag px-3.5 py-1.5 rounded text-sm font-medium transition bg-slate-800/80 text-slate-300 hover:bg-slate-700" data-tag="综艺">综艺</button>
                 <button onclick="changeTag('动漫')" class="nav-tag px-3.5 py-1.5 rounded text-sm font-medium transition bg-slate-800/80 text-slate-300 hover:bg-slate-700" data-tag="动漫">动漫</button>
                 
-                <a href="/tasks" class="px-2.5 py-1.5 rounded text-xs font-medium bg-purple-600 hover:bg-purple-500 text-white transition flex items-center gap-1 shadow">
+                <a href="/tasks" class="px-2.5 py-1.5 rounded text-xs font-medium bg-purple-600/90 hover:bg-purple-500 text-white transition flex items-center gap-1 shadow-lg shadow-purple-600/10">
                     <i class="fa-solid fa-list-check"></i> 任务中心
                 </a>
-                <a href="/openlist" target="_blank" rel="noopener noreferrer" class="px-2.5 py-1.5 rounded text-xs font-medium bg-emerald-600 hover:bg-emerald-500 text-white transition flex items-center gap-1 shadow">
+                <a href="/openlist" target="_blank" rel="noopener noreferrer" class="px-2.5 py-1.5 rounded text-xs font-medium bg-emerald-600/90 hover:bg-emerald-500 text-white transition flex items-center gap-1 shadow-lg shadow-emerald-600/10">
                     <i class="fa-solid fa-folder-open"></i> OpenList
                 </a>
-                <a href="https://pan.quark.cn" target="_blank" rel="noopener noreferrer" class="px-2.5 py-1.5 rounded text-xs font-medium bg-amber-600 hover:bg-amber-500 text-white transition flex items-center gap-1 shadow">
+                <a href="https://pan.quark.cn" target="_blank" rel="noopener noreferrer" class="px-2.5 py-1.5 rounded text-xs font-medium bg-amber-600/90 hover:bg-amber-500 text-white transition flex items-center gap-1 shadow-lg shadow-amber-600/10">
                     <i class="fa-solid fa-cloud"></i> 夸克端
                 </a>
             </div>
@@ -39,7 +39,7 @@
             <!-- 中间：搜索框 -->
             <div class="order-last lg:order-none w-full lg:flex-1 lg:max-w-xl lg:mx-2 relative">
                 <input type="text" id="search-input" placeholder="搜索豆瓣影视资源..." 
-                       class="w-full bg-slate-950/80 border border-slate-700/80 rounded-lg px-3.5 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-blue-500 shadow-inner"
+                       class="w-full glass-control bg-slate-950/55 border border-slate-700/60 rounded-xl px-3.5 py-2 text-sm text-slate-200 focus:outline-none focus:border-blue-500 shadow-inner"
                        onkeydown="if(event.key==='Enter') doSearch()">
                 <button onclick="doSearch()" class="absolute right-3 top-2 text-slate-400 hover:text-white text-xs">
                     <i class="fa-solid fa-magnifying-glass"></i>
@@ -48,7 +48,7 @@
 
             <!-- 右侧：Cookie状态、频道检测、运行日志、设置 -->
             <div class="hidden sm:flex items-center space-x-2 shrink-0">
-                <div id="cookie-status-badge" class="px-2 py-1 text-xs rounded bg-slate-800/80 text-slate-400 border border-slate-700/80 flex items-center gap-1">
+                <div id="cookie-status-badge" class="px-2 py-1 text-xs rounded glass-badge bg-slate-900/55 text-slate-400 border border-slate-700/60 flex items-center gap-1">
                     <span class="w-2 h-2 rounded-full bg-slate-500 animate-pulse"></span>
                     <span>检测中</span>
                 </div>
@@ -56,7 +56,7 @@
                     <i class="fa-brands fa-telegram text-sky-400"></i>
                     <span id="channel-count-text">频道 --/--</span>
                 </div>
-                <a href="/admin" class="px-2.5 py-1.5 text-xs bg-slate-800/80 hover:bg-slate-700 text-slate-300 rounded border border-slate-700/50 flex items-center gap-1">
+                <a href="/admin" class="px-2.5 py-1.5 text-xs glass-control bg-slate-900/55 hover:bg-slate-800/80 text-slate-300 rounded-xl border border-slate-700/60 flex items-center gap-1">
                     <i class="fa-solid fa-gear"></i> 设置
                 </a>
             </div>
@@ -64,18 +64,18 @@
     </header>
 
     <!-- 第二行：排序方式与超宽资源选择显示栏（吸顶 + 毛玻璃） -->
-    <div class="bg-slate-900/80 backdrop-blur-md border-b border-slate-800/80 px-4 py-2.5 sticky top-[57px] z-30 shadow-md">
+    <div class="glass-subnav backdrop-blur-xl border-b border-slate-800/60 px-4 py-2.5 sticky top-[57px] z-30 shadow-md">
         <div class="max-w-7xl mx-auto flex items-center justify-between gap-4">
             
             <!-- 左侧：排序方式 + 已选统计 + 影片名称预览区 -->
             <div class="flex items-center space-x-4 flex-1 overflow-hidden">
                 <div class="flex items-center space-x-2 shrink-0">
                     <span class="text-xs text-slate-400 font-medium">排序方式：</span>
-                    <div class="inline-flex bg-slate-950/80 p-0.5 rounded-lg border border-slate-800 text-xs gap-1">
-                        <button onclick="changeSort('U')" class="sort-tag px-3 py-1 rounded-md font-medium transition bg-blue-600 text-white shadow" data-sort="U">
+                    <div class="inline-flex bg-slate-950/55 p-1 rounded-xl border border-slate-700/60 text-xs gap-1">
+                        <button onclick="changeSort('U')" class="sort-tag px-3 py-1.5 rounded-lg font-medium transition bg-blue-600/90 text-white shadow" data-sort="U">
                             <i class="fa-solid fa-fire mr-1 text-amber-300"></i> 热门推荐
                         </button>
-                        <button onclick="changeSort('R')" class="sort-tag px-3 py-1 rounded-md font-medium transition text-slate-400 hover:text-white" data-sort="R">
+                        <button onclick="changeSort('R')" class="sort-tag px-3 py-1.5 rounded-lg font-medium transition text-slate-400 hover:text-white" data-sort="R">
                             <i class="fa-solid fa-clock mr-1 text-sky-300"></i> 最近最新
                         </button>
                     </div>
@@ -86,7 +86,7 @@
                 <div class="flex items-center space-x-3 flex-1 overflow-hidden">
                     <div class="flex items-center space-x-1.5 shrink-0">
                         <span class="text-xs text-slate-400">已选 <b id="selected-count" class="text-blue-400">0</b> 部</span>
-                        <button onclick="selectAll(true)" class="px-2 py-1 text-xs bg-slate-800/80 hover:bg-slate-700 text-slate-300 rounded">全选</button>
+                        <button onclick="selectAll(true)" class="px-2.5 py-1.5 text-[11px] bg-slate-900/60 hover:bg-slate-800 text-slate-300 rounded-lg border border-slate-700/50">全选</button>
                         <button onclick="selectAll(false)" class="px-2 py-1 text-xs bg-slate-800/80 hover:bg-slate-700 text-slate-300 rounded">取消</button>
                     </div>
                     
@@ -128,8 +128,8 @@
     <!-- 影视详情操作抽屉：海报点击后的统一入口 -->
     <div id="movie-detail-drawer" class="fixed inset-0 z-[90] hidden">
         <div onclick="closeMovieDetail()" class="absolute inset-0 bg-black/65 backdrop-blur-sm"></div>
-        <aside class="absolute right-0 top-0 h-full w-full max-w-xl overflow-y-auto border-l border-slate-800 bg-slate-900 shadow-2xl">
-            <div class="sticky top-0 z-10 flex items-center justify-between border-b border-slate-800 bg-slate-900/95 px-5 py-4 backdrop-blur">
+        <aside class="absolute right-0 top-0 h-full w-full max-w-xl overflow-y-auto border-l border-slate-700/60 bg-slate-900/75 backdrop-blur-2xl shadow-2xl">
+            <div class="sticky top-0 z-10 flex items-center justify-between border-b border-slate-700/60 bg-slate-900/70 px-5 py-4 backdrop-blur">
                 <div>
                     <div class="text-[10px] font-medium uppercase tracking-widest text-blue-400">MOVIE ACTIONS</div>
                     <h2 id="movie-detail-title" class="mt-1 text-base font-semibold text-white">影视详情</h2>
@@ -139,7 +139,7 @@
                 </button>
             </div>
             <div class="space-y-5 p-5">
-                <div class="flex gap-4 rounded-2xl border border-slate-800 bg-slate-950 p-4">
+                <div class="flex gap-4 glass-card rounded-2xl p-4">
                     <img id="movie-detail-cover" class="h-40 w-28 shrink-0 rounded-xl object-cover bg-slate-900" alt="">
                     <div class="min-w-0">
                         <h3 id="movie-detail-name" class="text-lg font-semibold text-white"></h3>
