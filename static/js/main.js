@@ -133,9 +133,11 @@ async function checkSystemHealth() {
 function changeTag(tag) {
     currentTag = tag;
     document.querySelectorAll('.nav-tag').forEach(btn => {
-        btn.className = btn.dataset.tag === tag 
-            ? 'nav-tag px-3.5 py-1.5 rounded text-sm font-medium transition bg-blue-600 text-white shadow-md'
-            : 'nav-tag px-3.5 py-1.5 rounded text-sm font-medium transition bg-slate-800/80 text-slate-300 hover:bg-slate-700';
+        const active = btn.dataset.tag === tag;
+        btn.className = 'nav-tag px-3.5 py-1.5 rounded-xl text-sm font-medium transition ' +
+            (active
+                ? 'bg-blue-600/90 text-white shadow-lg shadow-blue-600/10'
+                : 'glass-tab bg-slate-900/50 text-slate-300 hover:bg-slate-800/80');
     });
     loadCategoryOptions();
     fetchMovies();
