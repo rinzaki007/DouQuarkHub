@@ -276,10 +276,9 @@ function renderGrid() {
     const noCoverImage = getNoCoverImage();
 
     moviesData.forEach((movie, idx) => {
-        const coverUrl = movie.cover ? '/api/proxy-img?url=' + encodeURIComponent(movie.cover) : noCoverImage;        const card = document.createElement('article');
-        card.className = 'movie-card group relative overflow-hidden rounded-2xl border ' +
-            (isSelected ? 'border-blue-500 ring-2 ring-blue-500/30' : 'border-slate-800/80') +
-            ' bg-slate-900/80 shadow-lg transition duration-300 hover:-translate-y-1 hover:border-slate-600 hover:shadow-2xl';
+        const coverUrl = movie.cover ? '/api/proxy-img?url=' + encodeURIComponent(movie.cover) : noCoverImage;
+        const card = document.createElement('article');
+        card.className = 'movie-card group relative overflow-hidden rounded-2xl border border-slate-800/80 bg-slate-900/80 shadow-lg transition duration-300 hover:-translate-y-1 hover:border-slate-600 hover:shadow-2xl';
         card.onclick = (e) => { if (!e.target.closest('a, input, button')) openMovieDetail(idx); };
         const year = movie.year || (movie.pubdate ? String(movie.pubdate).match(/(19|20)\d{2}/)?.[0] : '');
         card.innerHTML = `
