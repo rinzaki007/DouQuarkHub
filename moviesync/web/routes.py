@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import secrets
 from functools import wraps
 from urllib.parse import urlparse
 
