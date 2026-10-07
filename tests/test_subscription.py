@@ -12,3 +12,30 @@ def test_subscription_ids_are_unique_and_interval_is_stored(tmp_path):
     assert first["id"] != second["id"]
     assert first["next_run_at"] is not None
     assert manager.get_subscriptions()[1]["interval_hours"] == 12
+
+
+def test_subscription_failure_uses_retry_backoff(tmp_path):
+    import logging
+
+    manager = SubscriptionManager(
+        tmp_path / "subscriptions.json",
+        lambda: "",
+        logging.getLogger("test"),
+    )
+    sub = manager.add_subscription(
+        title="Retry",
+        pwd_id="abc",
+        interval_hours=6,
+    )
+
+    ok, _ = manager._finish(
+        sub,
+        False,
+        "temporary failure",
+    )
+
+    assert not ok
+    saved = manager.get_subscriptions()[0]
+    assert saved["retry_count"] == 1
+    assert saved["next_run_at"] < __import__("time").time() + 6 * 3600
+    assert saved["last_error"] == "temporary failure"
