@@ -65,7 +65,7 @@ async function loadTasks() {
         const resp = await apiFetchTask('/api/subscriptions');
         const res = await resp.json();
         if (!res.success) throw new Error(res.message || '加载失败');
-        tasks = Array.isArray(res.subscriptions) ? res.subscriptions : [];
+        tasks = Array.isArray(res.tasks) ? res.tasks : [];
         renderStats();
         renderTasks();
     } catch (err) {
@@ -74,10 +74,12 @@ async function loadTasks() {
 }
 
 function taskState(task) {
-    const now = Date.now() / 1000;
     if (task.pending_save_keys && task.pending_save_keys.length) return {key:'pending', label:'待确认转存', cls:'text-amber-300 bg-amber-950/50 border-amber-800'};
-    if (task.last_error) return {key:'error', label:'异常重试', cls:'text-rose-300 bg-rose-950/50 border-rose-800'};
-    if (Number(task.next_run_at || 0) <= now) return {key:'soon', label:'即将检查', cls:'text-amber-300 bg-amber-950/50 border-amber-800'};
+    if (task.status === 'running') return {key:'running', label:'执行中', cls:'text-purple-300 bg-purple-950/50 border-purple-800'};
+    if (task.status === 'failed' || task.last_error) return {key:'error', label:'异常', cls:'text-rose-300 bg-rose-950/50 border-rose-800'};
+    if (task.status === 'success') return {key:'success', label:'已完成', cls:'text-emerald-300 bg-emerald-950/50 border-emerald-800'};
+    if (task.status === 'queued') return {key:'waiting', label:'排队中', cls:'text-blue-300 bg-blue-950/50 border-blue-800'};
+    if (task.next_run_at && Number(task.next_run_at) <= Date.now()/1000) return {key:'soon', label:'即将检查', cls:'text-amber-300 bg-amber-950/50 border-amber-800'};
     return {key:'waiting', label:'等待检查', cls:'text-blue-300 bg-blue-950/50 border-blue-800'};
 }
 
@@ -93,9 +95,9 @@ function formatNextRun(ts) {
 
 function renderStats() {
     const total = tasks.length;
-    const error = tasks.filter(t => !!t.last_error).length;
-    const waiting = tasks.filter(t => taskState(t).key === 'waiting').length;
-    const soon = tasks.filter(t => ['soon','pending'].includes(taskState(t).key)).length;
+    const error = tasks.filter(t => ['error','failed'].includes(t.status) || !!t.last_error).length;
+    const waiting = tasks.filter(t => ['waiting','queued'].includes(t.status)).length;
+    const soon = tasks.filter(t => ['soon','pending','running'].includes(taskState(t).key) || ['running','pending'].includes(t.status)).length;
     document.getElementById('stat-total').textContent = total;
     document.getElementById('stat-waiting').textContent = waiting;
     document.getElementById('stat-error').textContent = error;
@@ -114,8 +116,8 @@ function setFilter(filter) {
 function renderTasks() {
     const list = document.getElementById('task-list');
     let visible = tasks;
-    if (taskFilter === 'error') visible = tasks.filter(t => !!t.last_error);
-    if (taskFilter === 'waiting') visible = tasks.filter(t => taskState(t).key === 'waiting');
+    if (taskFilter === 'error') visible = tasks.filter(t => ['error','failed'].includes(t.status) || !!t.last_error);
+    if (taskFilter === 'waiting') visible = tasks.filter(t => ['waiting','queued'].includes(t.status));
     if (!visible.length) {
         list.innerHTML = '<div class="p-12 text-center text-xs text-slate-500">暂无符合条件的任务。</div>';
         return;
@@ -123,31 +125,33 @@ function renderTasks() {
     list.innerHTML = '';
     visible.forEach(task => {
         const state = taskState(task);
-        const files = Array.isArray(task.files) ? task.files.length : 0;
-        const saved = Array.isArray(task.saved_episodes) ? task.saved_episodes.length : 0;
+        const total = Number(task.total || 0);
+        const done = Number(task.success_count || 0) + Number(task.skipped_count || 0) + Number(task.failed_count || 0);
+        const progress = Math.max(0, Math.min(100, Number(task.progress || 0)));
+        const retryable = task.type === 'transfer' && task.status === 'failed';
         const card = document.createElement('article');
         card.className = 'p-4 hover:bg-slate-900/60 transition';
         card.innerHTML =
-            '<div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">' +
+            '<div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">' +
             '<div class="min-w-0 flex-1"><div class="flex flex-wrap items-center gap-2">' +
             '<h3 class="truncate text-sm font-semibold text-slate-100">' + escapeTask(task.title) + '</h3>' +
             '<span class="rounded-full border px-2 py-0.5 text-[10px] ' + state.cls + '">' + state.label + '</span>' +
-            '<span class="rounded-full border border-slate-700 bg-slate-950 px-2 py-0.5 text-[10px] text-slate-400">智能追剧</span>' +
-            '</div><div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-500">' +
-            '<span><i class="fa-brands fa-telegram mr-1 text-sky-400"></i>' + escapeTask(task.channel || '未知频道') + '</span>' +
-            '<span><i class="fa-solid fa-clock mr-1"></i>每 ' + Number(task.interval_hours || 6) + ' 小时</span>' +
-            '<span><i class="fa-solid fa-cloud mr-1 text-amber-400"></i>已记录 ' + saved + ' 项</span>' +
-            '<span><i class="fa-solid fa-list mr-1"></i>监控 ' + files + ' 项</span>' +
-            '</div><div class="mt-2 text-[11px] ' + (task.last_error ? 'text-rose-400' : 'text-slate-500') + '">' +
-            (task.last_error ? escapeTask(task.last_error) : '下次检查：' + formatNextRun(task.next_run_at)) +
-            '</div></div><div class="flex shrink-0 flex-wrap gap-2">' +
-            '<button data-action="run" data-id="' + escapeTask(task.id) + '" class="rounded-lg bg-purple-600 px-3 py-2 text-[11px] font-medium text-white hover:bg-purple-500"><i class="fa-solid fa-play mr-1"></i>立即检查</button>' +
-            '<button data-action="delete" data-id="' + escapeTask(task.id) + '" class="rounded-lg border border-rose-900/70 bg-rose-950/30 px-3 py-2 text-[11px] text-rose-300 hover:bg-rose-900/50"><i class="fa-solid fa-trash mr-1"></i>删除</button>' +
+            '<span class="rounded-full border border-slate-700 bg-slate-950 px-2 py-0.5 text-[10px] text-slate-400">' + escapeTask(task.kind || '任务') + '</span>' +
+            '</div>' +
+            '<div class="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-800"><div class="h-full rounded-full bg-purple-500 transition-all" style="width:' + progress + '%"></div></div>' +
+            '<div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-500">' +
+            '<span>进度 ' + progress + '%</span><span>成功 ' + Number(task.success_count || 0) + '</span><span>跳过 ' + Number(task.skipped_count || 0) + '</span><span>失败 ' + Number(task.failed_count || 0) + '</span>' +
+            (task.next_run_at ? '<span>下次：' + formatNextRun(task.next_run_at) + '</span>' : '') +
+            '</div><div class="mt-2 text-[11px] ' + ((task.status === 'failed' || task.last_error) ? 'text-rose-400' : 'text-slate-500') + '">' +
+            escapeTask(task.message || task.last_error || '') + '</div></div>' +
+            '<div class="flex shrink-0 flex-wrap gap-2">' +
+            (task.type === 'subscription' ? '<button data-action="run-sub" data-id="' + escapeTask(task.subscription_id) + '" class="rounded-lg bg-purple-600 px-3 py-2 text-[11px] font-medium text-white hover:bg-purple-500"><i class="fa-solid fa-play mr-1"></i>立即检查</button>' : '') +
+            (retryable ? '<button data-action="retry" data-id="' + escapeTask(task.id) + '" class="rounded-lg border border-amber-800 bg-amber-950/40 px-3 py-2 text-[11px] text-amber-300 hover:bg-amber-900/60"><i class="fa-solid fa-rotate-right mr-1"></i>失败重试</button>' : '') +
             '</div></div>';
         list.appendChild(card);
     });
-    list.querySelectorAll('[data-action="run"]').forEach(btn => btn.onclick = () => runTask(btn.dataset.id));
-    list.querySelectorAll('[data-action="delete"]').forEach(btn => btn.onclick = () => deleteTask(btn.dataset.id));
+    list.querySelectorAll('[data-action="run-sub"]').forEach(btn => btn.onclick = () => runSubscription(btn.dataset.id));
+    list.querySelectorAll('[data-action="retry"]').forEach(btn => btn.onclick = () => retryTask(btn.dataset.id));
 }
 
 function openAddTask() {
@@ -236,14 +240,28 @@ async function createTask() {
     }
 }
 
-async function runTask(id) {
-    document.querySelectorAll('[data-action="run"]').forEach(b => { if (b.dataset.id===id) { b.disabled=true; b.textContent='检查中…'; } });
+async function runSubscription(id) {
     try {
-        const resp=await apiFetchTask('/api/subscriptions/run-now',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id})});
-        const res=await resp.json();
-        taskToast(res.message || (res.success?'检查完成':'检查失败'));
-    }catch(err){ taskToast('手动检查失败'); }
-    finally{ await loadTasks(); }
+        const resp = await apiFetchTask('/api/subscriptions/run-now', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({id})});
+        const res = await resp.json();
+        taskToast(res.message || (res.success ? '检查完成' : '检查失败'));
+    } catch (err) {
+        taskToast('手动检查失败');
+    } finally {
+        await loadTasks();
+    }
+}
+
+async function retryTask(id) {
+    try {
+        const resp = await apiFetchTask('/api/tasks/' + encodeURIComponent(id) + '/retry', {method:'POST'});
+        const res = await resp.json();
+        if (!res.success) throw new Error(res.message || '重试失败');
+        taskToast('已创建重试任务');
+        await loadTasks();
+    } catch (err) {
+        taskToast(err.message || '重试失败');
+    }
 }
 
 async function deleteTask(id) {
