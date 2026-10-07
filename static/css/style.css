@@ -3,27 +3,36 @@ body {
     color: #f8fafc;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
+
 .card-shadow {
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
 }
+
 .line-clamp-1 {
     display: -webkit-box;
     -webkit-line-clamp: 1;
     -webkit-box-orient: vertical;
     overflow: hidden;
 }
+
 #log-box {
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
     background-color: transparent !important;
     font-size: 13px;
 }
+
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: rgba(51, 65, 85, 0.6); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: rgba(71, 85, 105, 0.8); }
 
+/* 管理后台输入框统一为深色，覆盖 Chrome / Edge 自动填充样式 */
+input,
+textarea,
+select {
+    color-scheme: dark;
+}
 
-/* 管理后台输入框：避免浏览器自动填充后出现白色背景 */
 input:-webkit-autofill,
 input:-webkit-autofill:hover,
 input:-webkit-autofill:focus,
@@ -32,9 +41,22 @@ textarea:-webkit-autofill,
 textarea:-webkit-autofill:hover,
 textarea:-webkit-autofill:focus,
 textarea:-webkit-autofill:active {
-    -webkit-text-fill-color: #e2e8f0;
-    -webkit-box-shadow: 0 0 0 1000px #020617 inset;
-    box-shadow: 0 0 0 1000px #020617 inset;
-    caret-color: #e2e8f0;
-    transition: background-color 9999s ease-in-out 0s;
+    -webkit-text-fill-color: #e2e8f0 !important;
+    -webkit-box-shadow: 0 0 0 1000px #020617 inset !important;
+    box-shadow: 0 0 0 1000px #020617 inset !important;
+    caret-color: #e2e8f0 !important;
+    background-color: #020617 !important;
+    color: #e2e8f0 !important;
+}
+
+/* 即使浏览器没有触发 autofill，也保持输入框和页面一致 */
+input,
+textarea,
+select {
+    background-color: #020617;
+}
+
+input::placeholder,
+textarea::placeholder {
+    color: #64748b;
 }
