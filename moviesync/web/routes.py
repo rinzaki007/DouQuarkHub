@@ -767,10 +767,24 @@ def get_tasks():
             "run_history": history[-10:],
             "subscription_id": sub.get("id"),
             "retry_count": sub.get("retry_count", 0),
+            "pending_save_keys": sub.get("pending_save_keys", []) or [],
+            "phase": "pending" if sub.get("pending_save_keys") else "waiting",
+            "phase_label": "等待夸克确认" if sub.get("pending_save_keys") else "等待下次检查",
         })
 
     items.sort(key=lambda item: float(item.get("updated_at") or item.get("created_at") or 0), reverse=True)
     return jsonify({"success": True, "tasks": items})
+
+
+@api.get("/tasks/<task_id>")
+def get_task_detail(task_id):
+    task = _services()["tasks"].get_task(task_id)
+    if not task:
+        return _json_error("未找到任务", 404)
+    return jsonify({
+        "success": True,
+        "task": {key: value for key, value in task.items() if key != "retry_payload"},
+    })
 
 
 @api.post("/tasks/<task_id>/retry")
