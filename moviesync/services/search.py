@@ -18,6 +18,37 @@ MAX_VIDEO_FILES_PER_CANDIDATE = 200
 MAX_CANDIDATES_PER_MOVIE = 20
 
 
+def _format_size(value: object) -> str:
+    try:
+        size = int(float(value or 0))
+    except (TypeError, ValueError):
+        return "未知大小"
+    if size <= 0:
+        return "未知大小"
+    units = ["B", "KB", "MB", "GB", "TB"]
+    index = 0
+    number = float(size)
+    while number >= 1024 and index < len(units) - 1:
+        number /= 1024
+        index += 1
+    return f"{number:.1f} {units[index]}"
+
+
+def _detect_resolution(name: str) -> str:
+    text = str(name or "").lower()
+    patterns = [
+        (r"\b(2160p|4k|uhd)\b", "4K"),
+        (r"\b(1440p|2k)\b", "2K"),
+        (r"\b1080[pi]?\b", "1080P"),
+        (r"\b(720[pi]?)\b", "720P"),
+        (r"\b(480[pi]?)\b", "480P"),
+    ]
+    for pattern, label in patterns:
+        if re.search(pattern, text):
+            return label
+    return "未知"
+
+
 class SearchService:
     def __init__(self, quark: QuarkClient, telegram: TelegramClient, logger):
         self.quark = quark
@@ -69,20 +100,31 @@ class SearchService:
                             "fid": f.get("fid"),
                             "file_name": f.get("file_name", ""),
                             "size": f.get("size", 0),
+                            "size_text": _format_size(f.get("size", 0)),
+                            "resolution": _detect_resolution(f.get("file_name", "")),
                         }
                         for f in files
                         if f.get("fid")
                         and str(f.get("file_name", "")).lower().endswith(VIDEO_EXTENSIONS)
                     ][:MAX_VIDEO_FILES_PER_CANDIDATE]
                     if videos:
+                        resolutions = {}
+                        for video in videos:
+                            resolution = video["resolution"]
+                            resolutions[resolution] = resolutions.get(resolution, 0) + 1
+                        total_size = sum(int(v.get("size") or 0) for v in videos)
                         local.append({
                             "channel": source["channel"],
                             "pwd_id": pwd_id,
                             "files": videos,
+                            "file_count": len(videos),
+                            "total_size": total_size,
+                            "total_size_text": _format_size(total_size),
+                            "resolutions": resolutions,
                             "summary": (
                                 f"频道: [{source['channel']}] | "
-                                f"包含 {len(videos)} 个视频 | "
-                                f"示例: {videos[0]['file_name']}"
+                                f"{len(videos)} 个视频 | "
+                                f"{_format_size(total_size)}"
                             ),
                         })
             except Exception as exc:
