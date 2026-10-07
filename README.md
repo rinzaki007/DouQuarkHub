@@ -1,47 +1,120 @@
 # 🎬 MovieSync
 
-> 豆瓣影视 → Telegram 资源 → 夸克网盘 → 自动转存 / 自动追剧
+> 影视信息 → 开放资源源 → 资源选择 → 存储任务 → 自动追剧
 
-MovieSync 是一个简单的影视资源整理工具，主要用于：
+MovieSync 是一个轻量、可自托管的影视信息与资源任务管理平台。
+
+它不内置影视资源内容，也不托管或分发影视文件。MovieSync 将“影视信息”“资源来源”和“存储目标”解耦，用户可以根据自己的需求配置和使用相应服务。
+
+## ✨ 当前能力
 
 - 🎬 浏览和搜索豆瓣电影、电视剧、综艺、动漫
-- 🔎 从 Telegram 频道搜索对应影视资源
+- 🔌 资源来源抽象层：当前内置 Telegram，后续可扩展其他来源
+- ❤️ 资源源健康检查与最近状态记录
+- 🔎 从已配置的资源来源检索候选资源
 - ☁️ 解析夸克网盘分享并选择需要的文件
-- 📁 将资源转存到指定的夸克目录
-- ❤️ 设置自动追剧，发现新资源后自动转存
-- ⚙️ 在后台管理夸克、Telegram、FID 和其他配置
+- 📁 将选定资源提交到指定的夸克目录
+- 🤖 自动追剧：周期性检查并跟进后续内容
+- 📋 独立任务中心：进度、阶段、成功/跳过/失败、日志、重试
+- 🔐 管理员认证、CSRF、防暴力登录、敏感配置脱敏
+- 💾 JSON 持久化，适合家庭服务器 / NAS / iStoreOS / Docker
+- 🐳 提供 GitHub Actions 自动测试与 Docker 镜像构建
 
----
+## 🧩 开放资源源架构
 
-## 📁 目录结构
+MovieSync 不把任何单一资源来源写死在核心业务里。
+
+当前结构：
+
+```text
+MovieSync
+├── 影视信息
+│   └── Douban
+│
+├── ResourceSource
+│   ├── Telegram（当前内置）
+│   └── 其他来源（可扩展）
+│
+├── 资源候选
+│
+├── Storage / Transfer
+│   └── Quark（当前存储目标）
+│
+└── Task Center
+```
+
+资源源统一位于：
+
+```text
+moviesync/services/resource_sources.py
+```
+
+核心接口为 `ResourceSource`。
+
+以后增加新的资源来源时，原则上只需要实现：
+
+- 资源搜索
+- 资源源健康检查
+- 统一的候选资源字段
+
+而不需要重新修改首页、资源选择页、任务中心和转存流程。
+
+这意味着 Telegram 即使未来不可用，也不会影响 MovieSync 的整体架构；只需要增加或替换一个资源源实现即可。
+
+> 当前版本只内置 Telegram 实现，开放接口是为了降低未来迁移和维护成本，并不代表项目自带其他资源来源。
+
+## 🩺 资源源健康状态
+
+后台的“资源来源”区域可以手动检查来源状态。
+
+状态包括：
+
+- 🟢 正常：来源可用
+- 🟡 部分可用：例如部分 Telegram 频道不可用
+- 🔴 不可用：来源整体不可用
+- ⚪ 未检查：尚未执行健康检查
+
+健康信息会持久化保存，包括最近检查时间、最近成功时间和失败次数。
+
+健康检查用于帮助判断“是 MovieSync 出问题，还是外部资源来源出了问题”，不会把某个来源视为系统永久依赖。
+
+## 🏗️ 项目结构
 
 ```text
 MovieSync/
-├── moviesync/                 # Python 后端
-│   ├── clients/              # 豆瓣 / 夸克 / Telegram / HTTP
-│   ├── services/              # 搜索、转存、自动追剧
-│   ├── web/                   # Flask 页面和 API
-│   ├── app.py                # 应用初始化
-│   ├── auth.py               # 管理员登录和账号安全
-│   ├── config_store.py       # 配置管理
-│   ├── logging_setup.py      # 日志
-│   ├── settings.py           # 运行设置
-│   └── storage.py            # 数据保存
+├── moviesync/
+│   ├── clients/
+│   │   ├── douban.py
+│   │   ├── http.py
+│   │   ├── quark.py
+│   │   └── telegram.py
+│   │
+│   ├── services/
+│   │   ├── resource_sources.py  # 开放资源源抽象与健康检查
+│   │   ├── search.py            # 候选资源处理与转存
+│   │   ├── subscriptions.py     # 自动追剧
+│   │   └── tasks.py             # 任务中心
+│   │
+│   ├── web/
+│   │   └── routes.py
+│   ├── app.py
+│   ├── auth.py
+│   ├── config_store.py
+│   ├── logging_setup.py
+│   ├── settings.py
+│   └── storage.py
 │
-├── static/                    # CSS / JavaScript
-├── templates/                 # 网页模板
-├── tests/                     # 测试文件
-├── Dockerfile                 # Docker 镜像
-├── main.py                    # 程序入口
-├── requirements.txt           # 运行依赖
-└── README.md                  # 项目说明
+├── static/
+├── templates/
+├── tests/
+├── Dockerfile
+├── main.py
+└── README.md
 ```
-
----
 
 ## 🐳 Docker 部署
 
-### 方法一：Docker Compose
+### Docker Compose
 
 新建 `docker-compose.yml`：
 
@@ -60,21 +133,31 @@ services:
       - MOVIESYNC_COOKIE_SECURE=0
 ```
 
-然后运行：
+启动：
 
 ```bash
 docker compose up -d
 ```
 
-浏览器访问：
+访问：
 
 ```text
 http://你的服务器IP:8099
 ```
 
-第一次打开时会进入管理员初始化页面。
+第一次启动会进入管理员初始化页面。
 
-### 方法二：直接使用 Docker 命令
+### iStoreOS / NAS
+
+例如：
+
+```text
+/mnt/sata1-1/moviesync -> /app/data
+```
+
+只要 `/app/data` 挂载目录保持不变，更新容器不会丢失账号、配置和追剧任务。
+
+### 直接 Docker
 
 ```bash
 docker run -d \
@@ -87,52 +170,40 @@ docker run -d \
   ghcr.io/rinzaki007/moviesync:latest
 ```
 
-如果你使用 iStoreOS，也可以把数据目录挂载到例如：
-
-```text
-/mnt/sata1-1/moviesync -> /app/data
-```
-
-这样删除或更新容器后，账号、配置和自动追剧任务仍然会保留。
-
----
-
-## ⚙️ 初次使用
-
-第一次打开 MovieSync 后：
+## ⚙️ 初次配置
 
 1. 创建管理员账号
 2. 登录后台
-3. 填写夸克 Cookie
+3. 配置夸克 Cookie
 4. 设置默认 FID / 分类 FID
-5. 添加 Telegram 资源频道
-6. 返回首页搜索影视资源
-7. 选择资源文件并转存到夸克
+5. 配置资源来源
+6. 添加对应的 Telegram 频道（如果启用 Telegram）
+7. 使用首页搜索影视
+8. 选择候选资源和文件
+9. 提交转存任务
+10. 需要时创建自动追剧任务
 
-如果要使用自动追剧，在资源页面或后台创建对应的追剧任务即可。
+## 💾 数据目录
 
----
-
-## 💾 数据保存位置
-
-MovieSync 的运行数据都会保存在 `/app/data`：
+运行数据保存在：
 
 ```text
 /app/data/
-├── auth.json             # 管理员账号
-├── config.json           # MovieSync 配置
-├── subscriptions.json    # 自动追剧任务
-├── .secret_key           # Session 密钥
-└── logs/                 # 日志
+├── auth.json
+├── config.json
+├── subscriptions.json
+├── tasks.json
+├── .secret_key
+└── logs/
 ```
 
-这些文件属于运行数据，**不要提交到 GitHub**。
+这些内容属于运行数据，不应提交到 GitHub。
 
----
+配置文件会自动维护 schema version，并兼容旧版本配置。
 
-## 🔧 常用 Docker 命令
+## 🔧 常用命令
 
-查看运行状态：
+查看容器：
 
 ```bash
 docker ps | grep MovieSync
@@ -150,31 +221,32 @@ docker logs -f MovieSync
 docker restart MovieSync
 ```
 
-更新镜像后重新创建：
+更新：
 
 ```bash
-docker pull ghcr.io/rinzaki007/moviesync:latest
-docker stop MovieSync
-docker rm MovieSync
+docker compose pull
+docker compose up -d
 ```
 
-然后按照上面的 Docker 命令重新创建即可。
+## 🛡️ 设计原则
 
-**只要 `/app/data` 的挂载没有改变，更新容器不会丢失数据。**
+MovieSync 的核心设计目标不是绑定某一个资源网站，而是：
 
----
+1. **来源可替换**：ResourceSource 与核心业务解耦
+2. **存储可替换**：资源发现与存储目标解耦
+3. **失败可解释**：区分来源、解析、转存和任务执行错误
+4. **状态可追踪**：统一任务中心记录后台任务
+5. **数据可持久化**：容器更新不依赖容器内部文件
+6. **最小信任**：浏览器提交的资源参数在服务端重新验证
+7. **易于维护**：尽量保持单一职责和明确的 Provider 边界
 
 ## ⚠️ 免责声明
 
-本项目仅供个人学习、技术研究和交流使用。
+MovieSync 是一个通用的软件平台，不提供、托管或分发影视资源内容。
 
-请使用者自行遵守当地法律法规、版权要求以及豆瓣、Telegram、夸克等相关平台的服务条款。
+资源来源、账号、链接、文件以及具体使用方式均由使用者自行配置和决定。使用者应自行确认相关内容的合法性，并遵守所在地法律法规、版权要求以及相关服务的平台规则和服务条款。
 
-本项目不提供任何影视资源，仅提供资源搜索、整理和个人网盘转存等功能。
-
-因使用本项目产生的账号风险、数据损失、版权问题或其他任何后果，由使用者自行承担。
-
----
+项目作者不对使用者配置的第三方服务、外部资源来源、账号状态、数据损失或具体使用行为承担责任。
 
 ## 📄 License
 
