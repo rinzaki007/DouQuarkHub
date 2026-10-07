@@ -80,7 +80,7 @@ def register_web(app, services):
             return None
         auth = services["auth"]
         if not auth.is_initialized():
-            if request.path not in {"/setup", "/api/setup", "/login", "/api/login", "/api/login-backdrop", "/healthz"}:
+            if request.path not in {"/setup", "/api/setup", "/login", "/api/login", "/api/login-backdrop", "/api/proxy-img", "/healthz"}:
                 if request.path.startswith("/api/"):
                     return jsonify({"success": False, "message": "需要先完成初始化", "need_setup": True}), 401
                 return redirect("/setup")
