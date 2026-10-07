@@ -19,6 +19,7 @@ from .clients.telegram import TelegramClient
 from .config_store import ConfigStore
 from .logging_setup import configure_logging, recent_logs
 from .services.search import SearchService
+from .services.resource_sources import ResourceSourceManager
 from .services.subscriptions import SubscriptionManager
 from .services.tasks import TaskManager
 from .settings import PROJECT_ROOT, load_settings
@@ -66,6 +67,11 @@ def create_app(
 
     douban = DoubanClient()
     telegram = TelegramClient()
+    resource_sources = ResourceSourceManager(
+        telegram,
+        config_store,
+        logger,
+    )
     http = HttpClient()
 
     tasks = TaskManager(
@@ -86,13 +92,14 @@ def create_app(
         "config": config_store,
         "douban": douban,
         "telegram": telegram,
+        "resource_sources": resource_sources,
         "http": http,
         "subscriptions": subscriptions,
         "tasks": tasks,
         "quark_factory": lambda cookie: QuarkClient(cookie),
         "search_factory": lambda cookie: SearchService(
             QuarkClient(cookie),
-            telegram,
+            resource_sources,
             logger,
         ),
         "csrf": lambda: secrets.token_urlsafe(32),
