@@ -30,7 +30,7 @@ def sanitize_pwd_id(pwd_id: object) -> str:
         return match.group(1)
     if "://" in value or "/" in value or "?" in value:
         return ""
-    return value if re.fullmatch(r"[A-Za-z0-9]+", value) else ""
+    return value if re.fullmatch(r"[A-Za-z0-9]{1,128}", value) else ""
 
 
 def clean_tv_filename(raw_name: str, title: str = "") -> tuple[int | None, str]:
