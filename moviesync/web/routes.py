@@ -144,9 +144,35 @@ def logout():
 
 @pages.get("/healthz")
 def healthz():
+    services = _services()
+    scheduler = services.get("subscriptions")
+
+    scheduler_alive = bool(
+        scheduler
+        and scheduler.worker
+        and scheduler.worker.is_alive()
+    )
+
+    scheduler_expected = bool(
+        services.get("scheduler_enabled")
+    )
+
+    if scheduler_expected and not scheduler_alive:
+        return jsonify(
+            {
+                "status": "degraded",
+                "scheduler": "stopped",
+            }
+        ), 503
+
     return jsonify(
         {
-            "status": "ok"
+            "status": "ok",
+            "scheduler": (
+                "running"
+                if scheduler_alive
+                else "disabled"
+            ),
         }
     )
 
