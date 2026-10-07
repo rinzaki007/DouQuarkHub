@@ -353,6 +353,7 @@ class ConfigStore:
         source_id: str,
         status: str,
         message: str,
+        channels: list[dict] | None = None,
     ) -> None:
         current = self.load()
         import time
@@ -365,6 +366,17 @@ class ConfigStore:
             health["status"] = str(status or "unknown")
             health["message"] = str(message or "")[:200]
             health["last_checked_at"] = now
+            if channels is not None:
+                health["channels"] = [
+                    {
+                        "id": str(channel.get("id") or ""),
+                        "name": str(channel.get("name") or ""),
+                        "status": str(channel.get("status") or "unknown"),
+                        "message": str(channel.get("message") or "")[:200],
+                    }
+                    for channel in channels
+                    if isinstance(channel, dict)
+                ]
             if status == "healthy":
                 health["last_success_at"] = now
             elif status == "unavailable":
