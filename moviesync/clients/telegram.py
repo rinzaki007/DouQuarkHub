@@ -10,7 +10,7 @@ from urllib.parse import quote
 
 from bs4 import BeautifulSoup
 
-from .http import ApiError, HttpClient
+from .http import HttpClient
 
 CHANNEL_RE = re.compile(r"^[A-Za-z0-9_]{2,64}$")
 QUARK_RE = re.compile(r"(?:https?://)?(?:pan\.)?quark\.cn/s/([A-Za-z0-9]{1,128})(?![A-Za-z0-9])", re.IGNORECASE)
