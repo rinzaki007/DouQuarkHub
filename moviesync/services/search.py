@@ -14,6 +14,10 @@ from ..clients.quark import VIDEO_EXTENSIONS, QuarkClient, sanitize_pwd_id
 from ..clients.telegram import TelegramClient
 
 
+MAX_VIDEO_FILES_PER_CANDIDATE = 200
+MAX_CANDIDATES_PER_MOVIE = 20
+
+
 class SearchService:
     def __init__(self, quark: QuarkClient, telegram: TelegramClient, logger):
         self.quark = quark
@@ -61,10 +65,15 @@ class SearchService:
                         self.logger.debug("频道 %s 命中 %s 但解析失败: %s", source["channel"], pwd_id, err)
                         continue
                     videos = [
-                        {"fid": f.get("fid"), "file_name": f.get("file_name", ""), "size": f.get("size", 0)}
+                        {
+                            "fid": f.get("fid"),
+                            "file_name": f.get("file_name", ""),
+                            "size": f.get("size", 0),
+                        }
                         for f in files
-                        if f.get("fid") and str(f.get("file_name", "")).lower().endswith(VIDEO_EXTENSIONS)
-                    ]
+                        if f.get("fid")
+                        and str(f.get("file_name", "")).lower().endswith(VIDEO_EXTENSIONS)
+                    ][:MAX_VIDEO_FILES_PER_CANDIDATE]
                     if videos:
                         local.append({
                             "channel": source["channel"],
@@ -90,6 +99,8 @@ class SearchService:
                 if candidate["pwd_id"] not in seen_pwd_ids:
                     seen_pwd_ids.add(candidate["pwd_id"])
                     candidates.append(candidate)
+                    if len(candidates) >= MAX_CANDIDATES_PER_MOVIE:
+                        return candidates
         self.logger.info("《%s》检索完成，有效候选=%s", title, len(candidates))
         return candidates
 
