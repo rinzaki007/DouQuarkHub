@@ -673,10 +673,31 @@ def search_candidates():
             config.load(),
         )
 
+    source_status = config.get_resource_sources()
+    unavailable_sources = [
+        item.get("name", item.get("id", "未知来源"))
+        for item in source_status
+        if item.get("enabled", True)
+        and (item.get("health") or {}).get("status") == "unavailable"
+    ]
+
+    message = ""
+    if not any(candidates_map.values()):
+        if unavailable_sources:
+            message = (
+                "当前没有找到可用资源；资源来源不可用："
+                + "、".join(unavailable_sources)
+                + "。请先检查资源来源状态。"
+            )
+        else:
+            message = "当前已配置资源来源暂未找到可用候选，可稍后重试。"
+
     return jsonify(
         {
             "success": True,
             "candidates_map": candidates_map,
+            "resource_sources": source_status,
+            "message": message,
         }
     )
 
