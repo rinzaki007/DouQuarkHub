@@ -66,9 +66,22 @@ def register_web(app, services):
 
     @app.after_request
     def security_headers(response):
-        response.headers.setdefault("X-Content-Type-Options", "nosniff")
-        response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
-        response.headers.setdefault("Referrer-Policy", "same-origin")
+        response.headers.setdefault(
+            "X-Content-Type-Options",
+            "nosniff",
+        )
+        response.headers.setdefault(
+            "X-Frame-Options",
+            "SAMEORIGIN",
+        )
+        response.headers.setdefault(
+            "Referrer-Policy",
+            "same-origin",
+        )
+        response.headers.setdefault(
+            "Permissions-Policy",
+            "camera=(), microphone=(), geolocation=()",
+        )
         return response
 
     @app.errorhandler(413)
