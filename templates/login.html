@@ -17,22 +17,6 @@
             background: #020617;
             overflow: hidden;
         }
-        .login-backdrop {
-            position: fixed; inset: -40px;
-            background: linear-gradient(135deg, rgba(2,6,23,.90), rgba(15,23,42,.72));
-            background-position: center;
-            background-size: cover;
-            filter: blur(18px) saturate(.9);
-            transform: scale(1.08);
-            opacity: .82;
-            transition: opacity .45s ease, background-image .45s ease;
-        }
-        .login-backdrop.ready { opacity: .9; }
-        .login-vignette {
-            position: fixed; inset: 0;
-            background: radial-gradient(circle at 50% 40%, rgba(15,23,42,.15), rgba(2,6,23,.78) 75%);
-            pointer-events: none;
-        }
         .login-card {
             position: relative;
             width: min(430px, calc(100vw - 28px));
@@ -59,9 +43,6 @@
     </style>
 </head>
 <body class="flex items-center justify-center p-4">
-    <div class="login-backdrop"></div>
-    <div class="login-vignette"></div>
-
     <main class="login-card">
         <div class="text-center space-y-2">
             <div class="login-logo inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-blue-600/20 border border-blue-400/20 text-blue-300 text-xl mb-2">
@@ -89,24 +70,6 @@
         <div class="mt-5 text-center text-[10px] text-slate-400/60 tracking-wider">影视资源管理 · MovieSync</div>
     </main>
     <script>
-        async function loadLoginBackdrop() {
-            try {
-                const response = await fetch('/api/login-backdrop', {credentials:'same-origin'});
-                const result = await response.json();
-                const movies = Array.isArray(result.movies) ? result.movies.filter(item => item.cover) : [];
-                if (!movies.length) return;
-                const movie = movies[Math.floor(Math.random() * movies.length)];
-                const backdrop = document.querySelector('.login-backdrop');
-                backdrop.style.backgroundImage =
-                    'linear-gradient(135deg, rgba(2,6,23,.78), rgba(15,23,42,.58)), url("' +
-                    '/api/proxy-img?url=' + encodeURIComponent(movie.cover) + '")';
-                backdrop.classList.add('ready');
-            } catch (err) {
-                console.debug('登录页背景海报加载失败', err);
-            }
-        }
-        loadLoginBackdrop();
-
         const isSetup = {{ 'true' if is_setup else 'false' }};
         async function handleAuth(e) {
             e.preventDefault();
