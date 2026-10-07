@@ -88,7 +88,7 @@ class TelegramResourceSource(ResourceSource):
             )
 
         channel_results = []
-        for channel, detail in zip(channels, results):
+        for channel, detail in zip(channels, results, strict=True):
             channel_id = str(
                 channel.get("id", "")
                 if isinstance(channel, dict)
