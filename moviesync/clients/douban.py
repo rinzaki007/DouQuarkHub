@@ -41,7 +41,12 @@ class DoubanClient:
         response, payload = self.http.request_json("GET", url, timeout=10, retries=1, params=params)
         if response.status_code != 200:
             raise ApiError(f"豆瓣返回 HTTP {response.status_code}")
-        items = payload.get("subjects", []) or payload.get("items", []) or []
+        items = (
+            payload.get("subjects", [])
+            or payload.get("items", [])
+            or payload.get("subject_collection_items", [])
+            or []
+        )
         return [self._normalize_item(item) for item in items if item.get("title")]
 
     def search(self, query: str) -> list[dict]:
@@ -71,7 +76,15 @@ class DoubanClient:
     def _normalize_item(item: dict) -> dict:
         subject_id = item.get("id") or (item.get("target") or {}).get("id")
         rating = (item.get("rating") or {}).get("value", "暂无")
-        cover = (item.get("pic") or {}).get("normal") or item.get("cover", "")
+        pic = item.get("pic") or {}
+        cover_data = item.get("cover") or {}
+        cover = (
+            pic.get("normal")
+            or pic.get("large")
+            or cover_data.get("url")
+            or item.get("cover_url", "")
+            or ""
+        )
         return {
             "title": item.get("title"),
             "cover": cover,
