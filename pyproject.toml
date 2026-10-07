@@ -1,3 +1,5 @@
+# MovieSync Python 项目元数据与测试/构建配置
+# 用途：声明项目基本信息及 pytest 配置等开发工具设置。
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
