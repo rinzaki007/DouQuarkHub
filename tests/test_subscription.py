@@ -1,3 +1,7 @@
+"""自动追剧订阅管理单元测试。
+
+覆盖：订阅 ID 唯一性、检测周期持久化和首次运行时间生成。
+"""
 from moviesync.services.subscriptions import SubscriptionManager
 
 
