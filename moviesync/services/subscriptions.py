@@ -260,7 +260,10 @@ class SubscriptionManager:
         self,
         sub_id: str,
     ) -> bool:
+        sub_id = str(sub_id)
         with self.lock:
+            if sub_id in self.running_ids:
+                return False
             subscriptions = self._load_subscriptions()
 
             new_subscriptions = [
@@ -646,6 +649,7 @@ class SubscriptionManager:
 
             if success:
                 current["retry_count"] = 0
+                current["pending_save_keys"] = []
                 delay_seconds = interval_hours * 3600
             else:
                 try:
