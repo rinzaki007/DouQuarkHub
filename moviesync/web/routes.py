@@ -20,7 +20,6 @@ from flask import (
     session,
 )
 
-
 pages = Blueprint("pages", __name__)
 api = Blueprint("api", __name__, url_prefix="/api")
 
