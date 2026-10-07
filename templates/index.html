@@ -128,6 +128,53 @@
 
     <div id="toast-container" class="fixed right-3 top-20 z-[200] flex w-[min(360px,calc(100vw-24px))] flex-col gap-2 pointer-events-none"></div>
 
+    <!-- 影视详情操作抽屉：海报点击后的统一入口 -->
+    <div id="movie-detail-drawer" class="fixed inset-0 z-[90] hidden">
+        <div onclick="closeMovieDetail()" class="absolute inset-0 bg-black/65 backdrop-blur-sm"></div>
+        <aside class="absolute right-0 top-0 h-full w-full max-w-xl overflow-y-auto border-l border-slate-800 bg-slate-900 shadow-2xl">
+            <div class="sticky top-0 z-10 flex items-center justify-between border-b border-slate-800 bg-slate-900/95 px-5 py-4 backdrop-blur">
+                <div>
+                    <div class="text-[10px] font-medium uppercase tracking-widest text-blue-400">MOVIE ACTIONS</div>
+                    <h2 id="movie-detail-title" class="mt-1 text-base font-semibold text-white">影视详情</h2>
+                </div>
+                <button onclick="closeMovieDetail()" class="rounded-md px-2 py-1 text-slate-400 hover:bg-slate-800 hover:text-white">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="space-y-5 p-5">
+                <div class="flex gap-4 rounded-2xl border border-slate-800 bg-slate-950 p-4">
+                    <img id="movie-detail-cover" class="h-40 w-28 shrink-0 rounded-xl object-cover bg-slate-900" alt="">
+                    <div class="min-w-0">
+                        <h3 id="movie-detail-name" class="text-lg font-semibold text-white"></h3>
+                        <div id="movie-detail-meta" class="mt-2 text-xs leading-6 text-slate-400"></div>
+                        <a id="movie-detail-douban" href="#" target="_blank" rel="noopener noreferrer" class="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-blue-900/60 bg-blue-950/40 px-3 py-1.5 text-[11px] text-blue-300 hover:bg-blue-900/50">
+                            <i class="fa-solid fa-arrow-up-right-from-square"></i> 豆瓣详情
+                        </a>
+                    </div>
+                </div>
+                <div>
+                    <div class="mb-2 text-xs font-semibold text-slate-300">你想对这部影视做什么？</div>
+                    <div class="grid gap-3 sm:grid-cols-2">
+                        <button onclick="movieDetailTransfer()" class="group rounded-2xl border border-emerald-800/70 bg-emerald-950/30 p-4 text-left hover:border-emerald-600 hover:bg-emerald-950/50">
+                            <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-600/20 text-emerald-400"><i class="fa-solid fa-cloud-arrow-down"></i></div>
+                            <div class="mt-3 text-sm font-semibold text-white">转存资源</div>
+                            <div class="mt-1 text-[11px] leading-5 text-slate-400">搜索频道中的可用资源，选择版本和文件后转存到夸克。</div>
+                        </button>
+                        <button onclick="movieDetailChase()" class="group rounded-2xl border border-purple-800/70 bg-purple-950/30 p-4 text-left hover:border-purple-600 hover:bg-purple-950/50">
+                            <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-600/20 text-purple-400"><i class="fa-solid fa-rotate"></i></div>
+                            <div class="mt-3 text-sm font-semibold text-white">添加追剧</div>
+                            <div class="mt-1 text-[11px] leading-5 text-slate-400">找到稳定分享源后持续监控，新集出现时自动执行转存。</div>
+                        </button>
+                    </div>
+                </div>
+                <div class="rounded-xl border border-slate-800 bg-slate-950/70 p-4">
+                    <div class="flex items-center gap-2 text-xs font-medium text-slate-300"><i class="fa-solid fa-circle-info text-blue-400"></i> 说明</div>
+                    <p class="mt-2 text-[11px] leading-5 text-slate-500">普通转存和自动追剧都会进入任务中心。转存过程中不再要求你盯着底部日志，可以随时关闭页面继续浏览。</p>
+                </div>
+            </div>
+        </aside>
+    </div>
+
     <!-- 批量转存资源弹窗 -->
     <div id="candidate-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-[100] flex items-center justify-center hidden">
         <div class="bg-slate-900 border border-slate-800 rounded-lg w-full max-w-4xl p-6 shadow-2xl space-y-4 max-h-[90vh] flex flex-col">
@@ -156,6 +203,7 @@
         </div>
     </div>
 
+    <!-- 底部日志保留给频道检索等调试信息；正式转存进度统一进入任务中心 -->
     <!-- 底部固定实时日志面板（使用 40% 透明度 + 强模糊，展现真实透光毛玻璃效果） -->
     <div id="log-panel" class="fixed bottom-0 left-0 right-0 z-50 bg-slate-950/40 backdrop-blur-2xl border-t border-slate-700/40 shadow-2xl transition-all duration-300 hidden">
         <div class="flex items-center justify-between px-4 py-2 bg-slate-900/40 backdrop-blur-xl border-b border-slate-800/40">
