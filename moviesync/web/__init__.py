@@ -87,6 +87,7 @@ def register_web(app, services):
                 "/api/login",
                 "/api/login-backdrop",
                 "/api/proxy-img",
+                "/favicon.ico",
                 "/healthz",
             }
             if request.path not in public_paths:
