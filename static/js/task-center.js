@@ -68,6 +68,7 @@ async function loadTasks() {
         tasks = Array.isArray(res.tasks) ? res.tasks : [];
         renderStats();
         renderTasks();
+        renderHistory();
     } catch (err) {
         list.innerHTML = '<div class="p-10 text-center text-xs text-rose-400">任务加载失败，请刷新重试。</div>';
     }
@@ -152,6 +153,47 @@ function renderTasks() {
     });
     list.querySelectorAll('[data-action="run-sub"]').forEach(btn => btn.onclick = () => runSubscription(btn.dataset.id));
     list.querySelectorAll('[data-action="retry"]').forEach(btn => btn.onclick = () => retryTask(btn.dataset.id));
+}
+
+function renderHistory() {
+    const box = document.getElementById('history-list');
+    if (!box) return;
+    const rows = [];
+    tasks.forEach(task => {
+        (task.run_history || []).forEach(item => rows.push({
+            ...item,
+            title: task.title,
+            kind: task.kind || '任务'
+        }));
+    });
+    tasks.filter(t => t.type === 'transfer').forEach(task => {
+        rows.push({
+            at: task.updated_at || task.created_at,
+            success: task.status === 'success',
+            message: task.message || '',
+            success_count: task.success_count || 0,
+            failed_count: task.failed_count || 0,
+            title: task.title,
+            kind: task.kind || '普通转存'
+        });
+    });
+    rows.sort((a,b) => Number(b.at || 0) - Number(a.at || 0));
+    const recent = rows.slice(0, 20);
+    if (!recent.length) {
+        box.innerHTML = '<div class="p-10 text-center text-xs text-slate-500">暂无执行记录。</div>';
+        return;
+    }
+    box.innerHTML = recent.map(item => {
+        const time = item.at ? new Date(Number(item.at) * 1000).toLocaleString() : '未知时间';
+        const cls = item.success ? 'text-emerald-400' : 'text-rose-400';
+        const icon = item.success ? 'fa-circle-check' : 'fa-circle-xmark';
+        return '<div class="flex flex-col gap-2 p-4 sm:flex-row sm:items-center sm:justify-between">' +
+            '<div class="min-w-0"><div class="flex flex-wrap items-center gap-2"><i class="fa-solid ' + icon + ' ' + cls + '"></i>' +
+            '<span class="text-xs font-medium text-slate-200">' + escapeTask(item.title) + '</span>' +
+            '<span class="text-[10px] text-slate-500">' + escapeTask(item.kind) + '</span></div>' +
+            '<div class="mt-1 text-[11px] text-slate-500">' + escapeTask(item.message) + '</div></div>' +
+            '<div class="shrink-0 text-[10px] text-slate-600">' + escapeTask(time) + '</div></div>';
+    }).join('');
 }
 
 function openAddTask() {
