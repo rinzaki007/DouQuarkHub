@@ -297,8 +297,8 @@ function renderGrid() {
         } rounded-lg overflow-hidden card-shadow cursor-pointer transition`;
 
         card.onclick = (e) => {
-            if (!e.target.closest('a')) {
-                toggleSelect(idx);
+            if (!e.target.closest('a, input, button')) {
+                openMovieDetail(idx);
             }
         };
 
@@ -419,11 +419,7 @@ function movieDetailChase() {
 }
 
 async function searchAndOpenCandidates(selectedMovies) {
-    toggleLogBox(true);
-    clearLog();
-    startLogTimer();
-    appendLogLine('[资源检索] 🔎 正在并发搜索可用资源…', 'info');
-    selectedMovies.forEach(m => appendLogLine('  -> 《' + m.title + '》', 'info'));
+    showToast('正在检索资源，请稍候…', 'info');
     try {
         const response = await apiFetch('/api/search-candidates', {
             method: 'POST',
@@ -431,20 +427,17 @@ async function searchAndOpenCandidates(selectedMovies) {
             body: JSON.stringify({movies: selectedMovies})
         });
         const res = await response.json();
-        stopLogTimer();
-        if (!res.success) {
-            appendLogLine('[检索失败] ❌ ' + (res.message || '无法搜索资源'), 'error');
-            return;
-        }
+        if (!res.success) return showToast(res.message || '无法搜索资源', 'error');
         const candidatesMap = res.candidates_map || {};
         const totalFound = selectedMovies.reduce((sum, movie) => sum + ((candidatesMap[movie.title] || []).length), 0);
-        appendLogLine('[检索完成] ✅ 共找到 ' + totalFound + ' 个可用资源版本。', 'success');
+        if (!totalFound) return showToast('没有找到可用资源', 'warning');
+        showToast('找到 ' + totalFound + ' 个可用资源版本', 'success');
         openCandidateModal(selectedMovies, candidatesMap);
     } catch (err) {
-        stopLogTimer();
-        appendLogLine('[异常] ❌ ' + (err.message || '资源检索异常'), 'error');
+        showToast(err.message || '资源检索异常', 'error');
     }
 }
+
 
 function toggleSelect(idx) {
     if (selectedIndices.has(idx)) selectedIndices.delete(idx);
@@ -552,75 +545,32 @@ function appendLogLine(text, type = 'info') {
 
 async function batchTransfer() {
     if (selectedIndices.size === 0) return alert('请先选择至少一部影片');
-
     const selectedMovies = Array.from(selectedIndices).map(idx => {
         const item = moviesData[idx];
-        return {
-            title: item.title,
-            tag: currentTag || '电影',
-            cover: item.cover,
-            url: item.url
-        };
+        return {title:item.title, tag:currentTag || '电影', cover:item.cover, url:item.url};
     });
-    
-    toggleLogBox(true);
-    clearLog();
-    startLogTimer();
-
-    appendLogLine(`[任务发起] 🚀 准备开始并发多线程搜刮，共选中 ${selectedMovies.length} 部目标影片...`, 'info');
-    selectedMovies.forEach(m => appendLogLine(`  -> 目标解析: 《${m.title}》 (${m.tag})`, 'info'));
-    appendLogLine(`[网络交互] ⏳ 正在向后端发送检索请求，请耐心等待所有TG频道响应...`, 'warn');
-    
-    const startTime = Date.now();
+    showToast('正在检索 ' + selectedMovies.length + ' 部影视的资源…', 'info');
     try {
         const response = await apiFetch('/api/search-candidates', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                movies: selectedMovies,
-            })
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({movies:selectedMovies})
         });
-
-        const res = await response.json();
-        const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-        stopLogTimer();
-
-        if (!res.success) {
-            appendLogLine(`[系统错误] ❌ 搜刮失败 (耗时 ${elapsed}秒): ${res.message || '未知错误'}`, 'error');
-            return;
-        }
-
-        appendLogLine(`[并发搜刮] ✅ 后端多线程检索顺利完成！总耗时: ${elapsed} 秒`, 'success');
-
-        const candidatesMap = res.candidates_map || {};
-        let totalFound = 0;
-
-        for (const movie of selectedMovies) {
-            const title = movie.title;
-            const candidates = candidatesMap[title] || [];
-            totalFound += candidates.length;
-
-            if (candidates.length === 0) {
-                appendLogLine(`[结果统计] ⚠️ 《${title}》：未能在任何配置的 TG 频道中检索到有效候选资源。`, 'warn');
-            } else {
-                appendLogLine(`[结果统计] 🎯 《${title}》：成功匹配到 ${candidates.length} 个可用版本。`, 'success');
-                candidates.forEach((cand, idx) => {
-                    appendLogLine(`    [源 ${idx + 1}] 频道名称: "${cand.channel}" | 夸克短码: ${escapeHtml(cand.pwd_id)} | 包含视频文件: ${cand.files.length} 个`, 'info');
-                });
-            }
-        }
-
-        appendLogLine(`[系统完成] 📦 全网检索汇总完毕：共找到 ${totalFound} 个候选资源，正在为您弹出交互选择窗口...`, 'success');
-        openCandidateModal(selectedMovies, candidatesMap);
-    } catch (err) {
-        stopLogTimer();
-        appendLogLine(`[异常捕获] ❌ 请求过程发生异常: ${err.message}`, 'error');
+        const res=await response.json();
+        if(!res.success) return showToast(res.message || '资源检索失败','error');
+        const candidatesMap=res.candidates_map || {};
+        const totalFound=selectedMovies.reduce((sum,m)=>sum+((candidatesMap[m.title]||[]).length),0);
+        if(!totalFound) return showToast('没有找到可用资源','warning');
+        showToast('找到 '+totalFound+' 个可用资源版本','success');
+        openCandidateModal(selectedMovies,candidatesMap);
+    } catch(err) {
+        showToast(err.message || '资源检索异常','error');
     }
 }
 
+
 function openCandidateModal(movies, candidatesMap) {
     candidateModalState = { movies, candidatesMap };
-    toggleLogBox(false);
     loadCategoryOptions();
 
     const container = document.getElementById('candidate-content');
