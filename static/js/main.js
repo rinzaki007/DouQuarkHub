@@ -199,16 +199,28 @@ async function doSearch() {
     }
 }
 
+
 function renderGrid() {
     const grid = document.getElementById('movie-grid');
     grid.innerHTML = '';
 
+    const noCoverImage = getNoCoverImage();
+
     moviesData.forEach((movie, idx) => {
-        const coverUrl = movie.cover ? `/api/proxy-img?url=${encodeURIComponent(movie.cover)}` : 'https://via.placeholder.com/150x220?text=No+Cover';
+        const coverUrl = movie.cover
+            ? `/api/proxy-img?url=${encodeURIComponent(movie.cover)}`
+            : noCoverImage;
+
         const isSelected = selectedIndices.has(idx);
 
         const card = document.createElement('div');
-        card.className = `relative group bg-slate-900/90 backdrop-blur border ${isSelected ? 'border-blue-500 ring-1 ring-blue-500' : 'border-slate-800/80'} rounded-lg overflow-hidden card-shadow cursor-pointer transition`;
+
+        card.className = `relative group bg-slate-900/90 backdrop-blur border ${
+            isSelected
+                ? 'border-blue-500 ring-1 ring-blue-500'
+                : 'border-slate-800/80'
+        } rounded-lg overflow-hidden card-shadow cursor-pointer transition`;
+
         card.onclick = (e) => {
             if (!e.target.closest('a')) {
                 toggleSelect(idx);
@@ -217,25 +229,65 @@ function renderGrid() {
 
         card.innerHTML = `
             <div class="aspect-[2/3] w-full bg-slate-950 relative overflow-hidden">
-                <img src="${coverUrl}" alt="${escapeHtml(movie.title)}" class="w-full h-full object-cover group-hover:scale-105 transition duration-300" loading="lazy">
+                <img
+                    src="${coverUrl}"
+                    alt="${escapeHtml(movie.title)}"
+                    class="movie-cover w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                    loading="lazy"
+                >
+
                 <div class="absolute top-2 left-2 z-10">
-                    <input type="checkbox" ${isSelected ? 'checked' : ''} class="w-4 h-4 rounded border-slate-600 bg-slate-900/80 text-blue-600 focus:ring-0 pointer-events-none">
+                    <input
+                        type="checkbox"
+                        ${isSelected ? 'checked' : ''}
+                        class="w-4 h-4 rounded border-slate-600 bg-slate-900/80 text-blue-600 focus:ring-0 pointer-events-none"
+                    >
                 </div>
+
                 <div class="absolute top-2 right-2 bg-slate-900/90 backdrop-blur text-amber-400 text-[11px] font-bold px-1.5 py-0.5 rounded border border-slate-700/50">
                     ${escapeHtml(movie.rate || '暂无')}
                 </div>
             </div>
+
             <div class="p-2.5">
-                <div class="font-medium text-xs text-slate-200 line-clamp-1 group-hover:text-blue-400 transition" title="${escapeHtml(movie.title)}">${escapeHtml(movie.title)}</div>
+                <div
+                    class="font-medium text-xs text-slate-200 line-clamp-1 group-hover:text-blue-400 transition"
+                    title="${escapeHtml(movie.title)}"
+                >
+                    ${escapeHtml(movie.title)}
+                </div>
+
                 <div class="mt-1.5 flex items-center justify-between text-[11px]">
-                    <span class="text-slate-400 text-[10px]">豆瓣影视</span>
-                    <a href="${escapeHtml(movie.url)}" target="_blank" class="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 bg-blue-950/60 px-2 py-0.5 rounded border border-blue-900/50 transition">
+                    <span class="text-slate-400 text-[10px]">
+                        豆瓣影视
+                    </span>
+
+                    <a
+                        href="${escapeHtml(movie.url)}"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 bg-blue-950/60 px-2 py-0.5 rounded border border-blue-900/50 transition"
+                    >
                         <span>详情</span>
                         <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
                     </a>
                 </div>
             </div>
         `;
+
+        const cover = card.querySelector('.movie-cover');
+
+        if (cover) {
+            cover.addEventListener('error', () => {
+                if (cover.dataset.fallback === '1') {
+                    return;
+                }
+
+                cover.dataset.fallback = '1';
+                cover.src = noCoverImage;
+            });
+        }
+
         grid.appendChild(card);
     });
 }
