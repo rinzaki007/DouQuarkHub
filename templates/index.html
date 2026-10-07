@@ -20,10 +20,10 @@
             
             <!-- 左侧：分类与功能入口 -->
             <div class="flex items-center space-x-1.5 shrink-0 overflow-x-auto max-w-full">
-                <button onclick="changeTag('电影')" class="nav-tag px-3.5 py-1.5 glass-tab rounded-xl text-sm font-medium transition bg-blue-600/90 text-white shadow-lg shadow-blue-600/10" data-tag="电影">电影</button>
-                <button onclick="changeTag('电视剧')" class="nav-tag px-3.5 py-1.5 glass-tab rounded-xl text-sm font-medium transition bg-slate-900/50 text-slate-300 hover:bg-slate-800/80" data-tag="电视剧">电视剧</button>
-                <button onclick="changeTag('综艺')" class="nav-tag px-3.5 py-1.5 rounded text-sm font-medium transition bg-slate-800/80 text-slate-300 hover:bg-slate-700" data-tag="综艺">综艺</button>
-                <button onclick="changeTag('动漫')" class="nav-tag px-3.5 py-1.5 rounded text-sm font-medium transition bg-slate-800/80 text-slate-300 hover:bg-slate-700" data-tag="动漫">动漫</button>
+                <button onclick="changeTag('电影')" class="nav-tag px-3.5 py-1.5 rounded-xl text-sm font-medium transition" data-tag="电影">电影</button>
+                <button onclick="changeTag('电视剧')" class="nav-tag px-3.5 py-1.5 rounded-xl text-sm font-medium transition" data-tag="电视剧">电视剧</button>
+                <button onclick="changeTag('综艺')" class="nav-tag px-3.5 py-1.5 rounded-xl text-sm font-medium transition" data-tag="综艺">综艺</button>
+                <button onclick="changeTag('动漫')" class="nav-tag px-3.5 py-1.5 rounded-xl text-sm font-medium transition" data-tag="动漫">动漫</button>
                 
                 <a href="/tasks" class="px-2.5 py-1.5 rounded text-xs font-medium bg-purple-600/90 hover:bg-purple-500 text-white transition flex items-center gap-1 shadow-lg shadow-purple-600/10">
                     <i class="fa-solid fa-list-check"></i> 任务中心
@@ -147,7 +147,7 @@
 
     <!-- 资源版本选择弹窗：电影按版本选择，剧集按资源包折叠集数 -->
     <div id="candidate-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-[100] flex items-center justify-center hidden">
-        <div class="candidate-modal-shell bg-slate-900/95 border border-slate-700/80 rounded-2xl w-full max-w-5xl p-4 sm:p-5 shadow-2xl space-y-4 max-h-[92vh] flex flex-col backdrop-blur-xl">
+        <div class="candidate-modal-shell bg-slate-900/95 border border-slate-700/80 rounded-2xl w-full max-w-6xl p-4 sm:p-6 shadow-2xl space-y-4 max-h-[92vh] flex flex-col backdrop-blur-xl">
             <div class="flex items-center justify-between border-b border-slate-800 pb-3">
                 <div class="flex items-center gap-3">
                     <h3 class="text-base font-medium text-white flex items-center gap-2">
@@ -165,7 +165,7 @@
                 <span class="text-[10px] text-slate-500 shrink-0">默认不选择任何资源，确认后才会进入转存任务</span>
             </div>
 
-            <div id="candidate-content" class="flex-1 overflow-y-auto space-y-4 pr-1"></div>
+            <div id="candidate-content" class="flex-1 overflow-y-auto space-y-5 pr-1 sm:pr-2"></div>
             
             <div class="flex justify-end pt-2 border-t border-slate-800">
                 <button onclick="closeCandidateModal()" class="px-4 py-2 text-xs bg-slate-800 text-slate-300 rounded hover:bg-slate-700">关闭</button>
