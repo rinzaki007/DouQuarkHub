@@ -22,7 +22,12 @@ class DoubanClient:
         sort_type = sort_type if sort_type in {"U", "T", "R"} else "U"
         if tag == "电影":
             url = "https://m.douban.com/rexxar/api/v2/subject/recent_hot/movie"
-            params = {"start": "0", "limit": "100", "category": "最新" if sort_type in {"T", "R"} else "热门", "type": "全部"}
+            params = {
+                "start": "0",
+                "limit": "100",
+                "category": "最新" if sort_type in {"T", "R"} else "热门",
+                "type": "全部",
+            }
         else:
             url = "https://m.douban.com/rexxar/api/v2/tv/recommend"
             cat_map = {
@@ -38,16 +43,74 @@ class DoubanClient:
                 "tags": tag,
                 "sort": "R" if sort_type in {"T", "R"} else "U",
             }
-        response, payload = self.http.request_json("GET", url, timeout=10, retries=1, params=params)
+        response, payload = self.http.request_json(
+            "GET",
+            url,
+            timeout=10,
+            retries=1,
+            params=params,
+        )
+
         if response.status_code != 200:
             raise ApiError(f"豆瓣返回 HTTP {response.status_code}")
-        items = (
-            payload.get("subjects", [])
-            or payload.get("items", [])
-            or payload.get("subject_collection_items", [])
-            or []
-        )
-        return [self._normalize_item(item) for item in items if item.get("title")]
+
+        items = self._extract_items(payload)
+
+        # 豆瓣移动端接口偶尔会调整 recent_hot 的响应或直接拒绝请求。
+        # 电影列表失败时，回退到仍在使用的 movie/recommend 接口。
+        if not items and tag == "电影":
+            fallback_params = {
+                "refresh": "0",
+                "start": "0",
+                "count": "100",
+                "selected_categories": json.dumps(
+                    {"类型": ""},
+                    ensure_ascii=False,
+                ),
+                "uncollect": "false",
+                "tags": "",
+            }
+            fallback_response, fallback_payload = self.http.request_json(
+                "GET",
+                "https://m.douban.com/rexxar/api/v2/movie/recommend",
+                timeout=10,
+                retries=1,
+                params=fallback_params,
+            )
+            if fallback_response.status_code == 200:
+                items = self._extract_items(fallback_payload)
+
+        return [
+            self._normalize_item(item)
+            for item in items
+            if isinstance(item, dict) and item.get("title")
+        ]
+
+    @staticmethod
+    def _extract_items(payload: object) -> list[dict]:
+        if isinstance(payload, list):
+            return [
+                item for item in payload
+                if isinstance(item, dict)
+            ]
+
+        if not isinstance(payload, dict):
+            return []
+
+        for key in (
+            "subjects",
+            "items",
+            "subject_collection_items",
+            "recommend_items",
+        ):
+            value = payload.get(key)
+            if isinstance(value, list):
+                return [
+                    item for item in value
+                    if isinstance(item, dict)
+                ]
+
+        return []
 
     def search(self, query: str) -> list[dict]:
         query = str(query or "").strip()
