@@ -9,6 +9,8 @@ let selectedIndices = new Set();
 let currentChaseSelectedCandidate = null;
 let candidateModalState = null;
 let chaseCandidateState = [];
+let movieRequestSeq = 0;
+let searchRequestSeq = 0;
 
 function escapeHtml(value) {
     return String(value ?? '').replace(/[&<>\"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[char]));
@@ -153,6 +155,7 @@ function changeSort(sort) {
 }
 
 async function fetchMovies() {
+    const requestId = ++movieRequestSeq;
     const loading = document.getElementById('loading');
     const grid = document.getElementById('movie-grid');
     loading.classList.remove('hidden');
@@ -164,15 +167,22 @@ async function fetchMovies() {
         const url = `/api/get-movies?tag=${encodeURIComponent(currentTag)}&sort=${currentSort}`;
         const resp = await apiFetch(url);
         const res = await resp.json();
+
+        if (requestId !== movieRequestSeq) return;
+
         if (res.success) {
             moviesData = res.movies || [];
             renderGrid();
         }
     } catch (err) {
-        console.error(err);
+        if (requestId === movieRequestSeq) {
+            console.error(err);
+        }
     } finally {
-        loading.classList.add('hidden');
-        grid.classList.remove('hidden');
+        if (requestId === movieRequestSeq) {
+            loading.classList.add('hidden');
+            grid.classList.remove('hidden');
+        }
     }
 }
 
@@ -180,6 +190,7 @@ async function doSearch() {
     const query = document.getElementById('search-input').value.trim();
     if (!query) return;
 
+    const requestId = ++searchRequestSeq;
     const loading = document.getElementById('loading');
     const grid = document.getElementById('movie-grid');
     loading.classList.remove('hidden');
@@ -190,15 +201,22 @@ async function doSearch() {
     try {
         const resp = await apiFetch(`/api/search-douban?q=${encodeURIComponent(query)}`);
         const res = await resp.json();
+
+        if (requestId !== searchRequestSeq) return;
+
         if (res.success) {
             moviesData = res.movies || [];
             renderGrid();
         }
     } catch (err) {
-        console.error(err);
+        if (requestId === searchRequestSeq) {
+            console.error(err);
+        }
     } finally {
-        loading.classList.add('hidden');
-        grid.classList.remove('hidden');
+        if (requestId === searchRequestSeq) {
+            loading.classList.add('hidden');
+            grid.classList.remove('hidden');
+        }
     }
 }
 
