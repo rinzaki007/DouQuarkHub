@@ -1,42 +1,39 @@
 name: Build and Push Docker Image
 
 on:
-workflow_dispatch:
+  workflow_dispatch:
 
 # 避免重复构建
-
 concurrency:
-group: ${{ github.workflow }}
-cancel-in-progress: true
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
 
 permissions:
-contents: read
-packages: write
+  contents: read
+  packages: write
 
 jobs:
-build:
-runs-on: ubuntu-latest
+  build:
+    runs-on: ubuntu-latest
 
-```
-steps:
-  - name: Checkout code
-    uses: actions/checkout@v4
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-  - name: Log in to GitHub Container Registry
-    uses: docker/login-action@v3
-    with:
-      registry: ghcr.io
-      username: ${{ github.actor }}
-      password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-  - name: Lowercase Repository Owner
-    run: |
-      echo "REPO_OWNER=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_ENV"
+      - name: Lowercase Repository Owner
+        run: |
+          echo "REPO_OWNER=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_ENV"
 
-  - name: Build and push Docker image
-    uses: docker/build-push-action@v6
-    with:
-      context: .
-      push: true
-      tags: ghcr.io/${{ env.REPO_OWNER }}/moviesync:latest
-```
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ghcr.io/${{ env.REPO_OWNER }}/moviesync:latest
