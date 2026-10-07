@@ -56,9 +56,6 @@
                     <i class="fa-brands fa-telegram text-sky-400"></i>
                     <span id="channel-count-text">频道 --/--</span>
                 </div>
-                <button onclick="toggleLogBox()" class="px-2.5 py-1.5 text-xs bg-slate-800/80 hover:bg-slate-700 text-slate-300 rounded border border-slate-700/50 flex items-center gap-1">
-                    <i class="fa-solid fa-terminal"></i> 运行日志
-                </button>
                 <a href="/admin" class="px-2.5 py-1.5 text-xs bg-slate-800/80 hover:bg-slate-700 text-slate-300 rounded border border-slate-700/50 flex items-center gap-1">
                     <i class="fa-solid fa-gear"></i> 设置
                 </a>
@@ -201,23 +198,6 @@
                 <button onclick="closeCandidateModal()" class="px-4 py-2 text-xs bg-slate-800 text-slate-300 rounded hover:bg-slate-700">关闭</button>
             </div>
         </div>
-    </div>
-
-    <!-- 底部日志保留给频道检索等调试信息；正式转存进度统一进入任务中心 -->
-    <!-- 底部固定实时日志面板（使用 40% 透明度 + 强模糊，展现真实透光毛玻璃效果） -->
-    <div id="log-panel" class="fixed bottom-0 left-0 right-0 z-50 bg-slate-950/40 backdrop-blur-2xl border-t border-slate-700/40 shadow-2xl transition-all duration-300 hidden">
-        <div class="flex items-center justify-between px-4 py-2 bg-slate-900/40 backdrop-blur-xl border-b border-slate-800/40">
-            <div class="flex items-center gap-2 text-xs text-slate-300 font-medium">
-                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                <span>实时转存运行日志</span>
-                <span id="log-timer-badge" class="ml-2 px-2 py-0.5 rounded bg-blue-950/80 text-blue-400 font-mono text-[11px] hidden">耗时: 0 秒</span>
-            </div>
-            <div class="flex items-center gap-2">
-                <button onclick="clearLog()" class="px-2 py-0.5 text-xs bg-slate-800/80 hover:bg-slate-700 text-slate-300 rounded">清空</button>
-                <button onclick="toggleLogBox(false)" class="px-2 py-0.5 text-xs bg-slate-800/80 hover:bg-slate-700 text-slate-300 rounded">收起 ×</button>
-            </div>
-        </div>
-        <div id="log-box" class="h-48 overflow-y-auto p-3 bg-transparent"></div>
     </div>
 
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
