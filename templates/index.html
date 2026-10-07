@@ -63,46 +63,20 @@
         </div>
     </header>
 
-    <!-- 第二行：排序方式与超宽资源选择显示栏（吸顶 + 毛玻璃） -->
+    <!-- 第二行：排序 -->
     <div class="glass-subnav backdrop-blur-xl border-b border-slate-800/60 px-4 py-2.5 sticky top-[57px] z-30 shadow-md">
-        <div class="max-w-7xl mx-auto flex items-center justify-between gap-4">
-            
-            <!-- 左侧：排序方式 + 已选统计 + 影片名称预览区 -->
-            <div class="flex items-center space-x-4 flex-1 overflow-hidden">
-                <div class="flex items-center space-x-2 shrink-0">
-                    <span class="text-xs text-slate-400 font-medium">排序方式：</span>
-                    <div class="inline-flex bg-slate-950/55 p-1 rounded-xl border border-slate-700/60 text-xs gap-1">
-                        <button onclick="changeSort('U')" class="sort-tag px-3 py-1.5 rounded-lg font-medium transition bg-blue-600/90 text-white shadow" data-sort="U">
-                            <i class="fa-solid fa-fire mr-1 text-amber-300"></i> 热门推荐
-                        </button>
-                        <button onclick="changeSort('R')" class="sort-tag px-3 py-1.5 rounded-lg font-medium transition text-slate-400 hover:text-white" data-sort="R">
-                            <i class="fa-solid fa-clock mr-1 text-sky-300"></i> 最近最新
-                        </button>
-                    </div>
+        <div class="max-w-screen-2xl mx-auto flex items-center justify-between gap-3">
+            <div class="flex items-center gap-2 overflow-hidden">
+                <span class="text-xs text-slate-400 shrink-0">排序：</span>
+                <div class="inline-flex glass-control p-1 rounded-xl border border-slate-700/60 text-xs gap-1">
+                    <button onclick="changeSort('U')" class="sort-tag px-3 py-1.5 rounded-lg font-medium transition bg-blue-600/90 text-white shadow" data-sort="U"><i class="fa-solid fa-fire mr-1 text-amber-300"></i>热门</button>
+                    <button onclick="changeSort('R')" class="sort-tag px-3 py-1.5 rounded-lg font-medium transition text-slate-400 hover:text-white" data-sort="R"><i class="fa-solid fa-clock mr-1 text-sky-300"></i>最新</button>
                 </div>
-
-                <div class="h-4 w-px bg-slate-800 shrink-0"></div>
-
-                <div class="flex items-center space-x-3 flex-1 overflow-hidden">
-                    <div class="flex items-center space-x-1.5 shrink-0">
-                        <span class="text-xs text-slate-400">已选 <b id="selected-count" class="text-blue-400">0</b> 部</span>
-                        <button onclick="selectAll(true)" class="px-2.5 py-1.5 text-[11px] bg-slate-900/60 hover:bg-slate-800 text-slate-300 rounded-lg border border-slate-700/50">全选</button>
-                        <button onclick="selectAll(false)" class="px-2 py-1 text-xs bg-slate-800/80 hover:bg-slate-700 text-slate-300 rounded">取消</button>
-                    </div>
-                    
-                    <!-- 资源名称预览显示区 -->
-                    <div id="selected-titles-preview" class="flex items-center gap-1.5 overflow-hidden text-xs flex-1"></div>
-                </div>
+                <span class="hidden sm:inline text-[11px] text-slate-500 ml-2">点击海报查看资源、追剧和豆瓣详情</span>
             </div>
-
-            <!-- 右侧：转存资源按钮 -->
-            <div class="shrink-0">
-                <button onclick="batchTransfer()" class="px-4 py-2 text-xs bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-medium flex items-center gap-1.5 shadow-lg shadow-emerald-600/20 transition">
-                    <i class="fa-solid fa-cloud-arrow-down text-sm"></i> 转存资源
-                </button>
-            </div>
-
+            <a href="/tasks" class="glass-control shrink-0 rounded-xl px-3 py-2 text-[11px] text-slate-300 hover:text-white"><i class="fa-solid fa-list-check mr-1"></i>任务中心</a>
         </div>
+        <span id="selected-count" class="hidden">0</span>
     </div>
 
     <!-- 主展示网格 -->
@@ -144,8 +118,8 @@
                     <div class="min-w-0">
                         <h3 id="movie-detail-name" class="text-lg font-semibold text-white"></h3>
                         <div id="movie-detail-meta" class="mt-2 text-xs leading-6 text-slate-400"></div>
-                        <a id="movie-detail-douban" href="#" target="_blank" rel="noopener noreferrer" class="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-blue-900/60 bg-blue-950/40 px-3 py-1.5 text-[11px] text-blue-300 hover:bg-blue-900/50">
-                            <i class="fa-solid fa-arrow-up-right-from-square"></i> 豆瓣详情
+                        <a id="movie-detail-douban" href="#" target="_blank" rel="noopener noreferrer" class="douban-detail-btn mt-3 inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-[11px] font-medium">
+                            <i class="fa-solid fa-arrow-up-right-from-square"></i> 在豆瓣打开
                         </a>
                     </div>
                 </div>
