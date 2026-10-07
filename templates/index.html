@@ -145,13 +145,13 @@
         </aside>
     </div>
 
-    <!-- 批量转存资源弹窗 -->
+    <!-- 资源版本选择弹窗：电影按版本选择，剧集按资源包折叠集数 -->
     <div id="candidate-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-[100] flex items-center justify-center hidden">
         <div class="candidate-modal-shell bg-slate-900/95 border border-slate-700/80 rounded-2xl w-full max-w-5xl p-4 sm:p-5 shadow-2xl space-y-4 max-h-[92vh] flex flex-col backdrop-blur-xl">
             <div class="flex items-center justify-between border-b border-slate-800 pb-3">
                 <div class="flex items-center gap-3">
                     <h3 class="text-base font-medium text-white flex items-center gap-2">
-                        <i class="fa-solid fa-list-check text-blue-500"></i> 选择要转存的资源版本及文件白名单
+                        <i class="fa-solid fa-list-check text-blue-500"></i> 选择要转存的资源版本
                     </h3>
                 </div>
                 <button onclick="closeCandidateModal()" class="text-slate-400 hover:text-white text-lg">✕</button>
@@ -162,7 +162,7 @@
                 <select id="batch-target-fid" class="global-category-select flex-1 bg-slate-900 border border-slate-700 rounded px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-amber-500">
                     <option value="0">正在加载后台分类目录配置...</option>
                 </select>
-                <span class="text-[10px] text-slate-500 shrink-0">每部影片会自动建立专属文件夹</span>
+                <span class="text-[10px] text-slate-500 shrink-0">默认不选择任何资源，确认后才会进入转存任务</span>
             </div>
 
             <div id="candidate-content" class="flex-1 overflow-y-auto space-y-4 pr-1"></div>
