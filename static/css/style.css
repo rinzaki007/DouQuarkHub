@@ -63,3 +63,26 @@ input::placeholder,
 textarea::placeholder {
     color: #64748b;
 }
+
+
+/* 资源选择 / 影视库视觉增强 */
+.movie-card { transform: translateZ(0); }
+.resource-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: .35rem;
+    border: 1px solid rgba(71,85,105,.65);
+    background: rgba(2,6,23,.72);
+    color: #94a3b8;
+    border-radius: .6rem;
+    padding: .35rem .55rem;
+    font-size: 10px;
+}
+.resource-chip-accent {
+    border-color: rgba(59,130,246,.35);
+    color: #93c5fd;
+    background: rgba(30,64,175,.16);
+}
+.candidate-file-row input { accent-color: #3b82f6; }
+.candidate-resource-card { box-shadow: inset 0 1px 0 rgba(255,255,255,.02); }
+.candidate-modal-shell { box-shadow: 0 30px 80px rgba(0,0,0,.55); }
