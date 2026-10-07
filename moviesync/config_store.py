@@ -18,6 +18,7 @@ CHANNEL_ID_RE = re.compile(r"^[A-Za-z0-9_]{2,64}$")
 FID_RE = re.compile(r"^[A-Za-z0-9_-]{1,128}$")
 
 MAX_CHANNELS = 100
+CONFIG_SCHEMA_VERSION = 2
 
 
 class ConfigValidationError(ValueError):
@@ -38,6 +39,7 @@ class ConfigStore:
             "openlist_url": DEFAULT_OPENLIST_URL,
             "category_fids": deepcopy(DEFAULT_CATEGORY_FIDS),
             "channels": [],
+            "schema_version": CONFIG_SCHEMA_VERSION,
         }
 
     def _migrate_legacy(self) -> None:
@@ -186,6 +188,19 @@ class ConfigStore:
         if isinstance(data, dict):
             defaults.update(data)
 
+        # 旧版本没有 schema_version；读取时自动补齐，后续保存即完成升级。
+        try:
+            schema_version = int(
+                defaults.get("schema_version", 1)
+            )
+        except (TypeError, ValueError):
+            schema_version = 1
+
+        defaults["schema_version"] = max(
+            schema_version,
+            CONFIG_SCHEMA_VERSION,
+        )
+
         defaults["category_fids"] = {
             **DEFAULT_CATEGORY_FIDS,
             **(defaults.get("category_fids") or {}),
@@ -271,6 +286,7 @@ class ConfigStore:
                 incoming["channels"]
             )
 
+        current["schema_version"] = CONFIG_SCHEMA_VERSION
         self.store.write(current)
 
         return current
