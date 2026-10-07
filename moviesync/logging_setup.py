@@ -1,3 +1,8 @@
+"""MovieSync 日志基础设施。
+
+用途：同时提供内存最近日志、滚动文件日志和标准输出日志，供后台页面实时查看。
+维护说明：内存日志默认保留最近 300 条；磁盘日志按 2 MiB 轮转并保留 3 个备份。
+"""
 from __future__ import annotations
 
 import logging
