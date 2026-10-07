@@ -522,6 +522,25 @@ def check_channels_health():
     )
 
 
+@api.get("/login-backdrop")
+def login_backdrop():
+    """登录页专用公开背景接口：只返回少量带海报的影视数据，不暴露任何登录后配置。"""
+    try:
+        movies = _services()["douban"].get_movies("电影", "U")
+        covers = [
+            {
+                "title": item.get("title", ""),
+                "cover": item.get("cover", ""),
+            }
+            for item in movies
+            if isinstance(item, dict) and item.get("cover")
+        ][:12]
+        return jsonify({"success": True, "movies": covers})
+    except Exception:
+        _services()["logger"].exception("获取登录页背景海报失败")
+        return jsonify({"success": False, "movies": []})
+
+
 @api.get("/get-movies")
 def get_movies():
     tag = request.args.get(
