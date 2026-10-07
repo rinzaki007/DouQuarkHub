@@ -40,9 +40,7 @@ jobs:
         run: pytest -q
 
       - name: Run Ruff
-        run: ruff check . --fix --output-format=github
-      - name: Show Ruff fixes
-        run: git diff -- . ':(exclude)requirements-dev.txt'
+        run: ruff check . --output-format=github
 
   build:
     needs: test
