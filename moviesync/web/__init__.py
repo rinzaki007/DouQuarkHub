@@ -16,25 +16,54 @@ from .routes import api, pages
 
 
 class LoginRateLimiter:
-    def __init__(self, max_attempts: int = 5, window_seconds: int = 600):
+    def __init__(
+        self,
+        max_attempts: int = 5,
+        window_seconds: int = 600,
+        max_keys: int = 4096,
+    ):
         self.max_attempts = max_attempts
         self.window_seconds = window_seconds
+        self.max_keys = max_keys
         self.failures: dict[str, deque[float]] = defaultdict(deque)
         self.lock = Lock()
+
+    def _cleanup(self, now: float) -> None:
+        stale = [
+            key
+            for key, queue in self.failures.items()
+            if not queue or now - queue[-1] > self.window_seconds
+        ]
+        for key in stale:
+            self.failures.pop(key, None)
+
+        if len(self.failures) > self.max_keys:
+            oldest = sorted(
+                self.failures.items(),
+                key=lambda item: item[1][-1] if item[1] else 0,
+            )[: len(self.failures) - self.max_keys]
+            for key, _ in oldest:
+                self.failures.pop(key, None)
 
     def allow(self, key: str) -> tuple[bool, int]:
         now = time.time()
         with self.lock:
+            self._cleanup(now)
             queue = self.failures[key]
             while queue and now - queue[0] > self.window_seconds:
                 queue.popleft()
             if len(queue) < self.max_attempts:
                 return True, 0
-            return False, max(1, int(self.window_seconds - (now - queue[0])))
+            return False, max(
+                1,
+                int(self.window_seconds - (now - queue[0])),
+            )
 
     def record_failure(self, key: str) -> None:
+        now = time.time()
         with self.lock:
-            self.failures[key].append(time.time())
+            self._cleanup(now)
+            self.failures[key].append(now)
 
     def record_success(self, key: str) -> None:
         with self.lock:
