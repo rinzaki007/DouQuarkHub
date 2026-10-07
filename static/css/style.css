@@ -192,3 +192,11 @@ textarea::placeholder {
     .douban-poster-btn { min-height: 36px; padding: .45rem .65rem; }
     .douban-poster-btn span { display:none; }
 }
+
+
+/* 任务中心动态历史记录也使用同一玻璃层级 */
+#history-list > div {
+    background: rgba(15,23,42,.34);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+}
