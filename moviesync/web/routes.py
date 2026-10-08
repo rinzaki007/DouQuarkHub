@@ -485,12 +485,12 @@ def storage_targets():
 def set_default_storage_target():
     data = request.get_json(silent=True) or {}
     target_id = str(data.get("target_id") or "").strip()
+    if target_id and not _services()["storage_targets"].get(target_id):
+        return _json_error("指定的存储目标未加载或已停用")
     try:
         saved = _services()["config"].set_default_storage_target_id(target_id)
     except ValueError as exc:
         return _json_error(str(exc))
-    if saved and not _services()["storage_targets"].get(saved):
-        return _json_error("指定的存储目标未加载或已停用")
     return jsonify({"success": True, "default_target_id": saved})
 
 
