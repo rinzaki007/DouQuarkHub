@@ -257,83 +257,6 @@
                     </div>
                 </div>
 
-                <!-- TG 检索频道 -->
-
-
-
-                <div class="space-y-3 pt-4 border-t border-slate-800">
-
-                    <div class="flex items-center justify-between gap-3">
-                        <h3 class="text-xs font-bold text-slate-300">
-                            资源来源
-                        </h3>
-                        <button
-                            type="button"
-                            onclick="checkResourceSources()"
-                            class="glass-btn bg-slate-800/70 hover:bg-slate-700 text-slate-200 text-[11px] px-3 py-1.5 rounded-lg flex items-center gap-1.5"
-                        >
-                            <i class="fa-solid fa-heart-pulse"></i>
-                            检查来源
-                        </button>
-                    </div>
-
-                    <div
-                        id="resource-source-health"
-                        class="grid gap-2 sm:grid-cols-2"
-                    >
-                        <div class="glass-panel rounded-xl p-3 text-xs text-slate-500">
-                            正在读取资源来源状态…
-                        </div>
-                    </div>
-
-                    <h3 class="text-xs font-bold text-slate-300 pt-2">
-                        Telegram 频道
-                    </h3>
-
-
-                    <div
-                        id="tg-channels-container"
-                        class="flex flex-wrap gap-2 p-3 glass-panel rounded-lg border border-slate-800 min-h-[60px]"
-                    >
-                        <!-- JS 动态渲染 -->
-                    </div>
-
-
-                    <!-- 添加频道 -->
-
-                    <div
-                        class="flex flex-wrap items-center gap-2 pt-2 p-3 bg-slate-900/40 rounded-lg border border-slate-800/80"
-                    >
-
-                        <input
-                            type="text"
-                            id="new-ch-name"
-                            placeholder="频道名称 (例如: 夸克电影)"
-                            class="bg-slate-900 border border-slate-800 rounded px-3 py-1.5 text-xs flex-1 min-w-[150px] text-slate-200 focus:outline-none focus:border-blue-500"
-                        >
-
-
-                        <input
-                            type="text"
-                            id="new-ch-id"
-                            placeholder="频道 ID (例如: quark_movies)"
-                            class="bg-slate-900 border border-slate-800 rounded px-3 py-1.5 text-xs flex-1 min-w-[150px] text-slate-200 focus:outline-none focus:border-blue-500"
-                        >
-
-
-                        <button
-                            type="button"
-                            onclick="addTGChannel()"
-                            class="bg-blue-600/90 hover:bg-blue-500 text-white text-xs px-4 py-1.5 rounded font-medium shrink-0"
-                        >
-                            添加频道
-                        </button>
-
-                    </div>
-
-                </div>
-
-
                 <!-- 保存按钮 -->
 
                 <div
@@ -1049,9 +972,9 @@
             container.innerHTML = cards.map(card => {
                 const typeLabel = CARD_TYPE_LABELS[card.type] || card.type || "未知类型";
                 const capabilities = Array.isArray(card.capabilities) ? card.capabilities : [];
-                const clickable = card.id === "quark" ? "cursor-pointer hover:border-blue-400/40" : "";
+                const clickable = (card.id === "quark" || card.id === "telegram") ? "cursor-pointer hover:border-blue-400/40" : "";
                 return '<button type="button" class="glass-shell rounded-2xl p-4 text-left w-full transition ' + clickable + '" ' +
-                    (card.id === "quark" ? 'onclick="openQuarkCard()"' : "") + ">" +
+                    (card.id === "quark" ? 'onclick="openQuarkCard()"' : (card.id === "telegram" ? 'onclick="openTelegramCard()"' : "")) + ">" +
                     '<div class="flex items-start justify-between gap-3">' +
                         '<div class="flex items-center gap-2 min-w-0">' +
                             '<span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-500/10 border border-blue-400/15 text-blue-300"><i class="fa-solid fa-puzzle-piece"></i></span>' +
@@ -1061,7 +984,7 @@
                     '</div><div class="mt-3 flex flex-wrap gap-2"><span class="resource-chip resource-chip-accent">' + escapeHtml(typeLabel) + "</span>" +
                     capabilities.map(cap => '<span class="resource-chip">' + escapeHtml(cap) + "</span>").join("") + "</div>" +
                     (card.description ? '<div class="mt-3 text-[11px] leading-5 text-slate-500">' + escapeHtml(card.description) + "</div>" : "") +
-                    (card.id === "quark" ? '<div class="mt-3 text-[10px] text-blue-300"><i class="fa-solid fa-arrow-right mr-1"></i>点击配置 Quark</div>' : "") +
+                    (card.id === "quark" ? '<div class="mt-3 text-[10px] text-blue-300"><i class="fa-solid fa-arrow-right mr-1"></i>点击配置 Quark</div>' : (card.id === "telegram" ? '<div class="mt-3 text-[10px] text-blue-300"><i class="fa-solid fa-arrow-right mr-1"></i>点击管理 Telegram 频道</div>' : "")) +
                     "</button>";
             }).join("");
         }
@@ -1134,125 +1057,82 @@
             finally { button.disabled = false; }
         }
 
-        /* ==========================================================
-           TG 频道
+                /* ==========================================================
+           Telegram 卡片
            ========================================================== */
 
-        function renderTGChannels() {
-
-            const container =
-                document.getElementById(
-                    'tg-channels-container'
-                );
-
-
-            container.innerHTML =
-                '';
-
-
-            tgChannels.forEach(
-                (ch, idx) => {
-
-                    const badge =
-                        document.createElement(
-                            'div'
-                        );
-
-
-                    badge.className =
-                        'bg-slate-800 border border-slate-700 rounded-md px-2.5 py-1.5 flex items-center gap-2 text-xs text-slate-200 shrink-0';
-
-
-                    badge.innerHTML = `
-                        <span>
-                            <strong>${escapeHtml(ch.name || ch.id)}</strong>
-                            (${escapeHtml(ch.id)})
-                        </span>
-
-                        <button
-                            type="button"
-                            onclick="removeTGChannel(${idx})"
-                            class="text-slate-400 hover:text-rose-400 font-bold ml-1"
-                        >
-                            ✕
-                        </button>
-                    `;
-
-
-                    container.appendChild(
-                        badge
-                    );
-
-                }
-            );
-
+        function openTelegramCard() {
+            document.getElementById("telegram-card-modal").classList.remove("hidden");
+            loadTelegramCard();
+        }
+        function closeTelegramCard() {
+            document.getElementById("telegram-card-modal").classList.add("hidden");
+        }
+        function renderTelegramChannels() {
+            const box = document.getElementById("telegram-card-channels");
+            if (!box) return;
+            box.innerHTML = tgChannels.length ? tgChannels.map((ch, i) =>
+                '<div class="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 flex items-center gap-2 text-xs text-slate-200">' +
+                '<span><strong>' + escapeHtml(ch.name || ch.id) + '</strong><span class="ml-1 text-slate-500">(' + escapeHtml(ch.id) + ')</span></span>' +
+                '<button type="button" onclick="removeTelegramChannel(' + i + ')" class="text-slate-400 hover:text-rose-400 font-bold">×</button></div>'
+            ).join("") : '<div class="w-full py-4 text-center text-xs text-slate-500">暂未配置 Telegram 频道</div>';
+        }
+        function renderTelegramHealth(result) {
+            const source = (result.resource_sources || []).find(x => x.id === "telegram");
+            const box = document.getElementById("telegram-card-health");
+            if (!box || !source) return;
+            const meta = {healthy:["正常","text-emerald-300","fa-circle-check"],degraded:["部分可用","text-amber-300","fa-triangle-exclamation"],unavailable:["不可用","text-rose-300","fa-circle-xmark"],idle:["未配置","text-slate-400","fa-circle-question"]}[source.status] || ["未检查","text-slate-400","fa-circle-question"];
+            box.innerHTML = '<div class="glass-panel rounded-xl p-3 border border-slate-800"><div class="flex justify-between text-xs"><span class="text-slate-400">来源状态</span><span class="' + meta[1] + '"><i class="fa-solid ' + meta[2] + ' mr-1"></i>' + meta[0] + '</span></div><div class="mt-2 text-[10px] text-slate-500">' + escapeHtml(source.message || "尚未检查") + '</div></div>' +
+                (source.channels || []).map(ch => '<div class="glass-panel rounded-xl p-3 border border-slate-800"><div class="text-xs text-slate-200">' + escapeHtml(ch.name || ch.id) + '</div><div class="mt-1 text-[10px] ' + (ch.status === "healthy" ? "text-emerald-300" : "text-rose-300") + '">' + escapeHtml(ch.message || "无检测信息") + '</div></div>').join("");
+            document.getElementById("telegram-card-summary").textContent = (source.message || "尚未检查") + (source.last_checked_at ? " · " + new Date(source.last_checked_at * 1000).toLocaleString() : "");
+        }
+        async function loadTelegramCard() {
+            try {
+                const result = await (await apiFetch("/api/config")).json();
+                if (!result.success) throw new Error(result.message || "读取 Telegram 配置失败");
+                tgChannels = Array.isArray(result.config?.channels) ? result.config.channels : [];
+                renderTelegramChannels();
+                const source = (result.config?.resource_sources || []).find(x => x.id === "telegram");
+                if (source) renderTelegramHealth({resource_sources:[source]});
+                else document.getElementById("telegram-card-summary").textContent = "已配置 " + tgChannels.length + " 个频道";
+            } catch (e) { document.getElementById("telegram-card-summary").textContent = e.message || "读取失败"; }
+        }
+        async function checkTelegramCard() {
+            const button = document.getElementById("telegram-card-check");
+            button.disabled = true;
+            try {
+                const result = await (await apiFetch("/api/check-channels")).json();
+                if (!result.success) throw new Error(result.message || "检查失败");
+                renderTelegramHealth(result);
+            } catch (e) {
+                document.getElementById("telegram-card-health").innerHTML = '<div class="glass-panel rounded-xl p-3 text-xs text-rose-300">检查失败：' + escapeHtml(e.message || e) + '</div>';
+            } finally { button.disabled = false; }
+        }
+        function addTelegramChannel() {
+            const name = document.getElementById("telegram-new-channel-name").value.trim();
+            const id = document.getElementById("telegram-new-channel-id").value.trim().replace(/^@+/, "");
+            if (!name || !id) return alert("请填写完整的频道名称和 ID");
+            if (tgChannels.some(x => String(x.id).toLowerCase() === id.toLowerCase())) return alert("该频道已存在");
+            tgChannels.push({name, id});
+            document.getElementById("telegram-new-channel-name").value = "";
+            document.getElementById("telegram-new-channel-id").value = "";
+            renderTelegramChannels();
+        }
+        function removeTelegramChannel(index) {
+            tgChannels.splice(index, 1);
+            renderTelegramChannels();
+        }
+        async function saveTelegramCard() {
+            try {
+                const result = await (await apiFetch("/api/channels", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({channels:tgChannels})})).json();
+                if (!result.success) throw new Error(result.message || "保存失败");
+                tgChannels = result.channels || tgChannels;
+                renderTelegramChannels();
+                alert("Telegram 频道配置已保存");
+            } catch (e) { alert(e.message || "保存 Telegram 配置失败"); }
         }
 
-
-        function addTGChannel() {
-
-            const name =
-                document.getElementById(
-                    'new-ch-name'
-                ).value.trim();
-
-
-            const id =
-                document.getElementById(
-                    'new-ch-id'
-                ).value
-                    .trim()
-                    .replace('@', '');
-
-
-            if (!name || !id) {
-
-                alert(
-                    '请填写完整的频道名称和 ID'
-                );
-
-                return;
-
-            }
-
-
-            tgChannels.push({
-                name,
-                id
-            });
-
-
-            document.getElementById(
-                'new-ch-name'
-            ).value =
-                '';
-
-
-            document.getElementById(
-                'new-ch-id'
-            ).value =
-                '';
-
-
-            renderTGChannels();
-
-        }
-
-
-        function removeTGChannel(idx) {
-
-            tgChannels.splice(
-                idx,
-                1
-            );
-
-
-            renderTGChannels();
-
-        }
-
-
-        /* ==========================================================
+/* ==========================================================
            日志
            ========================================================== */
 
@@ -1324,9 +1204,6 @@
                     document.getElementById(
                         'openlist-url'
                     ).value.trim(),
-
-                channels:
-                    tgChannels
 
             };
 
@@ -2029,4 +1906,30 @@
     </script>
 
 </body>
-</html>
+</html>     <div id="telegram-card-modal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm p-4">
+         <div class="max-w-3xl mx-auto mt-8 max-h-[90vh] overflow-y-auto glass-panel rounded-2xl border border-slate-700 shadow-2xl">
+             <div class="flex items-center justify-between p-5 border-b border-slate-800">
+                 <div><h3 class="text-base font-bold text-white flex items-center gap-2"><i class="fa-brands fa-telegram text-sky-400"></i>Telegram 资源来源</h3><p class="text-[10px] text-slate-500 mt-1">ResourceSource · v1.0.0</p></div>
+                 <button type="button" onclick="closeTelegramCard()" class="text-slate-400 hover:text-white text-xl">×</button>
+             </div>
+             <div class="p-5 space-y-5">
+                 <div class="flex items-center justify-between gap-3">
+                     <div><div class="text-xs font-semibold text-slate-200">频道资源来源</div><div id="telegram-card-summary" class="mt-1 text-[10px] text-slate-500">正在读取频道配置…</div></div>
+                     <button type="button" id="telegram-card-check" onclick="checkTelegramCard()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-4 py-2 rounded"><i class="fa-solid fa-heart-pulse mr-1"></i>检查频道</button>
+                 </div>
+                 <div id="telegram-card-health" class="grid gap-2 sm:grid-cols-2"></div>
+                 <div><div class="text-xs font-semibold text-slate-300 mb-2">已配置频道</div><div id="telegram-card-channels" class="flex flex-wrap gap-2 p-3 glass-panel rounded-xl border border-slate-800 min-h-[60px]"></div></div>
+                 <div><div class="text-xs font-semibold text-slate-300 mb-2">添加频道</div><div class="flex flex-wrap gap-2 p-3 bg-slate-900/40 rounded-xl border border-slate-800/80">
+                     <input type="text" id="telegram-new-channel-name" placeholder="频道名称，例如：夸克电影" class="glass-input flex-1 min-w-[150px] border border-slate-800 rounded px-3 py-2 text-xs text-slate-200">
+                     <input type="text" id="telegram-new-channel-id" placeholder="频道 ID，例如：quark_movies" class="glass-input flex-1 min-w-[150px] border border-slate-800 rounded px-3 py-2 text-xs text-slate-200">
+                     <button type="button" onclick="addTelegramChannel()" class="bg-blue-600 hover:bg-blue-500 text-white text-xs px-4 py-2 rounded">添加</button>
+                 </div></div>
+                 <div class="flex justify-end gap-2 pt-2">
+                     <button type="button" onclick="closeTelegramCard()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-4 py-2 rounded">关闭</button>
+                     <button type="button" onclick="saveTelegramCard()" class="bg-blue-600 hover:bg-blue-500 text-white text-xs px-5 py-2 rounded font-semibold">保存频道配置</button>
+                 </div>
+             </div>
+         </div>
+     </div>
+
+
