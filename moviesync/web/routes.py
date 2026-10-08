@@ -484,7 +484,11 @@ def storage_target_destinations(target_id):
     manager = _services()["storage_targets"]
     if not manager.get(target_id):
         return _json_error("指定的存储目标未加载或已停用", 404)
-    return jsonify({"success": True, "target_id": target_id, "destinations": manager.destination_options(target_id)})
+    return jsonify({
+        "success": True,
+        "target_id": target_id,
+        "destinations": manager.destination_options(target_id),
+    })
 
 
 
