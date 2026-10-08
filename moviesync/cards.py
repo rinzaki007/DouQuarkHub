@@ -173,6 +173,24 @@ class QuarkStorageCard(StorageTargetCard):
     def __init__(self, config_store):
         self.config_store = config_store
 
+    def destination_options(self) -> list[dict[str, Any]]:
+        config = self.config_store.get_quark_config()
+        options = []
+        default_fid = str(config.get("default_fid") or "0")
+        options.append({"id": default_fid, "name": "默认目录", "is_default": True})
+        for name, fid in (config.get("category_fids") or {}).items():
+            fid = str(fid or "").strip()
+            if fid:
+                options.append({
+                    "id": fid,
+                    "name": f"{name}目录",
+                    "category": name,
+                    "is_default": False,
+                })
+        seen = set()
+        return [item for item in options if not (item["id"] in seen or seen.add(item["id"]))]
+
+
     def _client(self) -> QuarkClient:
         return QuarkClient(self.config_store.get_cookie())
 
@@ -318,16 +336,6 @@ class CardRegistry:
                 card
                 for card in self._cards.values()
                 if capability in card.capabilities
-            ]    def destination_options(self) -> list[dict[str, Any]]:
-        config = self.config_store.get_quark_config()
-        options = []
-        default_fid = str(config.get("default_fid") or "0")
-        options.append({"id": default_fid, "name": "默认目录", "is_default": True})
-        for name, fid in (config.get("category_fids") or {}).items():
-            fid = str(fid or "").strip()
-            if fid:
-                options.append({"id": fid, "name": f"{name}目录", "category": name, "is_default": False})
-        seen = set()
-        return [item for item in options if not (item["id"] in seen or seen.add(item["id"]))]
+            ]
 
 
