@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from threading import RLock
 from typing import Any
 
-from .clients.quark import QuarkClient
+from .clients.quark import QuarkClient, sanitize_pwd_id
 
 CARD_ID_RE = re.compile(r"^[a-z0-9][a-z0-9._-]{0,63}$")
 
@@ -189,10 +189,10 @@ class QuarkStorageCard(StorageTargetCard):
     def resolve_resource(self, resource: object) -> dict[str, Any]:
         if not isinstance(resource, dict):
             return {"files": [], "token": None, "error": "资源参数无效"}
-        pwd_id = resource.get("pwd_id")
+        pwd_id = sanitize_pwd_id(resource.get("pwd_id"))
         if not pwd_id:
-            return {"files": [], "token": None, "error": "缺少分享资源 ID"}
-        files, stoken, error = self._client().get_share_files(str(pwd_id))
+            return {"files": [], "token": None, "error": "分享资源 ID 无效"}
+        files, stoken, error = self._client().get_share_files(pwd_id)
         return {
             "files": files or [],
             "token": stoken,
@@ -216,8 +216,10 @@ class QuarkStorageCard(StorageTargetCard):
     ) -> tuple[bool, str]:
         if not isinstance(resource, dict):
             return False, "资源参数无效"
-        pwd_id = resource.get("pwd_id")
+        pwd_id = sanitize_pwd_id(resource.get("pwd_id"))
         stoken = resource.get("stoken")
+        if not pwd_id or not stoken:
+            return False, "分享资源参数无效"
         return self._client().save_files(
             pwd_id,
             files,
