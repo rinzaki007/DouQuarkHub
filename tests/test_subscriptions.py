@@ -25,6 +25,18 @@ class FakeStorageTargets:
         return True, "ok"
 
 
+class FakeResourceSources:
+    def __init__(self):
+        self.config_store = None
+        self.shares = [
+            {"channel": "demo", "pwd_id": "share1"},
+            {"channel": "demo", "pwd_id": "share2"},
+        ]
+
+    def search_channel(self, source_id, channel, title):
+        return list(self.shares)
+
+
 class FakeLogger:
     def info(self, *args, **kwargs):
         pass
@@ -40,6 +52,7 @@ def test_subscription_uses_storage_target_card(tmp_path):
     manager = SubscriptionManager(
         tmp_path / "subscriptions.json",
         FakeStorageTargets(),
+        FakeResourceSources(),
         FakeLogger(),
     )
     sub = manager.add_subscription(
@@ -110,3 +123,68 @@ def test_subscription_tracks_new_files_from_selected_source(tmp_path):
 
     saved = manager.get_subscriptions()[0]
     assert "ep3" in saved["tracked_file_keys"]
+
+
+class ChannelStorageTargets:
+    def __init__(self):
+        self.shares = {
+            "share1": [
+                {"fid": "ep1", "file_name": "Show.S01E01.mkv"},
+            ],
+            "share2": [
+                {"fid": "ep2", "file_name": "Show.S01E02.mkv"},
+            ],
+        }
+        self.transfers = []
+
+    def resolve_resource(self, resource, target_id=None):
+        pwd_id = resource["pwd_id"]
+        return {
+            "target_id": target_id or "demo-storage",
+            "files": list(self.shares.get(pwd_id, [])),
+            "token": "token-" + pwd_id,
+            "error": None,
+        }
+
+    def create_folder(self, name, parent_id="0", target_id=None):
+        return "folder-1"
+
+    def transfer(self, resource, files, target_id="0", storage_target_id=None, token=None):
+        self.transfers.append((resource["pwd_id"], [item["fid"] for item in files]))
+        return True, "ok"
+
+
+def test_subscription_monitors_selected_channel_shares(tmp_path):
+    storage = ChannelStorageTargets()
+    manager = SubscriptionManager(
+        tmp_path / "subscriptions.json",
+        storage,
+        FakeResourceSources(),
+        FakeLogger(),
+    )
+    sub = manager.add_subscription(
+        title="Show",
+        pwd_id="share1",
+        target_fid="0",
+        storage_target_id="demo-storage",
+        source_id="telegram",
+        channel="demo",
+        files=[{"fid": "ep1"}],
+    )
+
+    ok, message = manager.check_subscription_now(sub["id"])
+    assert ok is True
+    assert "成功追更 1 项" in message
+    assert storage.transfers == [("share2", ["ep2"])]
+
+    storage.shares["share3"] = [
+        {"fid": "ep3", "file_name": "Show.S01E03.mkv"},
+    ]
+    manager.resource_sources.shares.append(
+        {"channel": "demo", "pwd_id": "share3"}
+    )
+
+    ok, message = manager.check_subscription_now(sub["id"])
+    assert ok is True
+    assert "成功追更 1 项" in message
+    assert storage.transfers[-1] == ("share3", ["ep3"])
