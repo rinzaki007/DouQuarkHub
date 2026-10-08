@@ -354,6 +354,7 @@ async function createTask() {
     const payload = {
         title:title,
         channel:selectedCandidate.candidate.channel,
+        source_id:selectedCandidate.candidate.source_id || 'telegram',
         pwd_id:selectedCandidate.candidate.pwd_id,
         files:files,
         cover:selectedCandidate.candidate.cover || '',
