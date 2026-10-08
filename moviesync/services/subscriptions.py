@@ -512,7 +512,6 @@ class SubscriptionManager:
         source_id = str(sub.get("source_id") or "").strip()
         channel = str(sub.get("channel") or "").strip()
         title = str(sub.get("title") or "").strip()
-        config = self.config_store.load() if self.config_store else {}
         sources = self.resource_sources.search_channel(source_id, channel, title) if self.resource_sources else []
 
         if not sources:
