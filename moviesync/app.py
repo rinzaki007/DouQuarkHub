@@ -95,6 +95,7 @@ def create_app(
     subscriptions = SubscriptionManager(
         settings.subscriptions_file,
         storage_targets,
+        resource_sources,
         logger,
     )
 
