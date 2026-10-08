@@ -54,3 +54,19 @@ def test_card_registry_rejects_duplicate_without_replace():
 def test_card_manifest_rejects_invalid_id():
     with pytest.raises(ValueError):
         CardManifest(id="Bad ID", name="Bad")
+
+
+
+def test_telegram_resource_source_uses_card_interface():
+    from moviesync.services.resource_sources import TelegramResourceSource
+
+    class FakeTelegramClient:
+        pass
+
+    card = TelegramResourceSource(FakeTelegramClient())
+
+    assert isinstance(card, Card)
+    assert card.card_id == "telegram"
+    assert card.card_type == "resource_source"
+    assert "resource.search" in card.capabilities
+    assert card.manifest.to_dict()["name"] == "Telegram"
