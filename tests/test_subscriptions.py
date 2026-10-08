@@ -119,7 +119,7 @@ def test_subscription_tracks_new_files_from_selected_source(tmp_path):
 
     ok, message = manager.check_subscription_now(sub["id"])
     assert ok is True
-    assert "成功追更 2 项" in message
+    assert "成功追更 1 项" in message
     assert storage.transfers == [["ep3"]]
 
     saved = manager.get_subscriptions()[0]
@@ -229,5 +229,5 @@ def test_channel_subscription_uses_selected_episode_as_baseline(tmp_path):
     ok, message = manager.check_subscription_now(sub["id"])
 
     assert ok is True
-    assert "成功追更 1 项" in message
-    assert storage.transfers == [("share45", ["ep45"])]
+    assert "成功追更 2 项" in message
+    assert storage.transfers == [("share44", ["ep44"]), ("share45", ["ep45"])]
