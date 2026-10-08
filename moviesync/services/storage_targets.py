@@ -68,6 +68,12 @@ class StorageTargetManager:
             })
         return results
 
+    def destination_options(self, target_id: str | None = None) -> list[dict[str, Any]]:
+        card = self.get(target_id)
+        if not card:
+            return []
+        return card.destination_options()
+
     def resolve_resource(
         self,
         resource: object,
