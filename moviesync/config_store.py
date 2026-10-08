@@ -222,6 +222,9 @@ class ConfigStore:
         quark["config"] = quark_config
         cards["quark"] = quark
         defaults["cards"] = cards
+        defaults.pop("quark_cookie", None)
+        defaults.pop("default_fid", None)
+        defaults.pop("category_fids", None)
 
         # 旧版本没有 schema_version；读取时自动补齐，后续保存即完成升级。
         try:
