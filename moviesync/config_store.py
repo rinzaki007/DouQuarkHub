@@ -17,7 +17,7 @@ CHANNEL_ID_RE = re.compile(r"^[A-Za-z0-9_]{2,64}$")
 FID_RE = re.compile(r"^[A-Za-z0-9_-]{1,128}$")
 
 MAX_CHANNELS = 100
-CONFIG_SCHEMA_VERSION = 4
+CONFIG_SCHEMA_VERSION = 5
 
 
 class ConfigValidationError(ValueError):
@@ -58,6 +58,7 @@ class ConfigStore:
                 },
             },
             "openlist_url": DEFAULT_OPENLIST_URL,
+            "default_storage_target_id": "",
             "schema_version": CONFIG_SCHEMA_VERSION,
         }
 
@@ -313,6 +314,19 @@ class ConfigStore:
             self.get_quark_config().get("cookie") or ""
         ).strip()
 
+    def get_default_storage_target_id(self) -> str:
+        return str(self.load().get("default_storage_target_id") or "").strip()
+
+    def set_default_storage_target_id(self, target_id: object) -> str:
+        target_id = str(target_id or "").strip()
+        if len(target_id) > 64 or (target_id and not re.fullmatch(r"[a-z0-9][a-z0-9._-]{0,63}", target_id)):
+            raise ConfigValidationError("默认存储目标 ID 无效")
+        current = self.load()
+        current["default_storage_target_id"] = target_id
+        current["schema_version"] = CONFIG_SCHEMA_VERSION
+        self.store.write(current)
+        return target_id
+
     def get_channels(self) -> list[dict[str, str]]:
         return self.load()["cards"]["telegram"]["config"]["channels"]
 
@@ -371,6 +385,11 @@ class ConfigStore:
             current["openlist_url"] = self._normalize_openlist(
                 incoming["openlist_url"]
             )
+        if "default_storage_target_id" in incoming:
+            target_id = str(incoming.get("default_storage_target_id") or "").strip()
+            if len(target_id) > 64 or (target_id and not re.fullmatch(r"[a-z0-9][a-z0-9._-]{0,63}", target_id)):
+                raise ConfigValidationError("默认存储目标 ID 无效")
+            current["default_storage_target_id"] = target_id
 
         if "channels" in incoming:
             self.save_telegram_config({"channels": incoming["channels"]})
