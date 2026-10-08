@@ -912,29 +912,6 @@
                     loadCards();
 
 
-                    const cookieInput =
-                        document.getElementById(
-                            'quark-cookie'
-                        );
-
-
-                    cookieInput.value =
-                        '';
-
-
-                    cookieInput.placeholder =
-                        cfg.has_quark_cookie
-                            ? 'Cookie 已安全保存；需要更换时再粘贴新的 Cookie'
-                            : '请粘贴夸克网盘 Cookie...';
-
-
-                    document.getElementById(
-                        'fid-default'
-                    ).value =
-                        cfg.default_fid ||
-                        '0';
-
-
                     document.getElementById(
                         'openlist-url'
                     ).value =
