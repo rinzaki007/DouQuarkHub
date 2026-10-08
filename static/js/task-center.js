@@ -468,7 +468,7 @@ async function createTask() {
     const selectedFids = selectedCandidate.selectedFids || new Set();
     const files = (selectedCandidate.candidate.files || [])
         .filter(x => selectedFids.has(String(x.fid || '').trim()))
-        .map(x => ({fid:x.fid}))
+        .map(x => ({fid:x.fid, file_name:x.file_name || ''}))
         .filter(x => x.fid);
     if (!files.length) return taskToast('请至少选择 1 集作为首次处理基线');
     const payload = {

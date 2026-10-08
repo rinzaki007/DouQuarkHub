@@ -80,7 +80,7 @@ class TelegramClient:
     def check_channel(self, channel: object) -> bool:
         return self.check_channel_detail(channel)["status"] == "healthy"
 
-    def search_channel(self, channel: object, title: str) -> list[dict]:
+    def search_channel(self, channel: object, title: str, scan_all: bool = False) -> list[dict]:
         if isinstance(channel, dict):
             channel_id = normalize_channel_id(channel.get("id"))
             channel_name = str(channel.get("name") or channel_id).strip()
@@ -96,10 +96,19 @@ class TelegramClient:
         seen_shares: set[str] = set()
         before: str | None = None
 
-        for _ in range(MAX_CHANNEL_PAGES):
+        for page_index in range(MAX_CHANNEL_PAGES):
             url = f"https://t.me/s/{quote(channel_id)}"
+            params = []
+            if not scan_all and page_index == 0:
+                params.append(("q", title))
             if before:
-                url += f"?before={quote(before)}"
+                params.append(("before", before))
+            if params:
+                query = "&".join(
+                    f"{key}={quote(value)}"
+                    for key, value in params
+                )
+                url += f"?{query}"
 
             try:
                 response = self.http.session.get(url, timeout=8)
@@ -111,6 +120,20 @@ class TelegramClient:
 
             soup = BeautifulSoup(response.text, "html.parser")
             messages = soup.select("div.tgme_widget_message")
+            if not messages and not scan_all and page_index == 0:
+                # Telegram 的频道搜索参数在部分公开频道/缓存页面上可能失效；
+                # 普通资源搜索首屏无结果时回退到频道页，再由本地标题匹配筛选。
+                try:
+                    response = self.http.session.get(
+                        f"https://t.me/s/{quote(channel_id)}",
+                        timeout=8,
+                    )
+                except Exception:
+                    return results
+                if response.status_code != 200:
+                    return results
+                soup = BeautifulSoup(response.text, "html.parser")
+                messages = soup.select("div.tgme_widget_message")
             if not messages:
                 return results
 
