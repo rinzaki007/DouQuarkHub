@@ -538,7 +538,11 @@ def cards():
         else:
             try:
                 item["health"] = card.check(card_config)
-                item["configured"] = item["health"].get("status") not in {"unconfigured", "idle"} if isinstance(item["health"], dict) else True
+                item["configured"] = (
+                    item["health"].get("status") not in {"unconfigured", "idle"}
+                    if isinstance(item["health"], dict)
+                    else True
+                )
             except Exception as exc:
                 item["health"] = {
                     "status": "unavailable",
