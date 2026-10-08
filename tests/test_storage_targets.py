@@ -90,3 +90,30 @@ def test_storage_target_manager_routes_resource_and_transfer():
     )
     assert ok is True
     assert message == "ok"
+
+
+def test_storage_target_destination_options():
+    class DestinationCard:
+        card_id = "demo"
+
+        def destination_options(self):
+            return [{"id": "root", "name": "默认目录", "is_default": True}]
+
+    from moviesync.services.storage_targets import StorageTargetManager
+
+    class Registry:
+        def get(self, target_id):
+            return DestinationCard() if target_id == "demo" else None
+
+        def find_by_type(self, card_type):
+            return [DestinationCard()] if card_type == "storage_target" else []
+
+    class Config:
+        def load(self):
+            return {"cards": {"demo": {"enabled": True}}}
+
+        def get_default_storage_target_id(self):
+            return "demo"
+
+    manager = StorageTargetManager(Registry(), Config(), None)
+    assert manager.destination_options("demo") == [{"id": "root", "name": "默认目录", "is_default": True}]
