@@ -105,10 +105,10 @@ async function loadCategoryOptions() {
 
 async function checkSystemHealth() {
     try {
-        const resp = await apiFetch('/api/check-cookie', { method: 'POST' });
+        const resp = await apiFetch('/api/cards/quark/check', { method: 'POST' });
         const res = await resp.json();
         const badge = document.getElementById('cookie-status-badge');
-        if (res.valid) {
+        if (res.status === 'healthy') {
             badge.className = "px-2 py-1 text-xs rounded bg-emerald-950/80 text-emerald-400 border border-emerald-800 flex items-center gap-1";
             badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-500"></span><span>Cookie 有效</span>`;
         } else {
