@@ -908,7 +908,7 @@ def get_tasks():
                 "pending" if sub.get("pending_save_keys") else "waiting"
             ),
             "progress": 100,
-            "total": len(sub.get("files", []) or []),
+            "total": len(sub.get("tracked_file_keys", []) or []),
             "success_count": len(sub.get("saved_episodes", []) or []),
             "skipped_count": 0,
             "failed_count": 1 if sub.get("last_error") else 0,
@@ -916,6 +916,9 @@ def get_tasks():
             "next_run_at": sub.get("next_run_at"),
             "updated_at": sub.get("last_check_at") or 0,
             "run_history": history[-10:],
+            "cover": sub.get("cover", ""),
+            "source_channel": sub.get("channel", ""),
+            "tracked_file_count": len(sub.get("tracked_file_keys", []) or []),
             "subscription_id": sub.get("id"),
             "retry_count": sub.get("retry_count", 0),
             "pending_save_keys": sub.get("pending_save_keys", []) or [],
@@ -971,7 +974,7 @@ def get_task_detail(task_id):
             "phase": "pending" if sub.get("pending_save_keys") else "waiting",
             "phase_label": "等待存储目标确认" if sub.get("pending_save_keys") else "等待下次检查",
             "progress": 100,
-            "total": len(sub.get("files", []) or []),
+            "total": len(sub.get("tracked_file_keys", []) or []),
             "success_count": len(sub.get("saved_episodes", []) or []),
             "skipped_count": 0,
             "failed_count": 1 if sub.get("last_error") else 0,
@@ -981,6 +984,9 @@ def get_task_detail(task_id):
             "run_history": (sub.get("run_history", []) or [])[-20:],
             "subscription_id": sub_id,
             "pending_save_keys": sub.get("pending_save_keys", []) or [],
+            "cover": sub.get("cover", ""),
+            "source_channel": sub.get("channel", ""),
+            "tracked_file_count": len(sub.get("tracked_file_keys", []) or []),
         }
         return jsonify({"success": True, "task": task})
     task = _services()["tasks"].get_task(task_id)
@@ -1066,6 +1072,16 @@ def subscriptions():
 
         try:
             target_fid = _normalize_fid(data.get("target_fid") or "0")
+            cover = str(data.get("cover") or "").strip()[:1000]
+            if not cover:
+                try:
+                    title_for_cover = str(data.get("title") or "").strip()
+                    if title_for_cover:
+                        matches = _services()["metadata"].search(title_for_cover)
+                        if matches:
+                            cover = str(matches[0].get("cover") or "").strip()[:1000]
+                except Exception:
+                    _services()["logger"].debug("获取追剧任务海报失败", exc_info=True)
 
             sub = manager.add_subscription(
                 title=data.get(
@@ -1099,6 +1115,8 @@ def subscriptions():
                     "storage_target_id",
                     "",
                 ),
+                cover=cover,
+
             )
 
         except (

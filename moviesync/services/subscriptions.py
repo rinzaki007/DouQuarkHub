@@ -15,7 +15,7 @@ from threading import Event, RLock, Thread
 
 from ..storage import JsonStore
 
-SUBSCRIPTION_SCHEMA_VERSION = 3
+SUBSCRIPTION_SCHEMA_VERSION = 4
 
 
 def _normalize_resource_id(value: object) -> str:
@@ -131,6 +131,17 @@ class SubscriptionManager:
 
             item["schema_version"] = SUBSCRIPTION_SCHEMA_VERSION
             item.setdefault("storage_target_id", "")
+            item.setdefault("cover", "")
+            item.setdefault("tracking_mode", "legacy")
+            tracked = item.get("tracked_file_keys")
+            if not isinstance(tracked, list):
+                item["tracked_file_keys"] = []
+                changed = True
+            item["tracked_file_keys"] = list(dict.fromkeys(
+                str(key).strip()
+                for key in item.get("tracked_file_keys", [])
+                if str(key).strip()
+            ))[:1000]
             item.setdefault("run_history", [])
             if not isinstance(item["run_history"], list):
                 item["run_history"] = []
@@ -169,6 +180,7 @@ class SubscriptionManager:
         channel: str = "",
         files=None,
         storage_target_id: str = "",
+        cover: str = "",
     ) -> dict:
         title = str(
             title or ""
@@ -244,12 +256,10 @@ class SubscriptionManager:
             "channel": str(
                 channel or ""
             ).strip()[:100],
-            "files": [
-                {
-                    "fid": fid
-                }
-                for fid in target_fids
-            ],
+            "cover": str(cover or "").strip()[:1000],
+            "tracking_mode": "all" if target_fids else "legacy",
+            "tracked_file_keys": target_fids,
+            "files": [],
             "saved_episodes": [],
             "last_check": "从未检测",
             "last_check_at": None,
@@ -400,18 +410,38 @@ class SubscriptionManager:
         if err or not files or not fetched_stoken:
             return self._finish(sub, False, f"解析链接失败: {err or '未找到文件'}")
 
-        saved = {
-            item for item in (sub.get("saved_episodes", []) or [])
-            if isinstance(item, (str, int))
+        tracked_keys = {
+            str(key).strip()
+            for key in (sub.get("tracked_file_keys", []) or [])
+            if str(key).strip()
         }
+
+        # 追剧任务选择的是一个持续更新的分享源。创建任务时已有文件作为基线，
+        # 后续检查只处理该分享源新增的文件，不再依赖创建时勾选的文件列表。
+        if not tracked_keys and sub.get("files"):
+            tracked_keys = {
+                str(item.get("fid")).strip()
+                for item in (sub.get("files") or [])
+                if isinstance(item, dict) and item.get("fid")
+            }
+
         selected = []
         found_keys = []
-        target_files = sub.get("files") or []
-
-        if target_files:
+        if sub.get("tracking_mode") == "all":
+            for item in files:
+                fid = str(item.get("fid") or "").strip()
+                if fid and fid not in tracked_keys:
+                    selected.append({"fid": fid})
+                    found_keys.append(fid)
+        elif sub.get("files"):
+            # 兼容旧订阅：继续只监控创建时指定的文件。
+            saved = {
+                item for item in (sub.get("saved_episodes", []) or [])
+                if isinstance(item, (str, int))
+            }
             target_fids = {
                 str(item.get("fid"))
-                for item in target_files
+                for item in (sub.get("files") or [])
                 if isinstance(item, dict) and item.get("fid")
             }
             for item in files:
@@ -420,6 +450,11 @@ class SubscriptionManager:
                     selected.append({"fid": fid})
                     found_keys.append(fid)
         else:
+            # 兼容更早的旧订阅：没有初始文件基线时按集数判断。
+            saved = {
+                item for item in (sub.get("saved_episodes", []) or [])
+                if isinstance(item, (str, int))
+            }
             start_ep = int(sub.get("start_ep", 0) or 0)
             for item in files:
                 ep_num, _ = _clean_tv_filename(
@@ -587,6 +622,14 @@ class SubscriptionManager:
             current["run_history"] = history[-50:]
 
             if success_keys:
+                tracked = list(current.get("tracked_file_keys", []) or [])
+                seen_tracked = set(str(key) for key in tracked)
+                tracked.extend(
+                    str(key) for key in success_keys
+                    if str(key) not in seen_tracked
+                )
+                current["tracked_file_keys"] = tracked[-1000:]
+
                 old = list(
                     current.get(
                         "saved_episodes",

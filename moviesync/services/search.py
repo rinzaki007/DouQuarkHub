@@ -153,6 +153,7 @@ class SearchService:
             candidates.append({
                 "source_id": source.get("source_id", "unknown"),
                 "source_name": source.get("source_name", "未知来源"),
+                "cover": str(movie.get("cover", "") if isinstance(movie, dict) else "").strip()[:1000],
                 "storage_target_id": storage_target_id,
                 "channel": source.get("channel", ""),
                 "pwd_id": pwd_id,

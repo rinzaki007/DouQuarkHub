@@ -56,3 +56,57 @@ def test_subscription_uses_storage_target_card(tmp_path):
     saved = manager.get_subscriptions()[0]
     assert saved["storage_target_id"] == "demo-storage"
     assert saved["saved_episodes"] == [1, 2]
+
+
+class DynamicStorageTargets(FakeStorageTargets):
+    def __init__(self):
+        self.files = [
+            {"fid": "ep1", "file_name": "Show.S01E01.1080p.mkv"},
+            {"fid": "ep2", "file_name": "Show.S01E02.1080p.mkv"},
+        ]
+        self.transfers = []
+
+    def resolve_resource(self, resource, target_id=None):
+        return {
+            "target_id": target_id or "demo-storage",
+            "files": list(self.files),
+            "token": "token",
+            "error": None,
+        }
+
+    def transfer(self, resource, files, target_id="0", storage_target_id=None, token=None):
+        self.transfers.append([item["fid"] for item in files])
+        return True, "ok"
+
+
+def test_subscription_tracks_new_files_from_selected_source(tmp_path):
+    storage = DynamicStorageTargets()
+    manager = SubscriptionManager(
+        tmp_path / "subscriptions.json",
+        storage,
+        FakeLogger(),
+    )
+    sub = manager.add_subscription(
+        title="Show",
+        pwd_id="share123",
+        target_fid="0",
+        storage_target_id="demo-storage",
+        files=[{"fid": "ep1"}, {"fid": "ep2"}],
+    )
+
+    ok, message = manager.check_subscription_now(sub["id"])
+    assert ok is True
+    assert "暂无新更新" in message
+    assert storage.transfers == []
+
+    storage.files.append(
+        {"fid": "ep3", "file_name": "Show.S01E03.1080p.mkv"}
+    )
+
+    ok, message = manager.check_subscription_now(sub["id"])
+    assert ok is True
+    assert "成功追更 1 项" in message
+    assert storage.transfers == [["ep3"]]
+
+    saved = manager.get_subscriptions()[0]
+    assert "ep3" in saved["tracked_file_keys"]
