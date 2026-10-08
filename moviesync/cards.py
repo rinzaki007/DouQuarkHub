@@ -13,6 +13,8 @@ from dataclasses import dataclass
 from threading import RLock
 from typing import Any
 
+from .clients.quark import QuarkClient
+
 CARD_ID_RE = re.compile(r"^[a-z0-9][a-z0-9._-]{0,63}$")
 
 CARD_TYPES = {
@@ -136,6 +138,74 @@ class StorageTargetCard(Card):
         target_id: str = "0",
     ) -> tuple[bool, str]:
         raise NotImplementedError
+
+
+class QuarkStorageCard(StorageTargetCard):
+    """内置夸克存储卡。
+
+    这里只负责把现有 QuarkClient 包装成标准 StorageTargetCard；
+    原有 QuarkClient 业务保持不变，降低迁移风险。
+    """
+
+    manifest = CardManifest(
+        id="quark",
+        name="Quark",
+        version="1.0.0",
+        type="storage_target",
+        description="夸克网盘存储与转存卡片",
+        capabilities=(
+            "storage.check",
+            "storage.list_files",
+            "storage.create_folder",
+            "storage.transfer",
+        ),
+    )
+
+    def __init__(self, config_store):
+        self.config_store = config_store
+
+    def _client(self) -> QuarkClient:
+        return QuarkClient(self.config_store.get_cookie())
+
+    def check(self, config: dict | None = None) -> dict[str, Any]:
+        cookie = self.config_store.get_cookie()
+        if not cookie:
+            return {
+                "status": "unconfigured",
+                "message": "尚未配置夸克 Cookie",
+            }
+        return {
+            "status": "healthy" if self._client().check_cookie_valid() else "unavailable",
+            "message": "夸克 Cookie 有效" if self._client().check_cookie_valid() else "夸克 Cookie 无效或已过期",
+        }
+
+    def list_files(self, resource: object) -> list[dict[str, Any]]:
+        pwd_id = resource.get("pwd_id") if isinstance(resource, dict) else resource
+        files, _stoken, _error = self._client().get_share_files(pwd_id)
+        return files or []
+
+    def create_folder(self, name: str, parent_id: str = "0") -> str:
+        fid, error = self._client().get_or_create_subfolder(name, parent_id)
+        if not fid:
+            raise RuntimeError(error or "创建目录失败")
+        return fid
+
+    def transfer(
+        self,
+        resource: object,
+        files: list[dict[str, Any]],
+        target_id: str = "0",
+    ) -> tuple[bool, str]:
+        if not isinstance(resource, dict):
+            return False, "资源参数无效"
+        pwd_id = resource.get("pwd_id")
+        stoken = resource.get("stoken")
+        return self._client().save_files(
+            pwd_id,
+            files,
+            stoken,
+            target_id,
+        )
 
 
 class MetadataProviderCard(Card):
