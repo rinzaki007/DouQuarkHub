@@ -231,7 +231,6 @@ function renderGrid() {
         const card = document.createElement('article');
         card.className = 'movie-card group relative overflow-hidden rounded-2xl border border-slate-800/80 bg-slate-900/80 shadow-lg transition duration-300 hover:-translate-y-1 hover:border-slate-600 hover:shadow-2xl';
         card.onclick = (e) => { if (!e.target.closest('a, input, button')) openMovieDetail(idx); };
-        const year = movie.year || (movie.pubdate ? String(movie.pubdate).match(/(19|20)\d{2}/)?.[0] : '');
         card.innerHTML = `
             <div class="relative aspect-[2/3] overflow-hidden bg-slate-950">
                 <img src="${coverUrl}" alt="${escapeHtml(movie.title)}" class="movie-cover h-full w-full object-cover transition duration-500 group-hover:scale-105" loading="lazy">
@@ -240,11 +239,10 @@ function renderGrid() {
                     <i class="fa-solid fa-star mr-0.5"></i>${escapeHtml(movie.rate || '暂无')}
                 </div>
                 <div class="absolute bottom-2.5 left-2.5 right-2.5 flex items-center justify-between gap-2">
-                    <div class="flex items-center gap-1.5">
-                        <span class="rounded-md border border-slate-400/20 bg-black/55 px-2 py-1 text-[10px] text-slate-300 backdrop-blur-md">${escapeHtml(movie.tag || currentTag)}</span>
-                        ${year ? '<span class="rounded-md bg-black/55 px-2 py-1 text-[10px] text-slate-300 backdrop-blur-md">' + escapeHtml(year) + '</span>' : ''}
+                    <div class="flex min-w-0 items-center gap-1.5">
+                        <span class="shrink-0 whitespace-nowrap rounded-md border border-slate-400/20 bg-black/55 px-2 py-1 text-[10px] text-slate-300 backdrop-blur-md">${escapeHtml(movie.tag || currentTag)}</span>
                     </div>
-                    <a href="${escapeHtml(movie.url || '#')}" target="_blank" rel="noopener noreferrer" class="douban-poster-btn" aria-label="打开豆瓣详情">豆瓣 <i class="fa-solid fa-arrow-up-right-from-square"></i></a>
+                    <a href="${escapeHtml(movie.url || '#')}" target="_blank" rel="noopener noreferrer" class="douban-poster-btn shrink-0" aria-label="打开豆瓣详情">豆瓣 <i class="fa-solid fa-arrow-up-right-from-square"></i></a>
                 </div>
             </div>
             <div class="p-3">
