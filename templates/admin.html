@@ -810,15 +810,13 @@
 
             try {
 
-                const resp =
-                    await apiFetch(
-                        '/api/config'
-                    );
+                const [configResp, sourceResp] = await Promise.all([
+                    apiFetch('/api/config'),
+                    apiFetch('/api/resource-sources')
+                ]);
 
-
-                const res =
-                    await resp.json();
-
+                const res = await configResp.json();
+                const sourceRes = await sourceResp.json();
 
                 if (
                     res.success &&
@@ -829,7 +827,7 @@
                         res.config;
 
                     renderResourceSourceHealth(
-                        cfg.resource_sources || []
+                        sourceRes.resource_sources || []
                     );
 
                     loadCards();
