@@ -987,7 +987,6 @@ def retry_task(task_id):
             payload = old.get("retry_payload") or {}
             movie = payload.get("movie") or {}
             candidate = payload.get("candidate") or {}
-            current_config = _services()["config"].load()
             current_cookie = _services()["config"].get_cookie()
             if not current_cookie:
                 return False, "未配置夸克 Cookie", {
@@ -1001,7 +1000,7 @@ def retry_task(task_id):
                 candidate,
                 payload.get("target_fid")
                 or _services()["config"].get_quark_config().get("default_fid", "0"),
-                current_config.get("category_fids", {}),
+                _services()["config"].get_quark_config().get("category_fids", {}),
                 progress,
             )
 
