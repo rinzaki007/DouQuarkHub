@@ -16,6 +16,7 @@ from threading import Event, RLock, Thread
 from ..storage import JsonStore
 
 SUBSCRIPTION_SCHEMA_VERSION = 4
+VIDEO_EXTENSIONS = (".mp4", ".mkv", ".avi", ".mov", ".flv", ".wmv", ".m4v", ".ts", ".m2ts", ".iso")
 
 
 def _normalize_resource_id(value: object) -> str:
@@ -72,10 +73,14 @@ class SubscriptionManager:
         self,
         subscriptions_file,
         storage_targets,
-        resource_sources,
-        logger,
+        resource_sources=None,
+        logger=None,
         max_interval_hours: int = 168,
     ):
+        # 兼容旧调用方式：SubscriptionManager(file, storage_target, logger)
+        if logger is None:
+            logger = resource_sources
+            resource_sources = None
         self.store = JsonStore(
             subscriptions_file,
             lambda: [],
