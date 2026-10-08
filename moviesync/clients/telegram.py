@@ -120,6 +120,20 @@ class TelegramClient:
 
             soup = BeautifulSoup(response.text, "html.parser")
             messages = soup.select("div.tgme_widget_message")
+            if not messages and not scan_all and page_index == 0:
+                # Telegram 的频道搜索参数在部分公开频道/缓存页面上可能失效；
+                # 普通资源搜索首屏无结果时回退到频道页，再由本地标题匹配筛选。
+                try:
+                    response = self.http.session.get(
+                        f"https://t.me/s/{quote(channel_id)}",
+                        timeout=8,
+                    )
+                except Exception:
+                    return results
+                if response.status_code != 200:
+                    return results
+                soup = BeautifulSoup(response.text, "html.parser")
+                messages = soup.select("div.tgme_widget_message")
             if not messages:
                 return results
 
