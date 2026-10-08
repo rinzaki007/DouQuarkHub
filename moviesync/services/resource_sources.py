@@ -41,6 +41,14 @@ class TelegramResourceSource(ResourceSource):
     source_id = "telegram"
     name = "Telegram"
     source_type = "telegram"
+    manifest = CardManifest(
+        id="telegram",
+        name="Telegram",
+        version="1.0.0",
+        type="resource_source",
+        description="Telegram 公开频道资源发现卡片",
+        capabilities=("resource.search", "resource.health_check"),
+    )
 
     def __init__(self, client: TelegramClient):
         self.client = client
