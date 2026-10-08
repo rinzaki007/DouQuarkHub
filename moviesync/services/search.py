@@ -170,7 +170,9 @@ class SearchService:
         progress = progress or (lambda *_args: None)
         title, _ = self._title(movie)
         tag = str(movie.get("tag", "电影")) if isinstance(movie, dict) else "电影"
-        parent_fid = (category_fids or {}).get(tag, target_fid) or "0"
+        # 前端传入 target_fid 即表示用户明确选择了目标目录；分类目录仅作为资源选择页的默认值。
+        # 不再在服务层强制覆盖用户选择，避免“下拉框看似可选但实际始终按分类目录转存”。
+        parent_fid = str(target_fid or (category_fids or {}).get(tag) or "0").strip() or "0"
         pwd_id = sanitize_pwd_id(candidate.get("pwd_id"))
         selected_fids = [
             str(item.get("fid"))
