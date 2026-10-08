@@ -88,7 +88,7 @@ class TelegramResourceSource(ResourceSource):
         return results
 
     def search_channel(self, channel: object, title: str, config: dict) -> list[dict[str, Any]]:
-        return self.client.search_channel(channel, title)
+        return self.client.search_channel(channel, title, scan_all=True)
 
 
     def check(self, config: dict) -> dict[str, Any]:
