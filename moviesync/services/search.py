@@ -74,7 +74,8 @@ class SearchService:
     def _get_resource_files(self, resource: dict):
         storage_target_id = str(resource.get("storage_target_id") or "").strip()
         if not storage_target_id:
-            target = self.storage_targets.get()
+            getter = getattr(self.storage_targets, "get", None)
+            target = getter() if callable(getter) else None
             storage_target_id = target.card_id if target else ""
         pwd_id = str(resource.get("pwd_id") or "").strip()
         if not pwd_id:

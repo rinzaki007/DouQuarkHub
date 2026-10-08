@@ -805,7 +805,6 @@ def transfer_selected():
     if not isinstance(movie, dict) or not isinstance(candidate, dict):
         return _json_error("参数不完整")
 
-    config_store = _services()["config"]
     try:
         target_fid = _normalize_fid(
             data.get("target_fid") or "0"
