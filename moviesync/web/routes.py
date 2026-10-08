@@ -984,8 +984,7 @@ def retry_task(task_id):
             return service.transfer_selected_resource_with_progress(
                 movie,
                 candidate,
-                payload.get("target_fid")
-                or _services()["config"].get_default_storage_target_id() or "0",
+                payload.get("target_fid") or "0",
                 _services()["config"].get_quark_config().get("category_fids", {}),
                 progress,
             )
@@ -1033,17 +1032,7 @@ def subscriptions():
         )
 
         try:
-            target_fid = _normalize_fid(
-                data.get(
-                    "target_fid"
-                )
-                or _services()[
-                    "config"
-                ].get_quark_config().get(
-                    "default_fid",
-                    "0",
-                )
-            )
+            target_fid = _normalize_fid(data.get("target_fid") or "0")
 
             sub = manager.add_subscription(
                 title=data.get(
