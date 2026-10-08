@@ -116,6 +116,18 @@ class TelegramClient:
 
             soup = BeautifulSoup(response.text, "html.parser")
             messages = soup.select("div.tgme_widget_message")
+            if not messages and page_index == 0 and title:
+                try:
+                    response = self.http.session.get(
+                        f"https://t.me/s/{quote(channel_id)}",
+                        timeout=5,
+                    )
+                except Exception:
+                    return results
+                if response.status_code != 200:
+                    return results
+                soup = BeautifulSoup(response.text, "html.parser")
+                messages = soup.select("div.tgme_widget_message")
             if not messages:
                 return results
 
