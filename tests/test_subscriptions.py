@@ -1,0 +1,58 @@
+from moviesync.services.subscriptions import SubscriptionManager
+
+
+class FakeStorageTargets:
+    def resolve_resource(self, resource, target_id=None):
+        return {
+            "target_id": target_id or "demo-storage",
+            "files": [
+                {"fid": "ep1", "file_name": "Show.S01E01.1080p.mkv"},
+                {"fid": "ep2", "file_name": "Show.S01E02.1080p.mkv"},
+            ],
+            "token": "token",
+            "error": None,
+        }
+
+    def create_folder(self, name, parent_id="0", target_id=None):
+        assert target_id == "demo-storage"
+        return "folder-1"
+
+    def transfer(self, resource, files, target_id="0", storage_target_id=None, token=None):
+        assert storage_target_id == "demo-storage"
+        assert token == "token"
+        assert target_id == "folder-1"
+        assert [item["fid"] for item in files] == ["ep1", "ep2"]
+        return True, "ok"
+
+
+class FakeLogger:
+    def info(self, *args, **kwargs):
+        pass
+
+    def warning(self, *args, **kwargs):
+        pass
+
+    def exception(self, *args, **kwargs):
+        pass
+
+
+def test_subscription_uses_storage_target_card(tmp_path):
+    manager = SubscriptionManager(
+        tmp_path / "subscriptions.json",
+        FakeStorageTargets(),
+        FakeLogger(),
+    )
+    sub = manager.add_subscription(
+        title="Show",
+        pwd_id="share123",
+        target_fid="0",
+        storage_target_id="demo-storage",
+    )
+
+    ok, message = manager.check_subscription_now(sub["id"])
+
+    assert ok is True
+    assert "成功追更 2 项" in message
+    saved = manager.get_subscriptions()[0]
+    assert saved["storage_target_id"] == "demo-storage"
+    assert saved["saved_episodes"] == [1, 2]
