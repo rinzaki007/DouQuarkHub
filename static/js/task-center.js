@@ -38,7 +38,7 @@ function taskToast(message) {
 
 async function loadTaskCategories() {
     try {
-        const resp = await apiFetchTask('/api/config');
+        const resp = await apiFetchTask('/api/cards/quark/config');
         const res = await resp.json();
         if (!res.success || !res.config) return;
         const select = document.getElementById('task-target-fid');
@@ -46,13 +46,13 @@ async function loadTaskCategories() {
         const cfg = res.config;
         const option = document.createElement('option');
         option.value = cfg.default_fid || '0';
-        option.textContent = '默认全局目录';
+        option.textContent = '默认目录';
         select.appendChild(option);
         for (const [name, fid] of Object.entries(cfg.category_fids || {})) {
             if (!fid) continue;
             const item = document.createElement('option');
             item.value = fid;
-            item.textContent = name + '专属目录';
+            item.textContent = name + '目录';
             select.appendChild(item);
             if (name === '电视剧') item.selected = true;
         }
