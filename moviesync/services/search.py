@@ -9,8 +9,9 @@ import re
 import threading
 from typing import Any
 
-from ..clients.quark import VIDEO_EXTENSIONS, QuarkClient, sanitize_pwd_id
+from ..clients.quark import VIDEO_EXTENSIONS, sanitize_pwd_id
 from .resource_sources import ResourceSourceManager
+from .storage_targets import StorageTargetManager
 
 MAX_VIDEO_FILES_PER_CANDIDATE = 200
 MAX_CANDIDATES_PER_MOVIE = 20
@@ -48,9 +49,14 @@ def _detect_resolution(name: str) -> str:
 
 
 class SearchService:
-    def __init__(self, quark: QuarkClient, resource_sources: ResourceSourceManager, logger):
-        self.quark = quark
+    def __init__(
+        self,
+        resource_sources: ResourceSourceManager,
+        storage_targets: StorageTargetManager,
+        logger,
+    ):
         self.resource_sources = resource_sources
+        self.storage_targets = storage_targets
         self.logger = logger
         self._share_cache: dict[str, tuple[list[dict[str, Any]], str | None, str | None]] = {}
         self._share_lock = threading.Lock()
@@ -65,14 +71,23 @@ class SearchService:
     def _simplify(value: str) -> str:
         return re.sub(r"[^\w\u4e00-\u9fa5]", "", value or "")
 
-    def _get_share_files(self, pwd_id: str):
+    def _get_resource_files(self, resource: dict):
+        storage_target_id = str(resource.get("storage_target_id") or "").strip()
+        pwd_id = sanitize_pwd_id(resource.get("pwd_id"))
+        cache_key = f"{storage_target_id}:{pwd_id}"
         with self._share_lock:
-            cached = self._share_cache.get(pwd_id)
+            cached = self._share_cache.get(cache_key)
         if cached is not None:
             return cached
-        result = self.quark.get_share_files(pwd_id)
+        resolved = self.storage_targets.resolve_resource(resource, storage_target_id or None)
+        result = (
+            resolved.get("files") or [],
+            resolved.get("token"),
+            resolved.get("error"),
+            resolved.get("target_id") or storage_target_id,
+        )
         with self._share_lock:
-            self._share_cache[pwd_id] = result
+            self._share_cache[cache_key] = result
         return result
 
     def search_movie_candidates(self, movie: object, config: dict) -> list[dict]:
@@ -92,7 +107,11 @@ class SearchService:
             pwd_id = sanitize_pwd_id(source.get("pwd_id"))
             if not pwd_id or pwd_id in seen_pwd_ids:
                 continue
-            files, stoken, err = self._get_share_files(pwd_id)
+            resource = {
+                **source,
+                "pwd_id": pwd_id,
+            }
+            files, stoken, err, storage_target_id = self._get_resource_files(resource)
             if err or not files:
                 self.logger.debug(
                     "资源源 %s 命中 %s 但解析失败: %s",
@@ -128,6 +147,7 @@ class SearchService:
             candidates.append({
                 "source_id": source.get("source_id", "unknown"),
                 "source_name": source.get("source_name", "未知来源"),
+                "storage_target_id": storage_target_id,
                 "channel": source.get("channel", ""),
                 "pwd_id": pwd_id,
                 "files": videos,
@@ -184,8 +204,14 @@ class SearchService:
         if not pwd_id or not selected_fids:
             return False, "候选资源参数无效", {"success": 0, "skipped": 0, "failed": total}
 
+        storage_target_id = str(candidate.get("storage_target_id") or "").strip()
+        resource = {
+            **candidate,
+            "pwd_id": pwd_id,
+            "storage_target_id": storage_target_id,
+        }
         progress(20, "正在重新验证分享资源…")
-        files, fresh_stoken, err = self._get_share_files(pwd_id)
+        files, fresh_stoken, err, storage_target_id = self._get_resource_files(resource)
         if err or not files or not fresh_stoken:
             return False, f"分享资源解析失败: {err or '未知错误'}", {"success": 0, "skipped": 0, "failed": total}
         available_fids = {str(item.get("fid")) for item in files if item.get("fid")}
@@ -193,13 +219,26 @@ class SearchService:
             return False, "所选文件已不存在或不属于该分享资源", {"success": 0, "skipped": 0, "failed": total}
 
         progress(45, "正在准备目标文件夹…")
-        folder_fid, create_err = self.quark.get_or_create_subfolder(title, parent_fid)
+        try:
+            folder_fid = self.storage_targets.create_folder(
+                title,
+                parent_fid,
+                storage_target_id or None,
+            )
+            create_err = None
+        except Exception as exc:
+            folder_fid = None
+            create_err = str(exc)
         if not folder_fid:
             return False, f"创建专属文件夹失败: {create_err}", {"success": 0, "skipped": 0, "failed": total}
 
         progress(70, f"正在转存 {total} 个文件…")
-        ok, msg = self.quark.save_files(
-            pwd_id, [{"fid": fid} for fid in selected_fids], fresh_stoken, folder_fid
+        ok, msg = self.storage_targets.transfer(
+            resource,
+            [{"fid": fid} for fid in selected_fids],
+            folder_fid,
+            storage_target_id or None,
+            fresh_stoken,
         )
         if ok:
             self.logger.info("《%s》转存成功，pwd_id=%s", title, pwd_id)
