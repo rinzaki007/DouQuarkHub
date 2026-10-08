@@ -144,7 +144,7 @@ function renderTasks() {
             '<span class="rounded-full border px-2 py-0.5 text-[10px] ' + state.cls + '">' + state.label + '</span>' +
             '<span class="rounded-full border border-slate-700 bg-slate-950 px-2 py-0.5 text-[10px] text-slate-400">' + escapeTask(task.kind || '任务') + '</span>' +
             '</div>' +
-            '<div class="mt-3 flex items-center gap-3"><div class="h-2 flex-1 overflow-hidden rounded-full bg-slate-800"><div class="h-full rounded-full bg-purple-500 transition-all" style="width:' + progress + '%"></div></div><span class="w-10 text-right text-[10px] text-slate-400">' + progress + '%</span></div>' +
+            renderTaskProgressBar(task) +
             '<div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-500">' +
             '<span class="text-slate-300">' + phase + '</span>' +
             '<span>成功 ' + Number(task.success_count || 0) + '</span><span>跳过 ' + Number(task.skipped_count || 0) + '</span><span>失败 ' + Number(task.failed_count || 0) + '</span>' +
@@ -182,6 +182,32 @@ function closeTaskDetail() {
     document.getElementById('task-detail-drawer')?.classList.add('hidden');
 }
 
+function renderTaskProgressBar(task) {
+    const phases = [
+        ['validate', '校验'],
+        ['list_files', '获取文件'],
+        ['create_folder', '准备目录'],
+        ['transfer', '转存'],
+        ['completed', '完成']
+    ];
+    const current = task.status === 'success' ? 4 : phases.findIndex(p => p[0] === task.phase);
+    const failed = task.status === 'failed' || task.status === 'error';
+    return '<div class="mt-3 rounded-xl border border-slate-800 bg-slate-950/60 px-3 py-2.5">' +
+        '<div class="flex items-center gap-1.5">' +
+        phases.map((phase, index) => {
+            const done = current >= 0 && index < current;
+            const active = !failed && task.status === 'running' && index === current;
+            const isFailed = failed && index === Math.max(0, current);
+            const cls = isFailed ? 'bg-rose-500' : done ? 'bg-emerald-500' : active ? 'bg-purple-500 animate-pulse' : 'bg-slate-800';
+            return '<div class="h-1.5 flex-1 rounded-full ' + cls + '" title="' + phase[1] + '"></div>';
+        }).join('') +
+        '</div>' +
+        '<div class="mt-2 flex items-center justify-between gap-2 text-[10px]">' +
+        '<span class="text-slate-400">' + escapeTask(task.phase_label || task.message || '等待执行') + '</span>' +
+        '<span class="shrink-0 text-slate-600">' + (task.status === 'success' ? '已完成' : failed ? '执行失败' : task.status === 'running' ? '处理中' : '等待执行') + '</span>' +
+        '</div></div>';
+}
+
 function renderTaskDetail(task) {
     const title = document.getElementById('detail-title');
     const body = document.getElementById('detail-body');
@@ -200,8 +226,9 @@ function renderTaskDetail(task) {
         '<div class="flex gap-4 rounded-2xl border border-slate-700/60 bg-slate-950/55 p-4 backdrop-blur-xl">' +
         (task.cover ? '<img src="/api/proxy-img?url=' + encodeURIComponent(task.cover) + '" class="h-32 w-24 shrink-0 rounded-xl object-cover bg-slate-900" onerror="this.style.display=\'none\'">' : '') +
         '<div class="min-w-0 flex-1"><div class="flex flex-wrap items-center gap-2"><span class="rounded-full border px-2 py-0.5 text-[10px] ' + state.cls + '">' + state.label + '</span><span class="text-[11px] text-slate-500">' + escapeTask(task.kind || '任务') + '</span></div>' +
-        '<div class="mt-3 text-2xl font-semibold text-white">' + progress + '%</div><div class="mt-2 h-2 overflow-hidden rounded-full bg-slate-800"><div class="h-full rounded-full bg-purple-500" style="width:' + progress + '%"></div></div>' +
-        '<div class="mt-2 text-[11px] text-slate-400">' + escapeTask(task.phase_label || task.message || '') + '</div></div></div>' +
+        '<div class="mt-3 text-lg font-semibold text-white">' + escapeTask(task.phase_label || task.message || '等待执行') + '</div>' +
+        renderTaskProgressBar(task) +
+        '<div class="mt-2 text-[11px] text-slate-400">' + escapeTask(task.message || '') + '</div></div></div>' +
         '<div class="rounded-2xl border border-slate-800 bg-slate-950 p-4"><div class="text-xs font-semibold text-slate-200">执行阶段</div><div class="mt-4 space-y-3">' +
         phases.map((p,i) => {
             const done = task.status === 'success' || (phaseIndex >= 0 && i < phaseIndex);
@@ -318,6 +345,8 @@ async function searchTaskCandidates() {
             const resolutions = Object.keys(candidate.resolutions || {});
             const resolutionText = resolutions.length ? resolutions.join(' / ') : [...new Set(files.map(f => f.resolution).filter(Boolean))].join(' / ') || '未知';
             const totalSize = candidate.total_size_text || formatTaskSize(files.reduce((sum, f) => sum + Number(f.size || 0), 0));
+            const validFids = files.map(file => String(file.fid || '').trim()).filter(Boolean);
+            const selectedFids = new Set(validFids);
             row.className = 'rounded-2xl border border-slate-800 bg-slate-950/80 p-4 transition hover:border-slate-700';
             row.innerHTML =
                 '<div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div class="min-w-0">' +
@@ -327,20 +356,58 @@ async function searchTaskCandidates() {
                 '<span class="rounded-lg border border-slate-700 bg-slate-900 px-2 py-1 text-[10px] text-slate-400"><i class="fa-solid fa-hard-drive mr-1"></i>' + escapeTask(totalSize) + '</span>' +
                 '<span class="rounded-lg border border-blue-900/60 bg-blue-950/30 px-2 py-1 text-[10px] text-blue-300"><i class="fa-solid fa-display mr-1"></i>' + escapeTask(resolutionText) + '</span></div></div>' +
                 '<button data-candidate="' + index + '" class="candidate-select shrink-0 rounded-xl border border-purple-700 bg-purple-950/40 px-4 py-2.5 text-[11px] font-medium text-purple-200 hover:bg-purple-900/50">选择此源</button></div>' +
-                '<div class="mt-4 max-h-60 overflow-y-auto rounded-xl border border-slate-800 bg-slate-900/80 p-2 space-y-1">' +
-                files.map(file => '<div class="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-slate-800/70"><i class="fa-solid fa-circle-check text-emerald-500/70"></i><span class="min-w-0 flex-1 truncate text-xs text-slate-300">' + escapeTask(file.file_name) + '</span><span class="shrink-0 text-[10px] text-slate-500">' + escapeTask(file.resolution || '未知') + ' · ' + escapeTask(file.size_text || formatTaskSize(file.size)) + '</span></div>').join('') +
-                '</div>';
+                '<div class="mt-2 flex items-center justify-between rounded-xl border border-slate-800 bg-slate-900/60 px-3 py-2">' +
+                '<span class="text-[11px] text-slate-400">已选 <strong data-selected-count class="text-slate-200">' + validFids.length + '</strong> / ' + validFids.length + ' 集</span>' +
+                '<button type="button" data-toggle-files class="text-[11px] text-purple-300 hover:text-purple-200">' + (validFids.length ? '取消全选' : '全选') + '</button>' +
+                '</div>' +
+                '<div class="mt-2 max-h-60 overflow-y-auto rounded-xl border border-slate-800 bg-slate-900/80 p-2 space-y-1">' +
+                files.map((file, fileIndex) => {
+                    const fid = String(file.fid || '').trim();
+                    if (!fid) return '';
+                    return '<label class="flex cursor-pointer items-center gap-3 rounded-lg px-2 py-2 hover:bg-slate-800/70"><input type="checkbox" data-file-index="' + fileIndex + '" class="task-episode-checkbox h-4 w-4 rounded border-slate-600 bg-slate-950 text-purple-600 focus:ring-purple-500" checked><span class="min-w-0 flex-1 truncate text-xs text-slate-300">' + escapeTask(file.file_name) + '</span><span class="shrink-0 text-[10px] text-slate-500">' + escapeTask(file.resolution || '未知') + ' · ' + escapeTask(file.size_text || formatTaskSize(file.size)) + '</span></label>';
+                }).join('') +
+                '</div>' +
+                '<div class="mt-2 text-[10px] text-slate-500">默认选择当前已发现的全部集数；取消某些集只影响首次处理，后续新集仍会自动追更。</div>';
+            const updateSelectionUi = () => {
+                const checked = [...row.querySelectorAll('.task-episode-checkbox:checked')];
+                const selected = new Set(checked.map(input => {
+                    const file = files[Number(input.dataset.fileIndex)];
+                    return String(file?.fid || '').trim();
+                }).filter(Boolean));
+                row.querySelector('[data-selected-count]').textContent = selected.size;
+                row.querySelector('[data-toggle-files]').textContent = selected.size === validFids.length ? '取消全选' : '全选';
+                if (selectedCandidate?.row === row) {
+                    selectedCandidate.selectedFids = selected;
+                    const enabled = selected.size > 0;
+                    document.getElementById('task-submit').disabled = !enabled;
+                    document.getElementById('task-submit').classList.toggle('opacity-40', !enabled);
+                    document.getElementById('task-form-status').textContent = enabled
+                        ? '已选择 ' + selected.size + ' 集；后续频道新增集数仍会自动追更。'
+                        : '至少选择 1 集作为首次处理基线。';
+                }
+            };
+            row.querySelectorAll('.task-episode-checkbox').forEach(input => input.addEventListener('change', updateSelectionUi));
+            row.querySelector('[data-toggle-files]').onclick = () => {
+                const shouldSelectAll = row.querySelectorAll('.task-episode-checkbox:checked').length !== validFids.length;
+                row.querySelectorAll('.task-episode-checkbox').forEach(input => { input.checked = shouldSelectAll; });
+                updateSelectionUi();
+            };
             row.querySelector('.candidate-select').onclick = function() {
-                selectedCandidate = {candidate:candidate,row:row};
-                document.querySelectorAll('.candidate-select').forEach(b => { b.className='candidate-select rounded-xl border border-slate-700 bg-slate-900 px-4 py-2.5 text-[11px] text-slate-400'; b.textContent='选择此源'; });
-                this.className='candidate-select rounded-xl bg-emerald-600 px-4 py-2.5 text-[11px] font-medium text-white';
+                const currentSelected = new Set([...row.querySelectorAll('.task-episode-checkbox:checked')].map(input => {
+                    const file = files[Number(input.dataset.fileIndex)];
+                    return String(file?.fid || '').trim();
+                }).filter(Boolean));
+                selectedCandidate = {candidate:candidate,row:row,selectedFids:currentSelected};
+                document.querySelectorAll('.candidate-select').forEach(b => { b.className='candidate-select shrink-0 rounded-xl border border-slate-700 bg-slate-900 px-4 py-2.5 text-[11px] text-slate-400'; b.textContent='选择此源'; });
+                this.className='candidate-select shrink-0 rounded-xl bg-emerald-600 px-4 py-2.5 text-[11px] font-medium text-white';
                 this.textContent='已选择';
                 document.getElementById('task-submit').disabled=false;
                 document.getElementById('task-submit').classList.remove('opacity-40');
-                document.getElementById('task-form-status').textContent='已选择资源源，任务会自动监控这个频道分享后续新增文件。';
+                document.getElementById('task-form-status').textContent='已选择 ' + selectedFids.size + ' 集；后续频道新增集数仍会自动追更。';
             };
             box.appendChild(row);
         });
+
     } catch (err) {
         box.innerHTML = '<div class="rounded-xl border border-rose-900/50 bg-rose-950/20 p-5 text-xs text-rose-300">检索失败：' + escapeTask(err.message) + '</div>';
     }
@@ -349,8 +416,12 @@ async function searchTaskCandidates() {
 async function createTask() {
     if (!selectedCandidate) return taskToast('请先选择一个资源源');
     const title = document.getElementById('task-title').value.trim();
-    const files = (selectedCandidate.candidate.files || []).map(x => ({fid:x.fid})).filter(x => x.fid);
-    if (!files.length) return taskToast('当前资源源没有可监控文件');
+    const selectedFids = selectedCandidate.selectedFids || new Set();
+    const files = (selectedCandidate.candidate.files || [])
+        .filter(x => selectedFids.has(String(x.fid || '').trim()))
+        .map(x => ({fid:x.fid}))
+        .filter(x => x.fid);
+    if (!files.length) return taskToast('请至少选择 1 集作为首次处理基线');
     const payload = {
         title:title,
         channel:selectedCandidate.candidate.channel,
