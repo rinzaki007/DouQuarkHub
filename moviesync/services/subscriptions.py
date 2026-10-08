@@ -257,7 +257,7 @@ class SubscriptionManager:
                 channel or ""
             ).strip()[:100],
             "cover": str(cover or "").strip()[:1000],
-            "tracking_mode": "all",
+            "tracking_mode": "all" if target_fids else "legacy",
             "tracked_file_keys": target_fids,
             "files": [],
             "saved_episodes": [],
