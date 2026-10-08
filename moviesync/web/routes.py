@@ -904,10 +904,10 @@ def get_tasks():
             "type": "subscription",
             "kind": "智能追剧",
             "title": sub.get("title", "未命名任务"),
-            "status": sub.get("status") or ("error" if sub.get("last_error") else (
+            "status": "error" if sub.get("last_error") else (
                 "pending" if sub.get("pending_save_keys") else "waiting"
-            )),
-            "progress": 100 if (sub.get("status") or "waiting") == "success" else 0,
+            ),
+            "progress": 100,
             "total": len(sub.get("tracked_file_keys", []) or []),
             "success_count": len(sub.get("saved_episodes", []) or []),
             "skipped_count": 0,
@@ -922,17 +922,11 @@ def get_tasks():
             "subscription_id": sub.get("id"),
             "retry_count": sub.get("retry_count", 0),
             "pending_save_keys": sub.get("pending_save_keys", []) or [],
-            "phase": sub.get("phase") or ("pending" if sub.get("pending_save_keys") else "waiting"),
-            "phase_label": (
-                sub.get("phase_label")
-                or ("等待存储目标确认" if sub.get("pending_save_keys") else "等待下次检查")
-            ),
+            "phase": "pending" if sub.get("pending_save_keys") else "waiting",
+            "phase_label": "等待存储目标确认" if sub.get("pending_save_keys") else "等待下次检查",
         })
 
-    items.sort(
-        key=lambda item: float(item.get("updated_at") or item.get("created_at") or 0),
-        reverse=True,
-    )
+    items.sort(key=lambda item: float(item.get("updated_at") or item.get("created_at") or 0), reverse=True)
     return jsonify({"success": True, "tasks": items})
 
 
@@ -976,17 +970,10 @@ def get_task_detail(task_id):
             "type": "subscription",
             "kind": "智能追剧",
             "title": sub.get("title", "未命名任务"),
-            "status": (
-                sub.get("status")
-                or (
-                    "failed"
-                    if sub.get("last_error")
-                    else ("pending" if sub.get("pending_save_keys") else "waiting")
-                )
-            ),
-            "phase": sub.get("phase") or ("pending" if sub.get("pending_save_keys") else "waiting"),
-            "phase_label": sub.get("phase_label") or ("等待存储目标确认" if sub.get("pending_save_keys") else "等待下次检查"),
-            "progress": 100 if (sub.get("status") or "waiting") == "success" else 0,
+            "status": "failed" if sub.get("last_error") else ("pending" if sub.get("pending_save_keys") else "waiting"),
+            "phase": "pending" if sub.get("pending_save_keys") else "waiting",
+            "phase_label": "等待存储目标确认" if sub.get("pending_save_keys") else "等待下次检查",
+            "progress": 100,
             "total": len(sub.get("tracked_file_keys", []) or []),
             "success_count": len(sub.get("saved_episodes", []) or []),
             "skipped_count": 0,
