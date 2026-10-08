@@ -42,7 +42,8 @@ class StorageTargetManager:
             if isinstance(saved, dict) and not saved.get("enabled", True):
                 return None
             return card
-        default_id = self.config_store.get_default_storage_target_id()
+        getter = getattr(self.config_store, "get_default_storage_target_id", None)
+        default_id = getter() if callable(getter) else ""
         if default_id:
             card = self.registry.get(default_id)
             if isinstance(card, StorageTargetCard):
