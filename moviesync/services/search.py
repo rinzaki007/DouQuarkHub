@@ -1,7 +1,7 @@
 """影视资源检索与转存业务服务。
 
-用途：并发搜索配置的 Telegram 频道、解析夸克分享、去重候选资源，并执行用户选择的文件白名单转存。
-维护说明：转存前会重新解析分享并验证 FID，不能信任浏览器提交的 stoken 或未经验证的文件列表。
+用途：并发搜索已启用资源源、解析存储目标资源、去重候选资源，并执行用户选择的文件白名单转存。
+维护说明：具体平台解析与转存由 StorageTargetCard 负责；核心业务不直接依赖具体网盘平台。
 """
 from __future__ import annotations
 
@@ -111,7 +111,7 @@ class SearchService:
                 **source,
                 "pwd_id": pwd_id,
             }
-            files, stoken, err, storage_target_id = self._get_resource_files(resource)
+            files, _stoken, err, storage_target_id = self._get_resource_files(resource)
             if err or not files:
                 self.logger.debug(
                     "资源源 %s 命中 %s 但解析失败: %s",
