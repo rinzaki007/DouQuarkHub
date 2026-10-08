@@ -272,11 +272,19 @@ class SubscriptionManager:
             ).strip()[:100],
             "source_id": str(source_id or "").strip()[:100],
             "cover": str(cover or "").strip()[:1000],
-            "tracking_mode": "channel" if source_id and channel else ("all" if target_fids else "legacy"),
+            "tracking_mode": (
+                "channel"
+                if source_id and channel
+                else ("all" if target_fids else "legacy")
+            ),
             "status": "waiting",
             "phase": "waiting",
             "phase_label": "等待下次检查",
-            "tracked_file_keys": [f"{pwd_id}:{fid}" for fid in target_fids] if source_id and channel else target_fids,
+            "tracked_file_keys": (
+                [f"{pwd_id}:{fid}" for fid in target_fids]
+                if source_id and channel
+                else target_fids
+            ),
             "initial_file_keys": target_fids,
             "files": [],
             "saved_episodes": [],
@@ -418,7 +426,10 @@ class SubscriptionManager:
     def _set_status(self, sub: dict, status: str, phase: str, phase_label: str) -> None:
         with self.lock:
             subscriptions = self._load_subscriptions()
-            current = next((item for item in subscriptions if item.get("id") == sub.get("id")), None)
+            current = next(
+                (item for item in subscriptions if item.get("id") == sub.get("id")),
+                None,
+            )
             if current is None:
                 return
             current["status"] = status
@@ -445,7 +456,11 @@ class SubscriptionManager:
         )
         files = resolved.get("files") or []
         fetched_stoken = resolved.get("token")
-        target_id = str(resolved.get("target_id") or resource.get("storage_target_id") or "").strip()
+        target_id = str(
+            resolved.get("target_id")
+            or resource.get("storage_target_id")
+            or ""
+        ).strip()
         err = resolved.get("error")
 
         if err or not files or not fetched_stoken:
@@ -538,7 +553,11 @@ class SubscriptionManager:
         channel = str(sub.get("channel") or "").strip()
         title = str(sub.get("title") or "").strip()
         self._set_status(sub, "running", "searching", "正在搜刮频道资源…")
-        sources = self.resource_sources.search_channel(source_id, channel, title) if self.resource_sources else []
+        sources = (
+            self.resource_sources.search_channel(source_id, channel, title)
+            if self.resource_sources
+            else []
+        )
 
         if not sources:
             return self._finish(sub, True, f"《{title}》频道暂未发现新资源", success_keys=[])
