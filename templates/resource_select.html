@@ -36,9 +36,15 @@
                 <p class="mt-2 text-xs leading-5 text-slate-500">先选择资源版本，再选择需要转存的文件。所有文件默认不勾选。</p>
                 <a id="movie-douban" href="#" target="_blank" rel="noopener noreferrer" class="douban-detail-btn mt-3 inline-flex items-center gap-2 rounded-xl px-3 py-2 text-[11px] font-medium"><i class="fa-solid fa-arrow-up-right-from-square"></i>打开豆瓣详情</a>
             </div>
-            <div class="w-full shrink-0 sm:w-72">
-                <label class="mb-2 block text-[10px] font-medium text-slate-500">目标存储目录</label>
-                <select id="target-fid" class="glass-control w-full rounded-xl px-3 py-2.5 text-xs text-slate-200"></select>
+            <div class="w-full shrink-0 sm:w-80 space-y-2">
+                <div>
+                    <label class="mb-1 block text-[10px] font-medium text-slate-500">存储目标</label>
+                    <select id="storage-target" class="glass-control w-full rounded-xl px-3 py-2.5 text-xs text-slate-200"></select>
+                </div>
+                <div>
+                    <label class="mb-1 block text-[10px] font-medium text-slate-500">目标存储目录</label>
+                    <select id="target-fid" class="glass-control w-full rounded-xl px-3 py-2.5 text-xs text-slate-200"></select>
+                </div>
             </div>
         </div>
     </section>
