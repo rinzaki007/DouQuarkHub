@@ -137,7 +137,7 @@ class TelegramClient:
                 match = re.search(r"/(\\d+)$", data_post)
                 if match:
                     post_id = int(match.group(1))
-                    oldest_post_id = post_id if oldest_post_id is None else min(oldest_post_id, post_id)
+                    oldest_post_id = (post_id if oldest_post_id is None else min(oldest_post_id, post_id))
 
                 text_node = message.select_one("div.tgme_widget_message_text")
                 if not text_node:
