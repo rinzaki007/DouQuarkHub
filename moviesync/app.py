@@ -12,7 +12,7 @@ from pathlib import Path
 from flask import Flask, session
 
 from .auth import AuthStore
-from .cards import QuarkStorageCard
+from .cards import CardRegistry, QuarkStorageCard
 from .clients.douban import DoubanClient
 from .clients.http import HttpClient
 from .clients.quark import QuarkClient
@@ -21,6 +21,7 @@ from .config_store import ConfigStore
 from .logging_setup import configure_logging, recent_logs
 from .services.resource_sources import ResourceSourceManager
 from .services.search import SearchService
+from .services.storage_targets import StorageTargetManager
 from .services.subscriptions import SubscriptionManager
 from .services.tasks import TaskManager
 from .settings import PROJECT_ROOT, load_settings
@@ -68,13 +69,19 @@ def create_app(
 
     douban = DoubanClient()
     telegram = TelegramClient()
+    card_registry = CardRegistry()
     resource_sources = ResourceSourceManager(
         telegram,
         config_store,
         logger,
+        registry=card_registry,
     )
-    quark_card = QuarkStorageCard(config_store)
-    resource_sources.registry.register(quark_card)
+    card_registry.register(QuarkStorageCard(config_store))
+    storage_targets = StorageTargetManager(
+        card_registry,
+        config_store,
+        logger,
+    )
     http = HttpClient()
 
     tasks = TaskManager(
@@ -96,14 +103,15 @@ def create_app(
         "douban": douban,
         "telegram": telegram,
         "resource_sources": resource_sources,
-        "card_registry": resource_sources.registry,
+        "card_registry": card_registry,
+        "storage_targets": storage_targets,
         "http": http,
         "subscriptions": subscriptions,
         "tasks": tasks,
         "quark_factory": lambda cookie: QuarkClient(cookie),
-        "search_factory": lambda cookie: SearchService(
-            QuarkClient(cookie),
+        "search_factory": lambda _cookie: SearchService(
             resource_sources,
+            storage_targets,
             logger,
         ),
         "csrf": lambda: secrets.token_urlsafe(32),
