@@ -328,7 +328,7 @@ async function searchTaskCandidates() {
                 '<span class="rounded-lg border border-blue-900/60 bg-blue-950/30 px-2 py-1 text-[10px] text-blue-300"><i class="fa-solid fa-display mr-1"></i>' + escapeTask(resolutionText) + '</span></div></div>' +
                 '<button data-candidate="' + index + '" class="candidate-select shrink-0 rounded-xl border border-purple-700 bg-purple-950/40 px-4 py-2.5 text-[11px] font-medium text-purple-200 hover:bg-purple-900/50">选择此源</button></div>' +
                 '<div class="mt-4 max-h-60 overflow-y-auto rounded-xl border border-slate-800 bg-slate-900/80 p-2 space-y-1">' +
-                files.map(file => '<label class="flex cursor-pointer items-center gap-3 rounded-lg px-2 py-2 hover:bg-slate-800/70"><input type="checkbox" data-fid="' + escapeTask(file.fid) + '" class="task-file h-4 w-4 rounded border-slate-700 bg-slate-900 text-purple-600"> <span class="min-w-0 flex-1 truncate text-xs text-slate-300">' + escapeTask(file.file_name) + '</span><span class="shrink-0 text-[10px] text-slate-500">' + escapeTask(file.resolution || '未知') + ' · ' + escapeTask(file.size_text || formatTaskSize(file.size)) + '</span></label>').join('') +
+                files.map(file => '<div class="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-slate-800/70"><i class="fa-solid fa-circle-check text-emerald-500/70"></i><span class="min-w-0 flex-1 truncate text-xs text-slate-300">' + escapeTask(file.file_name) + '</span><span class="shrink-0 text-[10px] text-slate-500">' + escapeTask(file.resolution || '未知') + ' · ' + escapeTask(file.size_text || formatTaskSize(file.size)) + '</span></div>').join('') +
                 '</div>';
             row.querySelector('.candidate-select').onclick = function() {
                 selectedCandidate = {candidate:candidate,row:row};
@@ -337,7 +337,7 @@ async function searchTaskCandidates() {
                 this.textContent='已选择';
                 document.getElementById('task-submit').disabled=false;
                 document.getElementById('task-submit').classList.remove('opacity-40');
-                document.getElementById('task-form-status').textContent='已选择资源源，请勾选需要持续监控的文件。';
+                document.getElementById('task-form-status').textContent='已选择资源源，任务会自动监控这个频道分享后续新增文件。';
             };
             box.appendChild(row);
         });
@@ -349,10 +349,17 @@ async function searchTaskCandidates() {
 async function createTask() {
     if (!selectedCandidate) return taskToast('请先选择一个资源源');
     const title = document.getElementById('task-title').value.trim();
-    const checks = selectedCandidate.row.querySelectorAll('input[data-fid]:checked');
-    if (!checks.length) return taskToast('请至少选择一个需要监控的文件');
-    const files = Array.from(checks).map(x => ({fid:x.dataset.fid}));
-    const payload = {title:title, channel:selectedCandidate.candidate.channel, pwd_id:selectedCandidate.candidate.pwd_id, files:files, interval_hours:Number(document.getElementById('task-interval').value || 6), target_fid:document.getElementById('task-target-fid').value || '0'};
+    const files = (selectedCandidate.candidate.files || []).map(x => ({fid:x.fid})).filter(x => x.fid);
+    if (!files.length) return taskToast('当前资源源没有可监控文件');
+    const payload = {
+        title:title,
+        channel:selectedCandidate.candidate.channel,
+        pwd_id:selectedCandidate.candidate.pwd_id,
+        files:files,
+        cover:selectedCandidate.candidate.cover || '',
+        interval_hours:Number(document.getElementById('task-interval').value || 6),
+        target_fid:document.getElementById('task-target-fid').value || '0'
+    };
     const btn=document.getElementById('task-submit');
     btn.disabled=true;
     document.getElementById('task-form-status').textContent='正在保存…';
