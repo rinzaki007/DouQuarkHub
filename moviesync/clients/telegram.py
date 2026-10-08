@@ -134,17 +134,24 @@ class TelegramClient:
             oldest_post_id = None
             for message in messages:
                 data_post = str(message.get("data-post") or "")
-                match = re.search(r"/(\\d+)$", data_post)
+                match = re.search(r"/(\d+)$", data_post)
                 if match:
                     post_id = int(match.group(1))
-                    oldest_post_id = (post_id if oldest_post_id is None else min(oldest_post_id, post_id))
+                    oldest_post_id = (
+                        post_id
+                        if oldest_post_id is None
+                        else min(oldest_post_id, post_id)
+                    )
 
                 text_node = message.select_one("div.tgme_widget_message_text")
                 if not text_node:
                     continue
                 plain_text = text_node.get_text(" ", strip=True)
                 simple_plain = self._simplify(plain_text)
-                if title not in plain_text and (not simple_target or simple_target not in simple_plain):
+                if (
+                    title not in plain_text
+                    and (not simple_target or simple_target not in simple_plain)
+                ):
                     continue
 
                 links = [anchor.get("href", "") for anchor in message.select("a[href]")]
