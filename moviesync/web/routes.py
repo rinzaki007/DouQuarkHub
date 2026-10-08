@@ -732,7 +732,7 @@ def search_candidates():
             "未选择影片"
         )
 
-        if (
+    if (
         not isinstance(
             movies,
             list,
