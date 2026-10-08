@@ -13,13 +13,13 @@ from flask import Flask, session
 
 from .auth import AuthStore
 from .cards import CardRegistry, QuarkStorageCard
+from .cards_metadata import DoubanMetadataCard
 from .clients.douban import DoubanClient
 from .clients.http import HttpClient
 from .clients.telegram import TelegramClient
 from .config_store import ConfigStore
 from .logging_setup import configure_logging, recent_logs
 from .services.metadata import MetadataProviderManager
-from .cards_metadata import DoubanMetadataCard
 from .services.resource_sources import ResourceSourceManager
 from .services.search import SearchService
 from .services.storage_targets import StorageTargetManager
