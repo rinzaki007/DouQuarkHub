@@ -776,14 +776,15 @@ def transfer_selected():
     if not isinstance(movie, dict) or not isinstance(candidate, dict):
         return _json_error("参数不完整")
 
-    cookie = _services()["config"].get_cookie()
+    config_store = _services()["config"]
+    quark_config = config_store.get_quark_config()
+    cookie = str(quark_config.get("cookie") or "").strip()
     if not cookie:
         return _json_error("未配置夸克 Cookie")
 
-    config = _services()["config"].load()
     try:
         target_fid = _normalize_fid(
-            data.get("target_fid") or config.get("default_fid", "0")
+            data.get("target_fid") or quark_config.get("default_fid", "0")
         )
     except ValueError as exc:
         return _json_error(str(exc))
@@ -800,7 +801,6 @@ def transfer_selected():
 
     def runner(progress):
         with app.app_context():
-            current_config = _services()["config"].load()
             current_cookie = _services()["config"].get_cookie()
             if not current_cookie:
                 return False, "未配置夸克 Cookie", {
