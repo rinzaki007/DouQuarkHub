@@ -70,3 +70,20 @@ def test_telegram_resource_source_uses_card_interface():
     assert card.card_type == "resource_source"
     assert "resource.search" in card.capabilities
     assert card.manifest.to_dict()["name"] == "Telegram"
+
+
+
+def test_quark_storage_card_uses_storage_target_interface():
+    from moviesync.cards import QuarkStorageCard, StorageTargetCard
+
+    class FakeConfigStore:
+        def get_cookie(self):
+            return ""
+
+    card = QuarkStorageCard(FakeConfigStore())
+
+    assert isinstance(card, StorageTargetCard)
+    assert card.card_id == "quark"
+    assert card.card_type == "storage_target"
+    assert "storage.transfer" in card.capabilities
+    assert card.check()["status"] == "unconfigured"
