@@ -397,16 +397,32 @@ class ConfigStore:
         if isinstance(imported_cards, dict):
             if isinstance(imported_cards.get("quark"), dict):
                 quark = imported_cards["quark"]
-                self.save_quark_config(quark.get("config") or {})
+                quark_config = quark.get("config")
+                if isinstance(quark_config, dict):
+                    imported_quark = dict(quark_config)
+                    if "cookie" in imported_quark:
+                        cookie = str(imported_quark.pop("cookie") or "").strip()
+                        imported_quark["clear_cookie"] = not bool(cookie)
+                        if cookie:
+                            imported_quark["cookie"] = cookie
+                    self.save_quark_config(imported_quark)
                 current = self.load()
                 if "enabled" in quark:
                     current["cards"]["quark"]["enabled"] = bool(quark["enabled"])
+                    self.store.write(current)
             if isinstance(imported_cards.get("telegram"), dict):
                 telegram = imported_cards["telegram"]
-                self.save_telegram_config(telegram.get("config") or {})
+                telegram_config = telegram.get("config")
+                if isinstance(telegram_config, dict):
+                    self.save_telegram_config({
+                        key: value
+                        for key, value in telegram_config.items()
+                        if key in {"channels"}
+                    })
                 current = self.load()
                 if "enabled" in telegram:
                     current["cards"]["telegram"]["enabled"] = bool(telegram["enabled"])
+                    self.store.write(current)
 
         if "channels" in incoming:
             self.save_telegram_config({"channels": incoming["channels"]})

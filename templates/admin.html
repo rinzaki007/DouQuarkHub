@@ -866,13 +866,20 @@
                         cfg.openlist_url || '';
 
 
+                    const telegramConfig =
+                        cfg.cards &&
+                        cfg.cards.telegram &&
+                        cfg.cards.telegram.config
+                            ? cfg.cards.telegram.config
+                            : {};
+
                     tgChannels =
-                        Array.isArray(cfg.channels)
-                            ? cfg.channels
+                        Array.isArray(telegramConfig.channels)
+                            ? telegramConfig.channels
                             : [];
 
-
                     renderTGChannels();
+                    renderTelegramChannels();
 
                 }
 
