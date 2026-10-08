@@ -235,6 +235,7 @@ class SubscriptionManager:
             )
 
         target_fids = []
+        selected_episode_numbers: list[int] = []
         seen = set()
 
         for item in (files or [])[:200]:
@@ -259,6 +260,14 @@ class SubscriptionManager:
             ):
                 seen.add(fid)
                 target_fids.append(fid)
+                ep_num, _ = _clean_tv_filename(
+                    str(item.get("file_name") or "")
+                    if isinstance(item, dict)
+                    else "",
+                    title,
+                )
+                if ep_num is not None:
+                    selected_episode_numbers.append(ep_num)
 
         subscription = {
             "id": uuid.uuid4().hex,
@@ -267,7 +276,7 @@ class SubscriptionManager:
             "target_fid": target_fid,
             "storage_target_id": str(storage_target_id or "").strip(),
             "interval_hours": interval_hours,
-            "start_ep": start_ep,
+            "start_ep": max([start_ep, *selected_episode_numbers], default=start_ep),
             "channel": str(
                 channel or ""
             ).strip()[:100],
@@ -571,6 +580,7 @@ class SubscriptionManager:
             for key in (sub.get("tracked_file_keys", []) or [])
             if str(key).strip()
         }
+        baseline_episode = int(sub.get("start_ep", 0) or 0)
         grouped: dict[tuple[str, str], dict] = {}
 
         for source in sources:
@@ -608,7 +618,11 @@ class SubscriptionManager:
                 key = f"{pwd_id}:{fid}"
                 if key in tracked:
                     continue
-                if not str(item.get("file_name") or "").lower().endswith(VIDEO_EXTENSIONS):
+                file_name = str(item.get("file_name") or "")
+                if not file_name.lower().endswith(VIDEO_EXTENSIONS):
+                    continue
+                episode, _ = _clean_tv_filename(file_name, title)
+                if episode is not None and episode <= baseline_episode:
                     continue
                 grouped.setdefault((pwd_id, target_id), {
                     "resource": resource,
