@@ -564,6 +564,39 @@ def save_quark_card_config():
     })
 
 
+@api.get("/cards/telegram/config")
+def get_telegram_card_config():
+    card = _services()["card_registry"].get("telegram")
+    if not card:
+        return _json_error("Telegram 卡片未加载", 404)
+    saved = _services()["config"].load()["cards"]["telegram"]
+    config = _services()["config"].get_telegram_config()
+    return jsonify({
+        "success": True,
+        "enabled": bool(saved.get("enabled", True)),
+        "config": {
+            "channels": config.get("channels", []),
+            "health": config.get("health", {}),
+        },
+    })
+
+
+@api.post("/cards/telegram/config")
+@require_csrf
+def save_telegram_card_config():
+    data = request.get_json(silent=True) or {}
+    try:
+        saved = _services()["config"].save_telegram_config(data)
+    except ValueError as exc:
+        return _json_error(str(exc))
+    return jsonify({
+        "success": True,
+        "enabled": bool(saved.get("enabled", True)),
+        "config": saved.get("config", {}),
+        "message": "Telegram 卡片配置已保存",
+    })
+
+
 @api.post("/cards/quark/check")
 @require_csrf
 def check_quark_card():
