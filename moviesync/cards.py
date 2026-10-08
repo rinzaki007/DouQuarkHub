@@ -174,9 +174,10 @@ class QuarkStorageCard(StorageTargetCard):
                 "status": "unconfigured",
                 "message": "尚未配置夸克 Cookie",
             }
+        valid = self._client().check_cookie_valid()
         return {
-            "status": "healthy" if self._client().check_cookie_valid() else "unavailable",
-            "message": "夸克 Cookie 有效" if self._client().check_cookie_valid() else "夸克 Cookie 无效或已过期",
+            "status": "healthy" if valid else "unavailable",
+            "message": "夸克 Cookie 有效" if valid else "夸克 Cookie 无效或已过期",
         }
 
     def list_files(self, resource: object) -> list[dict[str, Any]]:
