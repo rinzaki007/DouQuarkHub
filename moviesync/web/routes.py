@@ -842,10 +842,23 @@ def transfer_selected():
     except ValueError as exc:
         return _json_error(str(exc))
 
+    storage_target_id = str(
+        data.get("storage_target_id")
+        or candidate.get("storage_target_id")
+        or ""
+    ).strip()
+    if storage_target_id and not _services()["storage_targets"].get(storage_target_id):
+        return _json_error("指定的存储目标不存在或已停用", 400)
+
+    candidate = {
+        **candidate,
+        "storage_target_id": storage_target_id,
+    }
     payload = {
         "movie": movie,
         "candidate": candidate,
         "target_fid": target_fid,
+        "storage_target_id": storage_target_id,
     }
 
     # 任务在线程池中异步执行，后台线程没有 Flask 的默认请求上下文。
