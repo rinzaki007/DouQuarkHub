@@ -103,24 +103,6 @@ async function loadCategoryOptions() {
     }
 }
 
-async function checkSystemHealth() {
-    try {
-        const resp = await apiFetch('/api/cards/quark/check', { method: 'POST' });
-        const res = await resp.json();
-        const badge = document.getElementById('cookie-status-badge');
-        if (res.status === 'healthy') {
-            badge.className = "px-2 py-1 text-xs rounded bg-emerald-950/80 text-emerald-400 border border-emerald-800 flex items-center gap-1";
-            badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-500"></span><span>Cookie 有效</span>`;
-        } else {
-            badge.className = "px-2 py-1 text-xs rounded bg-rose-950/80 text-rose-400 border border-rose-800 flex items-center gap-1";
-            badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-rose-500"></span><span>Cookie 失效</span>`;
-        }
-    } catch (err) {
-        console.error("初始化检测异常", err);
-    }
-
-}
-
 function changeTag(tag) {
     currentTag = tag;
     document.querySelectorAll('.nav-tag').forEach(btn => {
