@@ -36,9 +36,7 @@ let logTimerSeconds = 0;
 let logAutoCloseTimer = null;
 
 document.addEventListener("DOMContentLoaded", () => {
-    fetchMovies();
-    checkSystemHealth();
-    loadCategoryOptions();
+    fetchMovies();loadCategoryOptions();
     applyGlassmorphismStyles();
 });
 
