@@ -897,6 +897,31 @@
     </div>
 
 
+    <div id="quark-card-modal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm p-4">
+        <div class="max-w-2xl mx-auto mt-8 max-h-[90vh] overflow-y-auto glass-panel rounded-2xl border border-slate-700 shadow-2xl">
+            <div class="flex items-center justify-between p-5 border-b border-slate-800">
+                <div><h3 class="text-base font-bold text-white flex items-center gap-2"><i class="fa-solid fa-hard-drive text-blue-400"></i>Quark 网盘</h3><p class="text-[10px] text-slate-500 mt-1">StorageTarget · v1.0.0</p></div>
+                <button type="button" onclick="closeQuarkCard()" class="text-slate-400 hover:text-white text-xl">×</button>
+            </div>
+            <div class="p-5 space-y-5">
+                <label class="flex items-center gap-2 text-xs text-slate-300"><input id="quark-card-enabled" type="checkbox" class="accent-blue-500">启用 Quark 卡片</label>
+                <div class="space-y-2"><label class="text-xs text-slate-400">Cookie</label><textarea id="quark-card-cookie" rows="4" class="glass-input w-full border border-slate-800 rounded p-3 text-xs font-mono text-slate-200 focus:outline-none focus:border-blue-500" placeholder="请粘贴夸克网盘 Cookie…"></textarea></div>
+                <div class="space-y-2"><label class="text-xs text-slate-400">默认目录 FID</label><input id="quark-card-default-fid" class="glass-input w-full border border-slate-800 rounded px-3 py-2 text-xs text-slate-200" value="0"></div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <input id="quark-card-fid-movie" class="glass-input border border-slate-800 rounded px-3 py-2 text-xs text-slate-200" placeholder="电影目录 FID">
+                    <input id="quark-card-fid-tv" class="glass-input border border-slate-800 rounded px-3 py-2 text-xs text-slate-200" placeholder="电视剧目录 FID">
+                    <input id="quark-card-fid-show" class="glass-input border border-slate-800 rounded px-3 py-2 text-xs text-slate-200" placeholder="综艺目录 FID">
+                    <input id="quark-card-fid-anime" class="glass-input border border-slate-800 rounded px-3 py-2 text-xs text-slate-200" placeholder="动漫目录 FID">
+                </div>
+                <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" id="quark-card-check" onclick="checkQuarkCard()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-4 py-2 rounded">检查连接</button>
+                    <button type="button" onclick="closeQuarkCard()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-4 py-2 rounded">取消</button>
+                    <button type="button" onclick="saveQuarkCardConfig()" class="bg-blue-600 hover:bg-blue-500 text-white text-xs px-5 py-2 rounded font-semibold">保存配置</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- ==========================================================
          JavaScript
          ========================================================== -->
@@ -1219,70 +1244,101 @@
         };
 
         function renderCards(cards) {
-            const container = document.getElementById('cards-list');
-            const summary = document.getElementById('cards-summary');
-
+            const container = document.getElementById("cards-list");
+            const summary = document.getElementById("cards-summary");
             if (!Array.isArray(cards) || !cards.length) {
-                summary.textContent = '当前没有已加载卡片';
+                summary.textContent = "当前没有已加载卡片";
                 container.innerHTML = '<div class="glass-panel rounded-xl p-5 text-xs text-slate-500 lg:col-span-2">暂无已加载卡片。</div>';
                 return;
             }
-
-            summary.textContent = '已加载 ' + cards.length + ' 张卡片';
-
+            summary.textContent = "已加载 " + cards.length + " 张卡片";
             container.innerHTML = cards.map(card => {
-                const typeLabel = CARD_TYPE_LABELS[card.type] || card.type || '未知类型';
+                const typeLabel = CARD_TYPE_LABELS[card.type] || card.type || "未知类型";
                 const capabilities = Array.isArray(card.capabilities) ? card.capabilities : [];
-
-                return '<div class="glass-shell rounded-2xl p-4">' +
+                const clickable = card.id === "quark" ? "cursor-pointer hover:border-blue-400/40" : "";
+                return '<button type="button" class="glass-shell rounded-2xl p-4 text-left w-full transition ' + clickable + '" ' +
+                    (card.id === "quark" ? 'onclick="openQuarkCard()"' : "") + ">" +
                     '<div class="flex items-start justify-between gap-3">' +
-                        '<div class="min-w-0">' +
-                            '<div class="flex items-center gap-2">' +
-                                '<span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-500/10 border border-blue-400/15 text-blue-300">' +
-                                    '<i class="fa-solid fa-puzzle-piece"></i>' +
-                                '</span>' +
-                                '<div class="min-w-0">' +
-                                    '<div class="truncate text-sm font-semibold text-slate-100">' + escapeHtml(card.name || card.id) + '</div>' +
-                                    '<div class="mt-0.5 text-[10px] text-slate-500">' +
-                                        escapeHtml(card.id || 'unknown') + ' · v' + escapeHtml(card.version || '1.0.0') +
-                                    '</div>' +
-                                '</div>' +
-                            '</div>' +
-                        '</div>' +
-                        '<span class="shrink-0 rounded-full border border-emerald-400/15 bg-emerald-400/5 px-2.5 py-1 text-[10px] text-emerald-300">' +
-                            '<i class="fa-solid fa-circle-check mr-1"></i>已加载' +
-                        '</span>' +
-                    '</div>' +
-                    '<div class="mt-3 flex flex-wrap gap-2">' +
-                        '<span class="resource-chip resource-chip-accent">' + escapeHtml(typeLabel) + '</span>' +
-                        capabilities.map(cap => '<span class="resource-chip">' + escapeHtml(cap) + '</span>').join('') +
-                    '</div>' +
-                    (card.description ? '<div class="mt-3 text-[11px] leading-5 text-slate-500">' + escapeHtml(card.description) + '</div>' : '') +
-                '</div>';
-            }).join('');
+                        '<div class="flex items-center gap-2 min-w-0">' +
+                            '<span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-500/10 border border-blue-400/15 text-blue-300"><i class="fa-solid fa-puzzle-piece"></i></span>' +
+                            '<div class="min-w-0"><div class="truncate text-sm font-semibold text-slate-100">' + escapeHtml(card.name || card.id) + '</div>' +
+                            '<div class="mt-0.5 text-[10px] text-slate-500">' + escapeHtml(card.id || "unknown") + " · v" + escapeHtml(card.version || "1.0.0") + "</div></div>" +
+                        '</div><span class="shrink-0 rounded-full border border-emerald-400/15 bg-emerald-400/5 px-2.5 py-1 text-[10px] text-emerald-300"><i class="fa-solid fa-circle-check mr-1"></i>已加载</span>' +
+                    '</div><div class="mt-3 flex flex-wrap gap-2"><span class="resource-chip resource-chip-accent">' + escapeHtml(typeLabel) + "</span>" +
+                    capabilities.map(cap => '<span class="resource-chip">' + escapeHtml(cap) + "</span>").join("") + "</div>" +
+                    (card.description ? '<div class="mt-3 text-[11px] leading-5 text-slate-500">' + escapeHtml(card.description) + "</div>" : "") +
+                    (card.id === "quark" ? '<div class="mt-3 text-[10px] text-blue-300"><i class="fa-solid fa-arrow-right mr-1"></i>点击配置 Quark</div>' : "") +
+                    "</button>";
+            }).join("");
         }
 
         async function loadCards() {
-            const container = document.getElementById('cards-list');
-            const summary = document.getElementById('cards-summary');
-
             try {
-                const resp = await apiFetch('/api/cards');
+                const resp = await apiFetch("/api/cards");
                 const result = await resp.json();
-
-                if (!result.success) {
-                    throw new Error(result.message || '读取卡片失败');
-                }
-
+                if (!result.success) throw new Error(result.message || "读取卡片失败");
                 renderCards(result.cards || []);
             } catch (error) {
-                summary.textContent = '读取卡片失败';
-                container.innerHTML = '<div class="glass-panel rounded-xl p-4 text-xs text-rose-300 lg:col-span-2">' +
-                    escapeHtml(error.message || '读取卡片失败') +
-                    '</div>';
+                document.getElementById("cards-summary").textContent = "读取卡片失败";
+                document.getElementById("cards-list").innerHTML = '<div class="glass-panel rounded-xl p-4 text-xs text-rose-300 lg:col-span-2">' + escapeHtml(error.message || "读取卡片失败") + "</div>";
             }
         }
 
+        async function openQuarkCard() {
+            document.getElementById("quark-card-modal").classList.remove("hidden");
+            await loadQuarkCardConfig();
+        }
+
+        function closeQuarkCard() { document.getElementById("quark-card-modal").classList.add("hidden"); }
+
+        async function loadQuarkCardConfig() {
+            try {
+                const result = await (await apiFetch("/api/cards/quark/config")).json();
+                if (!result.success) throw new Error(result.message || "读取 Quark 配置失败");
+                const cfg = result.config || {};
+                document.getElementById("quark-card-enabled").checked = result.enabled !== false;
+                document.getElementById("quark-card-cookie").value = "";
+                document.getElementById("quark-card-cookie").placeholder = cfg.has_cookie ? "Cookie 已保存；需要更换时再粘贴新的 Cookie" : "请粘贴夸克网盘 Cookie…";
+                document.getElementById("quark-card-default-fid").value = cfg.default_fid || "0";
+                const fids = cfg.category_fids || {};
+                document.getElementById("quark-card-fid-movie").value = fids["电影"] || "";
+                document.getElementById("quark-card-fid-tv").value = fids["电视剧"] || "";
+                document.getElementById("quark-card-fid-show").value = fids["综艺"] || "";
+                document.getElementById("quark-card-fid-anime").value = fids["动漫"] || "";
+            } catch (error) { alert(error.message || "读取 Quark 配置失败"); }
+        }
+
+        async function saveQuarkCardConfig() {
+            const payload = {
+                enabled: document.getElementById("quark-card-enabled").checked,
+                default_fid: document.getElementById("quark-card-default-fid").value.trim(),
+                category_fids: {
+                    "电影": document.getElementById("quark-card-fid-movie").value.trim(),
+                    "电视剧": document.getElementById("quark-card-fid-tv").value.trim(),
+                    "综艺": document.getElementById("quark-card-fid-show").value.trim(),
+                    "动漫": document.getElementById("quark-card-fid-anime").value.trim()
+                }
+            };
+            const cookie = document.getElementById("quark-card-cookie").value.trim();
+            if (cookie) payload.cookie = cookie;
+            try {
+                const result = await (await apiFetch("/api/cards/quark/config", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(payload)})).json();
+                if (!result.success) throw new Error(result.message || "保存失败");
+                closeQuarkCard();
+                await loadCards();
+                alert("Quark 卡片配置已保存");
+            } catch (error) { alert(error.message || "保存 Quark 配置失败"); }
+        }
+
+        async function checkQuarkCard() {
+            const button = document.getElementById("quark-card-check");
+            button.disabled = true;
+            try {
+                const result = await (await apiFetch("/api/cards/quark/check", {method: "POST"})).json();
+                alert(result.message || "检查完成");
+            } catch (error) { alert(error.message || "检查失败"); }
+            finally { button.disabled = false; }
+        }
 
         /* ==========================================================
            TG 频道
@@ -1468,60 +1524,17 @@
 
         async function saveAllSettings() {
 
-            const cookieVal =
-                document.getElementById(
-                    'quark-cookie'
-                ).value.trim();
-
-
             const payload = {
-
-                quark_cookie:
-                    cookieVal,
-
-
-                default_fid:
-                    document.getElementById(
-                        'fid-default'
-                    ).value.trim(),
-
 
                 openlist_url:
                     document.getElementById(
                         'openlist-url'
                     ).value.trim(),
 
-
-                category_fids: {
-
-                    '电影':
-                        document.getElementById(
-                            'fid-movie'
-                        ).value.trim(),
-
-                    '电视剧':
-                        document.getElementById(
-                            'fid-tv'
-                        ).value.trim(),
-
-                    '综艺':
-                        document.getElementById(
-                            'fid-show'
-                        ).value.trim(),
-
-                    '动漫':
-                        document.getElementById(
-                            'fid-anime'
-                        ).value.trim()
-
-                },
-
-
                 channels:
                     tgChannels
 
             };
-
 
             try {
 
