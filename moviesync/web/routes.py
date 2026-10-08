@@ -981,6 +981,9 @@ def get_task_detail(task_id):
             "run_history": (sub.get("run_history", []) or [])[-20:],
             "subscription_id": sub_id,
             "pending_save_keys": sub.get("pending_save_keys", []) or [],
+            "cover": sub.get("cover", ""),
+            "source_channel": sub.get("channel", ""),
+            "tracked_file_count": len(sub.get("tracked_file_keys", []) or []),
         }
         return jsonify({"success": True, "task": task})
     task = _services()["tasks"].get_task(task_id)
@@ -1099,6 +1102,8 @@ def subscriptions():
                     "storage_target_id",
                     "",
                 ),
+                cover=data.get("cover", ""),
+
             )
 
         except (
