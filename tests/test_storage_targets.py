@@ -93,7 +93,9 @@ def test_storage_target_manager_routes_resource_and_transfer():
 
 
 def test_storage_target_destination_options():
-    class DestinationCard:
+    from moviesync.cards import StorageTargetCard
+
+    class DestinationCard(StorageTargetCard):
         card_id = "demo"
 
         def destination_options(self):
