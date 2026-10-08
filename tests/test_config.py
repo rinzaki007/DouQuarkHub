@@ -138,3 +138,16 @@ def test_legacy_telegram_config_is_migrated_on_load(tmp_path):
     assert telegram["config"]["health"]["status"] == "healthy"
     assert "channels" not in config
     assert "resource_sources" not in config
+
+
+def test_default_storage_target_is_persisted(tmp_path):
+    store = ConfigStore(tmp_path / "config.json", tmp_path / "legacy")
+    assert store.get_default_storage_target_id() == ""
+    assert store.set_default_storage_target_id("quark") == "quark"
+    assert store.get_default_storage_target_id() == "quark"
+
+
+def test_openlist_url_can_be_empty(tmp_path):
+    store = ConfigStore(tmp_path / "config.json", tmp_path / "legacy")
+    saved = store.save({"openlist_url": ""})
+    assert saved["openlist_url"] == ""
