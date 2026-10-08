@@ -33,10 +33,17 @@ class ConfigStore:
     @staticmethod
     def _defaults() -> dict:
         return {
-            "quark_cookie": "",
-            "default_fid": "0",
+            "cards": {
+                "quark": {
+                    "enabled": True,
+                    "config": {
+                        "cookie": "",
+                        "default_fid": "0",
+                        "category_fids": deepcopy(DEFAULT_CATEGORY_FIDS),
+                    },
+                },
+            },
             "openlist_url": DEFAULT_OPENLIST_URL,
-            "category_fids": deepcopy(DEFAULT_CATEGORY_FIDS),
             "channels": [],
             "resource_sources": [
                 {
@@ -202,6 +209,20 @@ class ConfigStore:
         if isinstance(data, dict):
             defaults.update(data)
 
+        cards = defaults.get("cards") if isinstance(defaults.get("cards"), dict) else {}
+        quark = cards.get("quark") if isinstance(cards.get("quark"), dict) else {}
+        quark_config = quark.get("config") if isinstance(quark.get("config"), dict) else {}
+        if "quark_cookie" in defaults and "cookie" not in quark_config:
+            quark_config["cookie"] = str(defaults.get("quark_cookie") or "")
+        if "default_fid" in defaults and "default_fid" not in quark_config:
+            quark_config["default_fid"] = defaults.get("default_fid") or "0"
+        if "category_fids" in defaults and "category_fids" not in quark_config:
+            quark_config["category_fids"] = deepcopy(defaults.get("category_fids") or DEFAULT_CATEGORY_FIDS)
+        quark["enabled"] = bool(quark.get("enabled", True))
+        quark["config"] = quark_config
+        cards["quark"] = quark
+        defaults["cards"] = cards
+
         # 旧版本没有 schema_version；读取时自动补齐，后续保存即完成升级。
         try:
             schema_version = int(
@@ -215,9 +236,19 @@ class ConfigStore:
             CONFIG_SCHEMA_VERSION,
         )
 
-        defaults["category_fids"] = {
-            **DEFAULT_CATEGORY_FIDS,
-            **(defaults.get("category_fids") or {}),
+        quark_config = defaults["cards"]["quark"].setdefault("config", {})
+        quark_config["default_fid"] = self._normalize_fid(
+            quark_config.get("default_fid", "0"),
+            "cards.quark.config.default_fid",
+        )
+        incoming_category_fids = quark_config.get("category_fids") or {}
+        quark_config["category_fids"] = {
+            key: self._normalize_fid(
+                incoming_category_fids.get(key, ""),
+                f"cards.quark.config.category_fids.{key}",
+                allow_empty=True,
+            )
+            for key in DEFAULT_CATEGORY_FIDS
         }
 
         defaults["channels"] = self._normalize_channels(
@@ -243,9 +274,48 @@ class ConfigStore:
 
         return defaults
 
+    def get_quark_config(self) -> dict:
+        return deepcopy(self.load()["cards"]["quark"]["config"])
+
+    def save_quark_config(self, incoming: dict) -> dict:
+        if not isinstance(incoming, dict):
+            raise ConfigValidationError("Quark 卡片配置必须是 JSON 对象")
+        current = self.load()
+        quark = current["cards"]["quark"]
+        config = quark["config"]
+        if incoming.get("clear_cookie") is True:
+            config["cookie"] = ""
+        elif "cookie" in incoming:
+            cookie = str(incoming.get("cookie") or "").strip()
+            if cookie:
+                config["cookie"] = cookie
+        if "enabled" in incoming:
+            quark["enabled"] = bool(incoming["enabled"])
+        if "default_fid" in incoming:
+            config["default_fid"] = self._normalize_fid(
+                incoming["default_fid"],
+                "cards.quark.config.default_fid",
+            )
+        if "category_fids" in incoming:
+            category_fids = incoming["category_fids"] or {}
+            if not isinstance(category_fids, dict):
+                raise ConfigValidationError("Quark 分类目录 FID 必须是对象")
+            config["category_fids"] = {
+                key: self._normalize_fid(
+                    category_fids.get(key, config["category_fids"].get(key, "")),
+                    f"cards.quark.config.category_fids.{key}",
+                    allow_empty=True,
+                )
+                for key in DEFAULT_CATEGORY_FIDS
+            }
+        current["cards"]["quark"] = quark
+        current["schema_version"] = CONFIG_SCHEMA_VERSION
+        self.store.write(current)
+        return deepcopy(quark)
+
     def get_cookie(self) -> str:
         return str(
-            self.load().get("quark_cookie") or ""
+            self.get_quark_config().get("cookie") or ""
         ).strip()
 
     def get_channels(self) -> list[dict[str, str]]:
@@ -254,12 +324,13 @@ class ConfigStore:
     def public(self) -> dict:
         config = self.load()
 
-        config.pop("quark_cookie", None)
-
-        config["has_quark_cookie"] = bool(
-            self.get_cookie()
-        )
-
+        quark = config["cards"]["quark"]
+        quark_config = quark["config"]
+        quark["config"] = {
+            **quark_config,
+            "cookie": "",
+            "has_cookie": bool(quark_config.get("cookie")),
+        }
         return config
 
     def save(self, incoming: dict) -> dict:
@@ -270,22 +341,18 @@ class ConfigStore:
 
         current = self.load()
 
+        legacy_quark = {}
         if incoming.get("clear_quark_cookie") is True:
-            current["quark_cookie"] = ""
-
+            legacy_quark["clear_cookie"] = True
         elif "quark_cookie" in incoming:
-            cookie = str(
-                incoming.get("quark_cookie") or ""
-            ).strip()
-
-            if cookie:
-                current["quark_cookie"] = cookie
-
+            legacy_quark["cookie"] = incoming.get("quark_cookie")
         if "default_fid" in incoming:
-            current["default_fid"] = self._normalize_fid(
-                incoming["default_fid"],
-                "default_fid",
-            )
+            legacy_quark["default_fid"] = incoming["default_fid"]
+        if "category_fids" in incoming:
+            legacy_quark["category_fids"] = incoming["category_fids"]
+        if legacy_quark:
+            self.save_quark_config(legacy_quark)
+            current = self.load()
 
         if "openlist_url" in incoming:
             current["openlist_url"] = self._normalize_openlist(
