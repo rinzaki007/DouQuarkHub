@@ -33,7 +33,7 @@
             <div>
                 <p class="text-xs font-medium uppercase tracking-wider text-purple-400">Task Center</p>
                 <h1 class="mt-1 text-xl font-semibold text-white">任务中心</h1>
-                <p class="mt-1 text-xs text-slate-500">统一管理自动追剧任务。浏览影视、搜索资源与执行任务分开处理，状态会持续保留。</p>
+                <p class="mt-1 text-xs text-slate-500">以资源转存为主，智能追剧作为后台监控补充；两类任务状态都会自动刷新。</p>
             </div>
             <button onclick="loadTasks()" class="self-start rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-slate-300 hover:bg-slate-800 sm:self-auto"><i class="fa-solid fa-rotate mr-1"></i>刷新状态</button>
         </div>
@@ -48,7 +48,7 @@
 
     <section class="glass-panel rounded-2xl shadow-[0_18px_55px_rgba(0,0,0,.18)]">
         <div class="flex flex-col gap-3 border-b border-slate-800 p-4 sm:flex-row sm:items-center sm:justify-between">
-            <div><h2 class="text-sm font-semibold text-white">智能追剧</h2><p class="mt-1 text-[11px] text-slate-500">监控指定分享源的新集，只在发现新资源后执行转存。</p></div>
+            <div><h2 class="text-sm font-semibold text-white">普通转存</h2><p class="mt-1 text-[11px] text-slate-500">手动选择资源后的主要转存任务，实时显示校验、解析、目录与转存状态。</p></div>
             <div class="flex items-center gap-1 rounded-lg border border-slate-800 bg-slate-950 p-1 text-[11px]">
                 <button data-filter="all" onclick="setFilter('all')" class="task-filter rounded-md bg-slate-700 px-3 py-1.5 text-slate-100">全部</button>
                 <button data-filter="running" onclick="setFilter('running')" class="task-filter rounded-md px-3 py-1.5 text-slate-400 hover:text-white">执行中</button>
@@ -57,6 +57,14 @@
             </div>
         </div>
         <div id="task-list" class="divide-y divide-slate-800/80"><div class="p-10 text-center text-xs text-slate-500"><i class="fa-solid fa-spinner fa-spin mr-1"></i>正在加载任务…</div></div>
+    </section>
+
+    <section class="mt-6 glass-panel rounded-2xl shadow-[0_18px_55px_rgba(0,0,0,.18)]">
+        <div class="border-b border-slate-800 p-4">
+            <h2 class="text-sm font-semibold text-white">智能追剧</h2>
+            <p class="mt-1 text-[11px] text-slate-500">偶尔查看后台追更进度；频道会持续监控新集，发现符合条件的新资源后自动转存。</p>
+        </div>
+        <div id="smart-task-list" class="divide-y divide-slate-800/80"></div>
     </section>
 
     <section class="mt-6 rounded-2xl border border-slate-700/60 bg-slate-900/55 backdrop-blur-xl">
