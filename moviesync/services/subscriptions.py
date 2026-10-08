@@ -5,17 +5,36 @@
 """
 from __future__ import annotations
 
+import re
 import time
 import uuid
 from collections.abc import Callable
 from datetime import datetime
 from threading import Event, RLock, Thread
 
-from ..clients.quark import QuarkClient, clean_tv_filename, sanitize_pwd_id
 from ..storage import JsonStore
 
 SUBSCRIPTION_SCHEMA_VERSION = 2
 
+
+def _normalize_resource_id(value: object) -> str:
+    value = str(value or "").strip()
+    if len(value) > 128 or (value and not all(char.isalnum() or char in "_-" for char in value)):
+        raise ValueError("分享资源 ID 无效")
+    return value
+
+def _clean_tv_filename(file_name: str, title: str) -> tuple[int | None, str]:
+    text = str(file_name or "")
+    match = re.search(r"(?:S\d{1,2}E(\d{1,4})|(?:EP|E)\s*(\d{1,4})|第\s*(\d+)\s*[集话])", text, re.IGNORECASE)
+    if not match:
+        return None, text
+    for group in match.groups():
+        if group:
+            try:
+                return int(group), text
+            except ValueError:
+                break
+    return None, text
 
 def _normalize_fid(value: object) -> str:
     fid = str(
@@ -45,7 +64,7 @@ class SubscriptionManager:
     def __init__(
         self,
         subscriptions_file,
-        get_cookie: Callable[[], str],
+        storage_targets,
         logger,
         max_interval_hours: int = 168,
     ):
@@ -54,7 +73,7 @@ class SubscriptionManager:
             lambda: [],
         )
 
-        self.get_cookie = get_cookie
+        self.storage_targets = storage_targets
         self.logger = logger
         self.max_interval_hours = (
             max_interval_hours
@@ -141,6 +160,7 @@ class SubscriptionManager:
         start_ep: int = 0,
         channel: str = "",
         files=None,
+        storage_target_id: str = "",
     ) -> dict:
         title = str(
             title or ""
@@ -151,12 +171,9 @@ class SubscriptionManager:
                 "追剧名称长度必须在 1-200 个字符之间"
             )
 
-        pwd_id = sanitize_pwd_id(pwd_id)
-
+        pwd_id = _normalize_resource_id(pwd_id)
         if not pwd_id:
-            raise ValueError(
-                "分享链接 ID 无效"
-            )
+            raise ValueError("分享资源 ID 无效")
 
         target_fid = _normalize_fid(
             target_fid
@@ -213,6 +230,7 @@ class SubscriptionManager:
             "title": title,
             "pwd_id": pwd_id,
             "target_fid": target_fid,
+            "storage_target_id": str(storage_target_id or "").strip(),
             "interval_hours": interval_hours,
             "start_ep": start_ep,
             "channel": str(
@@ -358,224 +376,96 @@ class SubscriptionManager:
         self,
         sub: dict,
     ) -> tuple[bool, str]:
-        cookie = (
-            self.get_cookie()
-            .strip()
+        resource = {
+            "pwd_id": str(sub.get("pwd_id") or "").strip(),
+            "storage_target_id": str(sub.get("storage_target_id") or "").strip(),
+        }
+        resolved = self.storage_targets.resolve_resource(
+            resource,
+            resource.get("storage_target_id") or None,
         )
+        files = resolved.get("files") or []
+        fetched_stoken = resolved.get("token")
+        target_id = str(resolved.get("target_id") or resource.get("storage_target_id") or "").strip()
+        err = resolved.get("error")
 
-        if not cookie:
-            return self._finish(
-                sub,
-                False,
-                "缺少夸克 Cookie",
-            )
-
-        engine = QuarkClient(
-            cookie
-        )
-
-        (
-            files,
-            fetched_stoken,
-            err,
-        ) = engine.get_share_files(
-            sub.get("pwd_id")
-        )
-
-        if (
-            err
-            or not files
-            or not fetched_stoken
-        ):
-            return self._finish(
-                sub,
-                False,
-                "解析链接失败: "
-                f"{err or '未找到文件'}",
-            )
+        if err or not files or not fetched_stoken:
+            return self._finish(sub, False, f"解析链接失败: {err or '未找到文件'}")
 
         saved = {
-            item
-            for item in (
-                sub.get(
-                    "saved_episodes",
-                    [],
-                )
-                or []
-            )
+            item for item in (sub.get("saved_episodes", []) or [])
             if isinstance(item, (str, int))
         }
-
         selected = []
         found_keys = []
-
-        target_files = (
-            sub.get("files")
-            or []
-        )
+        target_files = sub.get("files") or []
 
         if target_files:
             target_fids = {
-                str(
-                    item.get("fid")
-                )
+                str(item.get("fid"))
                 for item in target_files
-                if (
-                    isinstance(
-                        item,
-                        dict,
-                    )
-                    and item.get("fid")
-                )
+                if isinstance(item, dict) and item.get("fid")
             }
-
             for item in files:
-                fid = str(
-                    item.get("fid")
-                    or ""
-                )
-
-                if (
-                    fid in target_fids
-                    and fid not in saved
-                ):
-                    selected.append(
-                        {
-                            "fid": fid
-                        }
-                    )
-
-                    found_keys.append(
-                        fid
-                    )
-
+                fid = str(item.get("fid") or "")
+                if fid in target_fids and fid not in saved:
+                    selected.append({"fid": fid})
+                    found_keys.append(fid)
         else:
-            start_ep = int(
-                sub.get(
-                    "start_ep",
-                    0,
-                )
-                or 0
-            )
-
+            start_ep = int(sub.get("start_ep", 0) or 0)
             for item in files:
-                ep_num, _ = (
-                    clean_tv_filename(
-                        str(
-                            item.get(
-                                "file_name",
-                                "",
-                            )
-                        ),
-                        str(
-                            sub.get(
-                                "title",
-                                "",
-                            )
-                        ),
-                    )
+                ep_num, _ = _clean_tv_filename(
+                    str(item.get("file_name", "")),
+                    str(sub.get("title", "")),
                 )
-
-                if (
-                    ep_num is not None
-                    and ep_num > start_ep
-                    and ep_num not in saved
-                ):
-                    selected.append(
-                        {
-                            "fid": item.get(
-                                "fid"
-                            )
-                        }
-                    )
-
-                    found_keys.append(
-                        ep_num
-                    )
+                if ep_num is not None and ep_num > start_ep and ep_num not in saved:
+                    selected.append({"fid": item.get("fid")})
+                    found_keys.append(ep_num)
 
         if not selected:
             return self._finish(
                 sub,
                 True,
-                (
-                    f"《{sub.get('title', '')}》"
-                    "暂无新更新"
-                ),
+                f"《{sub.get('title', '')}》暂无新更新",
                 success_keys=[],
             )
 
-        target_fid = _normalize_fid(
-            sub.get(
-                "target_fid"
-            )
-        )
-
-        folder_fid, folder_err = (
-            engine.get_or_create_subfolder(
-                str(
-                    sub.get(
-                        "title",
-                        "",
-                    )
-                ),
+        target_fid = _normalize_fid(sub.get("target_fid"))
+        try:
+            folder_fid = self.storage_targets.create_folder(
+                str(sub.get("title", "")),
                 target_fid,
+                target_id or None,
             )
-        )
+        except Exception as exc:
+            return self._finish(sub, False, f"创建专属文件夹失败: {exc}")
 
-        if not folder_fid:
-            return self._finish(
-                sub,
-                False,
-                (
-                    "创建专属文件夹失败: "
-                    f"{folder_err or '未知错误'}"
-                ),
-            )
-
-        pending_keys = list(
-            dict.fromkeys(
-                str(key)
-                for key in found_keys
-            )
-        )[:200]
-
+        pending_keys = list(dict.fromkeys(str(key) for key in found_keys))[:200]
         with self.lock:
             subscriptions = self._load_subscriptions()
             current = next(
-                (
-                    item
-                    for item in subscriptions
-                    if item.get("id") == sub.get("id")
-                ),
+                (item for item in subscriptions if item.get("id") == sub.get("id")),
                 None,
             )
             if current is not None:
                 current["pending_save_keys"] = pending_keys
+                current["storage_target_id"] = target_id
                 self.store.write(subscriptions)
 
-        ok, msg = engine.save_files(
-            sub.get("pwd_id"),
+        ok, msg = self.storage_targets.transfer(
+            resource,
             selected,
-            fetched_stoken,
             folder_fid,
+            target_id or None,
+            fetched_stoken,
         )
-
         if not ok:
-            return self._finish(
-                sub,
-                False,
-                f"转存失败: {msg}",
-            )
+            return self._finish(sub, False, f"转存失败: {msg}")
 
         return self._finish(
             sub,
             True,
-            (
-                f"🎉 成功追更 "
-                f"{len(found_keys)} 项，"
-                "已存入专属文件夹"
-                f"【{sub.get('title', '')}】！"
-            ),
+            f"🎉 成功追更 {len(found_keys)} 项，已存入专属文件夹【{sub.get('title', '')}】！",
             success_keys=found_keys,
         )
 
