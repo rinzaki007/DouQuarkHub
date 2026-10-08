@@ -240,176 +240,26 @@
                 </h2>
 
 
-                <!-- Cookie -->
+                <!-- Core 基础设置 -->
 
-                <div class="glass-shell rounded-2xl border border-slate-800/80 p-4 space-y-1.5">
-
-                    <label
-                        for="quark-cookie"
-                        class="block text-xs text-slate-400 font-semibold"
-                    >
-                        夸克网盘 Cookie (ck)：由服务端安全保存
-                    </label>
-
-
-                    <textarea
-                        id="quark-cookie"
-                        rows="4"
-                        class="glass-input w-full border border-slate-800/80 rounded p-3 text-xs font-mono text-slate-200 focus:outline-none focus:border-blue-500 break-all"
-                        placeholder="请粘贴夸克网盘 Cookie..."
-                    ></textarea>
-
+                <div class="space-y-1">
+                    <label for="openlist-url" class="block text-xs text-slate-400 font-semibold">OpenList 访问地址:</label>
+                    <input type="text" id="openlist-url" value="https://openlist.88888807.xyz:8807/" class="glass-input w-full border border-slate-800 rounded px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-blue-500">
                 </div>
 
-
-                <!-- 默认全局存储与 OpenList -->
-
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-
-                    <div class="space-y-1">
-
-                        <label
-                            for="fid-default"
-                            class="block text-xs text-slate-400 font-semibold"
-                        >
-                            默认全局存储目录 FID:
-                        </label>
-
-
-                        <input
-                            type="text"
-                            id="fid-default"
-                            value="0"
-                            class="glass-input w-full border border-slate-800/80 rounded px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-blue-500"
-                        >
-
+                <div class="glass-shell rounded-2xl border border-slate-800/80 p-4">
+                    <div class="flex items-start gap-3">
+                        <i class="fa-solid fa-puzzle-piece text-blue-400 mt-0.5"></i>
+                        <div class="text-xs leading-5 text-slate-500">
+                            <div class="font-semibold text-slate-300 mb-1">能力由卡片提供</div>
+                            Quark、Telegram 等组件不再作为 Core 全局参数。请进入“卡片管理”打开对应卡片配置。
+                        </div>
                     </div>
-
-
-                    <div class="space-y-1">
-
-                        <label
-                            for="openlist-url"
-                            class="block text-xs text-slate-400 font-semibold"
-                        >
-                            OpenList 访问地址:
-                        </label>
-
-
-                        <input
-                            type="text"
-                            id="openlist-url"
-                            value="https://openlist.88888807.xyz:8807/"
-                            class="w-full bg-slate-900 border border-slate-800 rounded px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-blue-500"
-                        >
-
-                    </div>
-
                 </div>
-
-
-                <!-- 各分类 FID -->
-
-                <div class="space-y-2 pt-2">
-
-                    <h3 class="text-xs font-bold text-amber-400 flex items-center gap-1">
-
-                        <i class="fa-solid fa-folder"></i>
-
-                        各分类专属存储目录 FID
-
-                        （未设定则自动使用默认全局 FID）
-
-                    </h3>
-
-
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-
-                        <div>
-
-                            <label
-                                for="fid-movie"
-                                class="block text-xs text-slate-400 mb-1"
-                            >
-                                🎬 电影目录 FID:
-                            </label>
-
-
-                            <input
-                                type="text"
-                                id="fid-movie"
-                                value=""
-                                class="w-full bg-slate-900 border border-slate-800 rounded px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-blue-500"
-                            >
-
-                        </div>
-
-
-                        <div>
-
-                            <label
-                                for="fid-tv"
-                                class="block text-xs text-slate-400 mb-1"
-                            >
-                                📺 电视剧目录 FID:
-                            </label>
-
-
-                            <input
-                                type="text"
-                                id="fid-tv"
-                                value=""
-                                class="w-full bg-slate-900 border border-slate-800 rounded px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-blue-500"
-                            >
-
-                        </div>
-
-
-                        <div>
-
-                            <label
-                                for="fid-show"
-                                class="block text-xs text-slate-400 mb-1"
-                            >
-                                🎤 综艺目录 FID:
-                            </label>
-
-
-                            <input
-                                type="text"
-                                id="fid-show"
-                                value=""
-                                class="w-full bg-slate-900 border border-slate-800 rounded px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-blue-500"
-                            >
-
-                        </div>
-
-
-                        <div>
-
-                            <label
-                                for="fid-anime"
-                                class="block text-xs text-slate-400 mb-1"
-                            >
-                                🎨 动漫目录 FID:
-                            </label>
-
-
-                            <input
-                                type="text"
-                                id="fid-anime"
-                                value=""
-                                class="w-full bg-slate-900 border border-slate-800 rounded px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-blue-500"
-                            >
-
-                        </div>
-
-                    </div>
-
-                </div>
-
 
                 <!-- TG 检索频道 -->
+
+
 
                 <div class="space-y-3 pt-4 border-t border-slate-800">
 
