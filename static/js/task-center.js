@@ -318,6 +318,8 @@ async function searchTaskCandidates() {
             const resolutions = Object.keys(candidate.resolutions || {});
             const resolutionText = resolutions.length ? resolutions.join(' / ') : [...new Set(files.map(f => f.resolution).filter(Boolean))].join(' / ') || '未知';
             const totalSize = candidate.total_size_text || formatTaskSize(files.reduce((sum, f) => sum + Number(f.size || 0), 0));
+            const validFids = files.map(file => String(file.fid || '').trim()).filter(Boolean);
+            const selectedFids = new Set(validFids);
             row.className = 'rounded-2xl border border-slate-800 bg-slate-950/80 p-4 transition hover:border-slate-700';
             row.innerHTML =
                 '<div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div class="min-w-0">' +
@@ -327,20 +329,54 @@ async function searchTaskCandidates() {
                 '<span class="rounded-lg border border-slate-700 bg-slate-900 px-2 py-1 text-[10px] text-slate-400"><i class="fa-solid fa-hard-drive mr-1"></i>' + escapeTask(totalSize) + '</span>' +
                 '<span class="rounded-lg border border-blue-900/60 bg-blue-950/30 px-2 py-1 text-[10px] text-blue-300"><i class="fa-solid fa-display mr-1"></i>' + escapeTask(resolutionText) + '</span></div></div>' +
                 '<button data-candidate="' + index + '" class="candidate-select shrink-0 rounded-xl border border-purple-700 bg-purple-950/40 px-4 py-2.5 text-[11px] font-medium text-purple-200 hover:bg-purple-900/50">选择此源</button></div>' +
-                '<div class="mt-4 max-h-60 overflow-y-auto rounded-xl border border-slate-800 bg-slate-900/80 p-2 space-y-1">' +
-                files.map(file => '<div class="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-slate-800/70"><i class="fa-solid fa-circle-check text-emerald-500/70"></i><span class="min-w-0 flex-1 truncate text-xs text-slate-300">' + escapeTask(file.file_name) + '</span><span class="shrink-0 text-[10px] text-slate-500">' + escapeTask(file.resolution || '未知') + ' · ' + escapeTask(file.size_text || formatTaskSize(file.size)) + '</span></div>').join('') +
-                '</div>';
+                '<div class="mt-2 flex items-center justify-between rounded-xl border border-slate-800 bg-slate-900/60 px-3 py-2">' +
+                '<span class="text-[11px] text-slate-400">已选 <strong data-selected-count class="text-slate-200">' + validFids.length + '</strong> / ' + validFids.length + ' 集</span>' +
+                '<button type="button" data-toggle-files class="text-[11px] text-purple-300 hover:text-purple-200">' + (validFids.length ? '取消全选' : '全选') + '</button>' +
+                '</div>' +
+                '<div class="mt-2 max-h-60 overflow-y-auto rounded-xl border border-slate-800 bg-slate-900/80 p-2 space-y-1">' +
+                files.map((file, fileIndex) => {
+                    const fid = String(file.fid || '').trim();
+                    if (!fid) return '';
+                    return '<label class="flex cursor-pointer items-center gap-3 rounded-lg px-2 py-2 hover:bg-slate-800/70"><input type="checkbox" data-file-index="' + fileIndex + '" class="task-episode-checkbox h-4 w-4 rounded border-slate-600 bg-slate-950 text-purple-600 focus:ring-purple-500" checked><span class="min-w-0 flex-1 truncate text-xs text-slate-300">' + escapeTask(file.file_name) + '</span><span class="shrink-0 text-[10px] text-slate-500">' + escapeTask(file.resolution || '未知') + ' · ' + escapeTask(file.size_text || formatTaskSize(file.size)) + '</span></label>';
+                }).join('') +
+                '</div>' +
+                '<div class="mt-2 text-[10px] text-slate-500">默认选择当前已发现的全部集数；取消某些集只影响首次处理，后续新集仍会自动追更。</div>';
+            const updateSelectionUi = () => {
+                const checked = [...row.querySelectorAll('.task-episode-checkbox:checked')];
+                const selected = new Set(checked.map(input => {
+                    const file = files[Number(input.dataset.fileIndex)];
+                    return String(file?.fid || '').trim();
+                }).filter(Boolean));
+                row.querySelector('[data-selected-count]').textContent = selected.size;
+                row.querySelector('[data-toggle-files]').textContent = selected.size === validFids.length ? '取消全选' : '全选';
+                if (selectedCandidate?.row === row) {
+                    selectedCandidate.selectedFids = selected;
+                    const enabled = selected.size > 0;
+                    document.getElementById('task-submit').disabled = !enabled;
+                    document.getElementById('task-submit').classList.toggle('opacity-40', !enabled);
+                    document.getElementById('task-form-status').textContent = enabled
+                        ? '已选择 ' + selected.size + ' 集；后续频道新增集数仍会自动追更。'
+                        : '至少选择 1 集作为首次处理基线。';
+                }
+            };
+            row.querySelectorAll('.task-episode-checkbox').forEach(input => input.addEventListener('change', updateSelectionUi));
+            row.querySelector('[data-toggle-files]').onclick = () => {
+                const shouldSelectAll = row.querySelectorAll('.task-episode-checkbox:checked').length !== validFids.length;
+                row.querySelectorAll('.task-episode-checkbox').forEach(input => { input.checked = shouldSelectAll; });
+                updateSelectionUi();
+            };
             row.querySelector('.candidate-select').onclick = function() {
-                selectedCandidate = {candidate:candidate,row:row};
-                document.querySelectorAll('.candidate-select').forEach(b => { b.className='candidate-select rounded-xl border border-slate-700 bg-slate-900 px-4 py-2.5 text-[11px] text-slate-400'; b.textContent='选择此源'; });
-                this.className='candidate-select rounded-xl bg-emerald-600 px-4 py-2.5 text-[11px] font-medium text-white';
+                selectedCandidate = {candidate:candidate,row:row,selectedFids:new Set(selectedFids)};
+                document.querySelectorAll('.candidate-select').forEach(b => { b.className='candidate-select shrink-0 rounded-xl border border-slate-700 bg-slate-900 px-4 py-2.5 text-[11px] text-slate-400'; b.textContent='选择此源'; });
+                this.className='candidate-select shrink-0 rounded-xl bg-emerald-600 px-4 py-2.5 text-[11px] font-medium text-white';
                 this.textContent='已选择';
                 document.getElementById('task-submit').disabled=false;
                 document.getElementById('task-submit').classList.remove('opacity-40');
-                document.getElementById('task-form-status').textContent='已选择资源源，任务会自动监控这个频道分享后续新增文件。';
+                document.getElementById('task-form-status').textContent='已选择 ' + selectedFids.size + ' 集；后续频道新增集数仍会自动追更。';
             };
             box.appendChild(row);
         });
+
     } catch (err) {
         box.innerHTML = '<div class="rounded-xl border border-rose-900/50 bg-rose-950/20 p-5 text-xs text-rose-300">检索失败：' + escapeTask(err.message) + '</div>';
     }
@@ -349,8 +385,12 @@ async function searchTaskCandidates() {
 async function createTask() {
     if (!selectedCandidate) return taskToast('请先选择一个资源源');
     const title = document.getElementById('task-title').value.trim();
-    const files = (selectedCandidate.candidate.files || []).map(x => ({fid:x.fid})).filter(x => x.fid);
-    if (!files.length) return taskToast('当前资源源没有可监控文件');
+    const selectedFids = selectedCandidate.selectedFids || new Set();
+    const files = (selectedCandidate.candidate.files || [])
+        .filter(x => selectedFids.has(String(x.fid || '').trim()))
+        .map(x => ({fid:x.fid}))
+        .filter(x => x.fid);
+    if (!files.length) return taskToast('请至少选择 1 集作为首次处理基线');
     const payload = {
         title:title,
         channel:selectedCandidate.candidate.channel,
