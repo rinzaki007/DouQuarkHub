@@ -1,5 +1,7 @@
 """自动追剧任务管理器。
 
+用途：周期性检查资源源中的新内容，并通过选定的存储目标完成归档。
+
 用途：创建/删除/立即执行订阅任务，并在后台周期性检查夸克分享中的新集数或指定文件。
 维护说明：订阅会持久化到 data/subscriptions.json；每次执行都会重新获取分享 Token，并再次校验目标 FID。
 """
@@ -8,13 +10,12 @@ from __future__ import annotations
 import re
 import time
 import uuid
-from collections.abc import Callable
 from datetime import datetime
 from threading import Event, RLock, Thread
 
 from ..storage import JsonStore
 
-SUBSCRIPTION_SCHEMA_VERSION = 2
+SUBSCRIPTION_SCHEMA_VERSION = 3
 
 
 def _normalize_resource_id(value: object) -> str:
@@ -123,6 +124,7 @@ class SubscriptionManager:
                 changed = True
 
             item["schema_version"] = SUBSCRIPTION_SCHEMA_VERSION
+            item.setdefault("storage_target_id", "")
             item.setdefault("run_history", [])
             if not isinstance(item["run_history"], list):
                 item["run_history"] = []
