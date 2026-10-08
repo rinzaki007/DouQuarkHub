@@ -193,8 +193,10 @@ class ConfigStore:
             value or DEFAULT_OPENLIST_URL
         ).strip()
 
-        parsed = urlparse(url)
+        if not url:
+            return ""
 
+        parsed = urlparse(url)
         if parsed.scheme not in {"http", "https"} or not parsed.netloc:
             raise ConfigValidationError("OpenList 地址无效")
 
