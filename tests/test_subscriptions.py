@@ -97,6 +97,7 @@ def test_subscription_tracks_new_files_from_selected_source(tmp_path):
     manager = SubscriptionManager(
         tmp_path / "subscriptions.json",
         storage,
+        FakeResourceSources(),
         FakeLogger(),
     )
     sub = manager.add_subscription(
