@@ -160,6 +160,7 @@ class QuarkStorageCard(StorageTargetCard):
         description="夸克网盘存储与转存卡片",
         capabilities=(
             "storage.check",
+            "storage.resolve_resource",
             "storage.list_files",
             "storage.create_folder",
             "storage.transfer",
