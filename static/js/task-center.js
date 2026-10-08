@@ -472,6 +472,9 @@ async function createTask() {
 }
 
 async function runSubscription(id) {
+    if (!taskRefreshTimer) {
+        taskRefreshTimer = setInterval(() => loadTasks(), 2000);
+    }
     try {
         const resp = await apiFetchTask('/api/subscriptions/run-now', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({id})});
         const res = await resp.json();
