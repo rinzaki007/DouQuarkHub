@@ -49,55 +49,33 @@ function applyGlassmorphismStyles() {
 
 async function loadCategoryOptions() {
     try {
-        const resp = await apiFetch('/api/cards/quark/config');
-        const res = await resp.json();
-        if (res.success && res.config) {
-            const cfg = res.config;
-            const selects = document.querySelectorAll('.global-category-select');
-            
-            selects.forEach(selectEl => {
-                selectEl.innerHTML = '';
-
-                const defaultFid = cfg.default_fid || '0';
-                const optDefault = document.createElement('option');
-                optDefault.value = defaultFid;
-                optDefault.textContent = `默认目录 (FID: ${defaultFid})`;
-                selectEl.appendChild(optDefault);
-
-                const catFids = cfg.category_fids || {};
-                for (const [catName, fid] of Object.entries(catFids)) {
-                    if (fid) {
-                        const opt = document.createElement('option');
-                        opt.value = fid;
-                        opt.textContent = `${catName}目录 (FID: ${fid})`;
-                        selectEl.appendChild(opt);
-                    }
-                }
-
-                if (selectEl.id === 'batch-target-fid') {
-                    let matched = false;
-                    for (let opt of selectEl.options) {
-                        if (opt.textContent.includes(currentTag + '目录')) {
-                            opt.selected = true;
-                            matched = true;
-                            break;
-                        }
-                    }
-                    if (!matched && selectEl.options.length > 0) {
-                        selectEl.selectedIndex = 0;
-                    }
-                } else if (selectEl.id === 'chase-target-fid') {
-                    for (let opt of selectEl.options) {
-                        if (opt.textContent.includes('电视剧专属')) {
-                            opt.selected = true;
-                            break;
-                        }
-                    }
-                }
-            });
-        }
+        const targetResp = await apiFetch('/api/storage-targets');
+        const targetData = await targetResp.json();
+        if (!targetData.success) throw new Error(targetData.message || '读取存储目标失败');
+        const targetId = targetData.default_target_id || targetData.targets?.find(t => t.enabled !== false)?.id;
+        window.defaultStorageTargetId = targetId || '';
+        if (!targetId) return;
+        const destResp = await apiFetch('/api/storage-targets/' + encodeURIComponent(targetId) + '/destinations');
+        const destData = await destResp.json();
+        if (!destData.success) throw new Error(destData.message || '读取存储目录失败');
+        const options = Array.isArray(destData.destinations) ? destData.destinations : [];
+        document.querySelectorAll('.global-category-select').forEach(selectEl => {
+            selectEl.innerHTML = '';
+            for (const item of options) {
+                const opt = document.createElement('option');
+                opt.value = item.id;
+                opt.textContent = item.name || item.id;
+                opt.dataset.category = item.category || '';
+                selectEl.appendChild(opt);
+            }
+            const matched = options.find(item => item.category === currentTag)
+                || options.find(item => item.category === '电视剧' && selectEl.id === 'chase-target-fid')
+                || options.find(item => item.is_default)
+                || options[0];
+            if (matched) selectEl.value = matched.id;
+        });
     } catch (err) {
-        console.error("加载后台目录配置失败:", err);
+        console.error("加载存储目标目录失败:", err);
     }
 }
 
@@ -619,7 +597,7 @@ async function confirmTransferAndSave(movie, candidate, targetFid = '0') {
         const response = await apiFetch('/api/transfer-selected', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({movie, candidate, target_fid: targetFid})
+            body: JSON.stringify({movie, candidate: {...candidate, storage_target_id: window.defaultStorageTargetId || ''}, target_fid: targetFid, storage_target_id: window.defaultStorageTargetId || ''})
         });
         const res = await response.json();
         if (!res.success) {
