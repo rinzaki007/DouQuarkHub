@@ -195,11 +195,8 @@ def healthz():
 
 @pages.get("/openlist")
 def openlist():
-    return redirect(
-        _services()["config"]
-        .load()
-        .get("openlist_url")
-    )
+    url = str(_services()["config"].load().get("openlist_url") or "").strip()
+    return redirect(url or "/")
 
 
 @api.post("/setup")
@@ -513,6 +510,30 @@ def resource_sources_health():
     )
 
 
+@api.get("/storage-targets")
+def storage_targets():
+    manager = _services()["storage_targets"]
+    return jsonify({
+        "success": True,
+        "targets": manager.list_targets(),
+        "default_target_id": _services()["config"].get_default_storage_target_id(),
+    })
+
+
+@api.post("/storage-targets/default")
+@require_csrf
+def set_default_storage_target():
+    data = request.get_json(silent=True) or {}
+    target_id = str(data.get("target_id") or "").strip()
+    try:
+        saved = _services()["config"].set_default_storage_target_id(target_id)
+    except ValueError as exc:
+        return _json_error(str(exc))
+    if saved and not _services()["storage_targets"].get(saved):
+        return _json_error("指定的存储目标未加载或已停用")
+    return jsonify({"success": True, "default_target_id": saved})
+
+
 @api.get("/cards")
 def cards():
     """返回当前进程已加载的卡片 Manifest。动态安装暂未开放。"""
@@ -610,7 +631,7 @@ def check_quark_card():
 def login_backdrop():
     """登录页专用公开背景接口：只返回少量带海报的影视数据，不暴露任何登录后配置。"""
     try:
-        movies = _services()["douban"].get_movies("电影", "U")
+        movies = _services()["metadata"].list_movies("电影", "U")
         covers = [
             {
                 "title": item.get("title", ""),
@@ -721,20 +742,13 @@ def search_candidates():
     )
 
     config = _services()["config"]
-    quark_config = config.get_quark_config()
-    cookie = str(quark_config.get("cookie") or "").strip()
 
     if not movies:
         return _json_error(
             "未选择影片"
         )
 
-    if not cookie:
-        return _json_error(
-            "未配置夸克 Cookie"
-        )
-
-    if (
+        if (
         not isinstance(
             movies,
             list,
@@ -745,9 +759,7 @@ def search_candidates():
             "一次最多检索 10 部影片"
         )
 
-    service = _services()[
-        "search_factory"
-    ](cookie)
+    service = _services()["search"]
 
     candidates_map = {}
 
@@ -810,14 +822,11 @@ def transfer_selected():
         return _json_error("参数不完整")
 
     config_store = _services()["config"]
-    quark_config = config_store.get_quark_config()
-    cookie = str(quark_config.get("cookie") or "").strip()
-    if not cookie:
-        return _json_error("未配置夸克 Cookie")
-
     try:
         target_fid = _normalize_fid(
-            data.get("target_fid") or quark_config.get("default_fid", "0")
+            data.get("target_fid")
+            or config_store.get_default_storage_target_id()
+            or "0"
         )
     except ValueError as exc:
         return _json_error(str(exc))
@@ -834,14 +843,7 @@ def transfer_selected():
 
     def runner(progress):
         with app.app_context():
-            current_cookie = _services()["config"].get_cookie()
-            if not current_cookie:
-                return False, "未配置夸克 Cookie", {
-                    "success": 0,
-                    "skipped": 0,
-                    "failed": 1,
-                }
-            service = _services()["search_factory"](current_cookie)
+            service = _services()["search"]
             return service.transfer_selected_resource_with_progress(
                 movie,
                 candidate,
@@ -987,19 +989,12 @@ def retry_task(task_id):
             payload = old.get("retry_payload") or {}
             movie = payload.get("movie") or {}
             candidate = payload.get("candidate") or {}
-            current_cookie = _services()["config"].get_cookie()
-            if not current_cookie:
-                return False, "未配置夸克 Cookie", {
-                    "success": 0,
-                    "skipped": 0,
-                    "failed": 1,
-                }
-            service = _services()["search_factory"](current_cookie)
+            service = _services()["search"]
             return service.transfer_selected_resource_with_progress(
                 movie,
                 candidate,
                 payload.get("target_fid")
-                or _services()["config"].get_quark_config().get("default_fid", "0"),
+                or _services()["config"].get_default_storage_target_id() or "0",
                 _services()["config"].get_quark_config().get("category_fids", {}),
                 progress,
             )
