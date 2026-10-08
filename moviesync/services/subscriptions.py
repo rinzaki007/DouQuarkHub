@@ -72,6 +72,7 @@ class SubscriptionManager:
         self,
         subscriptions_file,
         storage_targets,
+        resource_sources,
         logger,
         max_interval_hours: int = 168,
     ):
@@ -81,6 +82,8 @@ class SubscriptionManager:
         )
 
         self.storage_targets = storage_targets
+        self.resource_sources = resource_sources
+        self.config_store = getattr(resource_sources, "config_store", None)
         self.logger = logger
         self.max_interval_hours = (
             max_interval_hours
@@ -132,6 +135,8 @@ class SubscriptionManager:
             item["schema_version"] = SUBSCRIPTION_SCHEMA_VERSION
             item.setdefault("storage_target_id", "")
             item.setdefault("cover", "")
+            item.setdefault("source_id", "")
+            item.setdefault("initial_file_keys", [])
             item.setdefault("tracking_mode", "legacy")
             tracked = item.get("tracked_file_keys")
             if not isinstance(tracked, list):
