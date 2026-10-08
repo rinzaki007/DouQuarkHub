@@ -1069,6 +1069,16 @@ def subscriptions():
 
         try:
             target_fid = _normalize_fid(data.get("target_fid") or "0")
+            cover = str(data.get("cover") or "").strip()[:1000]
+            if not cover:
+                try:
+                    title_for_cover = str(data.get("title") or "").strip()
+                    if title_for_cover:
+                        matches = _services()["metadata"].search(title_for_cover)
+                        if matches:
+                            cover = str(matches[0].get("cover") or "").strip()[:1000]
+                except Exception:
+                    _services()["logger"].debug("获取追剧任务海报失败", exc_info=True)
 
             sub = manager.add_subscription(
                 title=data.get(
@@ -1102,7 +1112,7 @@ def subscriptions():
                     "storage_target_id",
                     "",
                 ),
-                cover=data.get("cover", ""),
+                cover=cover,
 
             )
 
