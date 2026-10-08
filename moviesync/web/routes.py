@@ -513,6 +513,19 @@ def resource_sources_health():
     )
 
 
+@api.get("/cards")
+def cards():
+    """返回当前进程已加载的卡片 Manifest。动态安装暂未开放。"""
+    registry = _services()["card_registry"]
+    return jsonify(
+        {
+            "success": True,
+            "cards": registry.manifests(),
+            "dynamic_install_enabled": False,
+        }
+    )
+
+
 @api.get("/login-backdrop")
 def login_backdrop():
     """登录页专用公开背景接口：只返回少量带海报的影视数据，不暴露任何登录后配置。"""
