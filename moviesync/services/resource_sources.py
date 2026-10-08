@@ -50,8 +50,9 @@ class TelegramResourceSource(ResourceSource):
         capabilities=("resource.search", "resource.health_check"),
     )
 
-    def __init__(self, client: TelegramClient):
+    def __init__(self, client: TelegramClient, config_store=None):
         self.client = client
+        self.config_store = config_store
 
     def search(self, movie: object, config: dict) -> list[dict[str, Any]]:
         channels = config.get("channels") or []
