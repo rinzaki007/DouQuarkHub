@@ -152,10 +152,16 @@ class TelegramResourceSource(ResourceSource):
 class ResourceSourceManager:
     """管理已注册资源源，并提供统一搜索/健康检查入口。"""
 
-    def __init__(self, telegram: TelegramClient, config_store, logger):
+    def __init__(
+        self,
+        telegram: TelegramClient,
+        config_store,
+        logger,
+        registry: CardRegistry | None = None,
+    ):
         self.logger = logger
         self.config_store = config_store
-        self.registry = CardRegistry()
+        self.registry = registry or CardRegistry()
         self.registry.register(TelegramResourceSource(telegram))
         # 保留 sources 属性，兼容现有调用方；新代码优先通过 registry 发现卡片。
         self.sources: dict[str, ResourceSource] = {
