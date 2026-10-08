@@ -585,7 +585,7 @@ function confirmBatchTransferForCandidate(mIdx, cIdx) {
         return alert('请至少勾选一个要转存的文件！');
     }
 
-    const filteredFiles = candidate.files.filter(f => selectedFids.includes(f.fid));
+    const filteredFiles = candidate.files.filter(f => selectedFids.includes(String(f.fid)));
     const customCandidate = { ...candidate, files: filteredFiles };
     const targetFid = document.getElementById('batch-target-fid').value;
     confirmTransferAndSave(movie, customCandidate, targetFid);
