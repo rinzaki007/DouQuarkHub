@@ -427,11 +427,27 @@ class SubscriptionManager:
 
         selected = []
         found_keys = []
-        for item in files:
-            fid = str(item.get("fid") or "").strip()
-            if fid and fid not in tracked_keys:
-                selected.append({"fid": fid})
-                found_keys.append(fid)
+        if tracked_keys or sub.get("files") or sub.get("tracking_mode") == "all":
+            for item in files:
+                fid = str(item.get("fid") or "").strip()
+                if fid and fid not in tracked_keys:
+                    selected.append({"fid": fid})
+                    found_keys.append(fid)
+        else:
+            # 兼容旧订阅：没有初始文件基线时继续按集数判断，避免历史任务行为改变。
+            saved = {
+                item for item in (sub.get("saved_episodes", []) or [])
+                if isinstance(item, (str, int))
+            }
+            start_ep = int(sub.get("start_ep", 0) or 0)
+            for item in files:
+                ep_num, _ = _clean_tv_filename(
+                    str(item.get("file_name", "")),
+                    str(sub.get("title", "")),
+                )
+                if ep_num is not None and ep_num > start_ep and ep_num not in saved:
+                    selected.append({"fid": item.get("fid")})
+                    found_keys.append(ep_num)
 
         if not selected:
             return self._finish(
