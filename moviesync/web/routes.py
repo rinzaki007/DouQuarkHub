@@ -1021,7 +1021,7 @@ def subscriptions():
                 )
                 or _services()[
                     "config"
-                ].load().get(
+                ].get_quark_config().get(
                     "default_fid",
                     "0",
                 )
