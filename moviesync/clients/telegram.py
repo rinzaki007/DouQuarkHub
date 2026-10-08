@@ -151,6 +151,7 @@ class TelegramClient:
                         results.append(
                             {
                                 "channel": channel_name,
+                                "channel_id": channel_id,
                                 "pwd_id": pwd_id,
                             }
                         )
