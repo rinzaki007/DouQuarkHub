@@ -526,6 +526,53 @@ def cards():
     )
 
 
+@api.get("/cards/quark/config")
+def get_quark_card_config():
+    card = _services()["card_registry"].get("quark")
+    if not card:
+        return _json_error("Quark 卡片未加载", 404)
+    config = _services()["config"].get_quark_config()
+    saved = _services()["config"].load()["cards"]["quark"]
+    return jsonify({
+        "success": True,
+        "enabled": bool(saved.get("enabled", True)),
+        "config": {
+            "default_fid": config.get("default_fid", "0"),
+            "category_fids": config.get("category_fids", {}),
+            "has_cookie": bool(config.get("cookie")),
+        },
+    })
+
+
+@api.post("/cards/quark/config")
+@require_csrf
+def save_quark_card_config():
+    data = request.get_json(silent=True) or {}
+    try:
+        saved = _services()["config"].save_quark_config(data)
+    except ValueError as exc:
+        return _json_error(str(exc))
+    return jsonify({
+        "success": True,
+        "enabled": bool(saved.get("enabled", True)),
+        "config": {
+            "default_fid": saved["config"].get("default_fid", "0"),
+            "category_fids": saved["config"].get("category_fids", {}),
+            "has_cookie": bool(saved["config"].get("cookie")),
+        },
+        "message": "Quark 卡片配置已保存",
+    })
+
+
+@api.post("/cards/quark/check")
+@require_csrf
+def check_quark_card():
+    card = _services()["card_registry"].get("quark")
+    if not card:
+        return _json_error("Quark 卡片未加载", 404)
+    result = card.check({})
+    return jsonify({"success": True, **result})
+
 @api.get("/login-backdrop")
 def login_backdrop():
     """登录页专用公开背景接口：只返回少量带海报的影视数据，不暴露任何登录后配置。"""
@@ -641,7 +688,8 @@ def search_candidates():
     )
 
     config = _services()["config"]
-    cookie = config.get_cookie()
+    quark_config = config.get_quark_config()
+    cookie = str(quark_config.get("cookie") or "").strip()
 
     if not movies:
         return _json_error(
@@ -765,7 +813,7 @@ def transfer_selected():
                 movie,
                 candidate,
                 target_fid,
-                current_config.get("category_fids", {}),
+                _services()["config"].get_quark_config().get("category_fids", {}),
                 progress,
             )
 
@@ -919,7 +967,7 @@ def retry_task(task_id):
                 movie,
                 candidate,
                 payload.get("target_fid")
-                or current_config.get("default_fid", "0"),
+                or _services()["config"].get_quark_config().get("default_fid", "0"),
                 current_config.get("category_fids", {}),
                 progress,
             )
