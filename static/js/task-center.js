@@ -144,7 +144,7 @@ function renderTasks() {
             '<span class="rounded-full border px-2 py-0.5 text-[10px] ' + state.cls + '">' + state.label + '</span>' +
             '<span class="rounded-full border border-slate-700 bg-slate-950 px-2 py-0.5 text-[10px] text-slate-400">' + escapeTask(task.kind || '任务') + '</span>' +
             '</div>' +
-            '<div class="mt-3 flex items-center gap-3"><div class="h-2 flex-1 overflow-hidden rounded-full bg-slate-800"><div class="h-full rounded-full bg-purple-500 transition-all" style="width:' + progress + '%"></div></div><span class="w-10 text-right text-[10px] text-slate-400">' + progress + '%</span></div>' +
+            renderTaskProgressBar(task) +
             '<div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-500">' +
             '<span class="text-slate-300">' + phase + '</span>' +
             '<span>成功 ' + Number(task.success_count || 0) + '</span><span>跳过 ' + Number(task.skipped_count || 0) + '</span><span>失败 ' + Number(task.failed_count || 0) + '</span>' +
@@ -182,6 +182,32 @@ function closeTaskDetail() {
     document.getElementById('task-detail-drawer')?.classList.add('hidden');
 }
 
+function renderTaskProgressBar(task) {
+    const phases = [
+        ['validate', '校验'],
+        ['list_files', '获取文件'],
+        ['create_folder', '准备目录'],
+        ['transfer', '转存'],
+        ['completed', '完成']
+    ];
+    const current = task.status === 'success' ? 4 : phases.findIndex(p => p[0] === task.phase);
+    const failed = task.status === 'failed' || task.status === 'error';
+    return '<div class="mt-3 rounded-xl border border-slate-800 bg-slate-950/60 px-3 py-2.5">' +
+        '<div class="flex items-center gap-1.5">' +
+        phases.map((phase, index) => {
+            const done = current >= 0 && index < current;
+            const active = !failed && task.status === 'running' && index === current;
+            const isFailed = failed && index === Math.max(0, current);
+            const cls = isFailed ? 'bg-rose-500' : done ? 'bg-emerald-500' : active ? 'bg-purple-500 animate-pulse' : 'bg-slate-800';
+            return '<div class="h-1.5 flex-1 rounded-full ' + cls + '" title="' + phase[1] + '"></div>';
+        }).join('') +
+        '</div>' +
+        '<div class="mt-2 flex items-center justify-between gap-2 text-[10px]">' +
+        '<span class="text-slate-400">' + escapeTask(task.phase_label || task.message || '等待执行') + '</span>' +
+        '<span class="shrink-0 text-slate-600">' + (task.status === 'success' ? '已完成' : failed ? '执行失败' : task.status === 'running' ? '处理中' : '等待执行') + '</span>' +
+        '</div></div>';
+}
+
 function renderTaskDetail(task) {
     const title = document.getElementById('detail-title');
     const body = document.getElementById('detail-body');
@@ -200,8 +226,9 @@ function renderTaskDetail(task) {
         '<div class="flex gap-4 rounded-2xl border border-slate-700/60 bg-slate-950/55 p-4 backdrop-blur-xl">' +
         (task.cover ? '<img src="/api/proxy-img?url=' + encodeURIComponent(task.cover) + '" class="h-32 w-24 shrink-0 rounded-xl object-cover bg-slate-900" onerror="this.style.display=\'none\'">' : '') +
         '<div class="min-w-0 flex-1"><div class="flex flex-wrap items-center gap-2"><span class="rounded-full border px-2 py-0.5 text-[10px] ' + state.cls + '">' + state.label + '</span><span class="text-[11px] text-slate-500">' + escapeTask(task.kind || '任务') + '</span></div>' +
-        '<div class="mt-3 text-2xl font-semibold text-white">' + progress + '%</div><div class="mt-2 h-2 overflow-hidden rounded-full bg-slate-800"><div class="h-full rounded-full bg-purple-500" style="width:' + progress + '%"></div></div>' +
-        '<div class="mt-2 text-[11px] text-slate-400">' + escapeTask(task.phase_label || task.message || '') + '</div></div></div>' +
+        '<div class="mt-3 text-lg font-semibold text-white">' + escapeTask(task.phase_label || task.message || '等待执行') + '</div>' +
+        renderTaskProgressBar(task) +
+        '<div class="mt-2 text-[11px] text-slate-400">' + escapeTask(task.message || '') + '</div></div></div>'
         '<div class="rounded-2xl border border-slate-800 bg-slate-950 p-4"><div class="text-xs font-semibold text-slate-200">执行阶段</div><div class="mt-4 space-y-3">' +
         phases.map((p,i) => {
             const done = task.status === 'success' || (phaseIndex >= 0 && i < phaseIndex);
