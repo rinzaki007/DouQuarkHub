@@ -106,8 +106,8 @@ function formatNextRun(ts) {
 
 function renderStats() {
     const smartTasks = tasks.filter(t => t.type === 'subscription');
-    const total = smartTasks.length;
-    const error = smartTasks.filter(t => ['error','failed'].includes(t.status) || !!t.last_error).length;
+    const total = tasks.length;
+    const error = tasks.filter(t => ['error','failed'].includes(t.status) || !!t.last_error).length;
     const waiting = tasks.filter(t => ['waiting','queued'].includes(t.status)).length;
     const soon = tasks.filter(t => ['soon','pending','running'].includes(taskState(t).key) || ['running','pending'].includes(t.status)).length;
     document.getElementById('stat-total').textContent = total;
@@ -126,65 +126,79 @@ function setFilter(filter) {
 }
 
 function renderTasks() {
-    const list = document.getElementById('task-list');
+    const lists = {
+        transfer: document.getElementById('task-list'),
+        subscription: document.getElementById('smart-task-list')
+    };
+    Object.values(lists).forEach(list => {
+        if (list) list.innerHTML = '';
+    });
+
     let visible = tasks.slice();
-    if (taskFilter === 'error') visible = visible.filter(t => ['error','failed'].includes(t.status) || !!t.last_error);
-    if (taskFilter === 'waiting') visible = visible.filter(t => ['waiting','queued'].includes(t.status));
-    if (taskFilter === 'running') visible = visible.filter(t => ['running','pending'].includes(taskState(t).key) || t.status === 'running');
-    if (!visible.length) {
-        list.innerHTML = '<div class="p-12 text-center text-xs text-slate-500">暂无符合条件的任务。</div>';
-        return;
+    if (taskFilter === 'error') {
+        visible = visible.filter(t => ['error','failed'].includes(t.status) || !!t.last_error);
     }
-    list.innerHTML = '';
+    if (taskFilter === 'waiting') {
+        visible = visible.filter(t => ['waiting','queued'].includes(t.status));
+    }
+    if (taskFilter === 'running') {
+        visible = visible.filter(
+            t => ['running','pending'].includes(taskState(t).key) || t.status === 'running'
+        );
+    }
+
     const groups = [
-        {type: 'subscription', title: '智能追剧', desc: '频道持续监控与自动追更'},
-        {type: 'transfer', title: '普通转存', desc: '手动选择资源后的转存任务'}
+        {type: 'transfer', empty: '暂无普通转存任务。'},
+        {type: 'subscription', empty: '暂无智能追剧任务。'}
     ];
+
     groups.forEach(group => {
+        const list = lists[group.type];
+        if (!list) return;
         const groupTasks = visible.filter(task => task.type === group.type);
-        if (!groupTasks.length) return;
-        const header = document.createElement('div');
-        header.className = 'px-3 pt-5 pb-2';
-        header.innerHTML = '<div class="flex items-center gap-2"><h2 class="text-sm font-semibold text-slate-200">' + group.title + '</h2><span class="text-[10px] text-slate-600">' + group.desc + '</span></div>';
-        list.appendChild(header);
+        if (!groupTasks.length) {
+            list.innerHTML = '<div class="p-10 text-center text-xs text-slate-500">' + group.empty + '</div>';
+            return;
+        }
+
         groupTasks.forEach(task => {
-        const state = taskState(task);
-        const progress = Math.max(0, Math.min(100, Number(task.progress || 0)));
-        const retryable = task.type === 'transfer' && task.status === 'failed';
-        const card = document.createElement('article');
-        card.className = 'glass-panel m-2 rounded-2xl p-4 transition hover:border-slate-600';
-        const phase = escapeTask(task.phase_label || task.message || '等待执行');
-        const cover = task.cover ? '/api/proxy-img?url=' + encodeURIComponent(task.cover) : '';
-        card.innerHTML =
-            '<div class="flex gap-3">' +
-            (cover ? '<img src="' + cover + '" class="h-20 w-14 shrink-0 rounded-lg object-cover bg-slate-950" onerror="this.style.display=\'none\'">' : '') +
-            '<div class="min-w-0 flex-1">' +
-            '<div class="flex flex-wrap items-center gap-2">' +
-            '<h3 class="truncate text-sm font-semibold text-slate-100">' + escapeTask(task.title) + '</h3>' +
-            '<span class="rounded-full border px-2 py-0.5 text-[10px] ' + state.cls + '">' + state.label + '</span>' +
-            '<span class="rounded-full border border-slate-700 bg-slate-950 px-2 py-0.5 text-[10px] text-slate-400">' + escapeTask(task.kind || '任务') + '</span>' +
-            '</div>' +
-            renderTaskProgressBar(task) +
-            '<div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-500">' +
-            '<span class="text-slate-300">' + phase + '</span>' +
-            '<span>成功 ' + Number(task.success_count || 0) + '</span><span>跳过 ' + Number(task.skipped_count || 0) + '</span><span>失败 ' + Number(task.failed_count || 0) + '</span>' +
-            (task.total ? '<span>文件 ' + Number(task.total) + '</span>' : '') +
-            '</div>' +
-            '<div class="mt-2 text-[11px] ' + ((task.status === 'failed' || task.last_error) ? 'text-rose-400' : 'text-slate-500') + '">' + escapeTask(task.message || task.last_error || '') + '</div>' +
-            '</div>' +
-            '<div class="flex shrink-0 flex-wrap content-start justify-end gap-2">' +
-            '<button data-action="detail" data-id="' + escapeTask(task.id) + '" class="rounded-xl border border-slate-700/70 bg-slate-950/55 px-3 py-2 text-[11px] text-slate-300 hover:bg-slate-800/80"><i class="fa-solid fa-circle-info mr-1"></i>详情</button>' +
-            (task.type === 'subscription' ? '<button data-action="run-sub" data-id="' + escapeTask(task.subscription_id) + '" class="rounded-xl bg-purple-600/90 px-3 py-2 text-[11px] font-medium text-white shadow-lg shadow-purple-600/15 hover:bg-purple-500"><i class="fa-solid fa-play mr-1"></i>立即检查</button>' : '') +
-            ((task.type === 'subscription' || task.status === 'success' || task.status === 'failed' || task.status === 'error') ? '<button data-action="delete" data-id="' + escapeTask(task.id) + '" class="rounded-xl border border-slate-700/70 bg-slate-950/55 px-3 py-2 text-[11px] text-slate-400 hover:bg-slate-800 hover:text-rose-300"><i class="fa-solid fa-trash mr-1"></i>删除</button>' : '') +
-            (retryable ? '<button data-action="retry" data-id="' + escapeTask(task.id) + '" class="rounded-xl border border-amber-800/70 bg-amber-950/35 px-3 py-2 text-[11px] text-amber-300 hover:bg-amber-900/60"><i class="fa-solid fa-rotate-right mr-1"></i>失败重试</button>' : '') +
-            '</div></div>';
+            const state = taskState(task);
+            const retryable = task.type === 'transfer' && task.status === 'failed';
+            const card = document.createElement('article');
+            card.className = 'm-2 rounded-2xl border border-slate-800/80 bg-slate-950/30 p-4 transition hover:border-slate-600';
+            const phase = escapeTask(task.phase_label || task.message || '等待执行');
+            const cover = task.cover ? '/api/proxy-img?url=' + encodeURIComponent(task.cover) : '';
+            card.innerHTML =
+                '<div class="flex gap-3">' +
+                (cover ? '<img src="' + cover + '" class="h-20 w-14 shrink-0 rounded-lg object-cover bg-slate-950" onerror="this.style.display=\'none\'">' : '') +
+                '<div class="min-w-0 flex-1">' +
+                '<div class="flex flex-wrap items-center gap-2">' +
+                '<h3 class="truncate text-sm font-semibold text-slate-100">' + escapeTask(task.title) + '</h3>' +
+                '<span class="rounded-full border px-2 py-0.5 text-[10px] ' + state.cls + '">' + state.label + '</span>' +
+                '<span class="rounded-full border border-slate-700 bg-slate-950 px-2 py-0.5 text-[10px] text-slate-400">' + escapeTask(task.kind || '任务') + '</span>' +
+                '</div>' +
+                renderTaskProgressBar(task) +
+                '<div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-500">' +
+                '<span class="text-slate-300">' + phase + '</span>' +
+                '<span>成功 ' + Number(task.success_count || 0) + '</span><span>跳过 ' + Number(task.skipped_count || 0) + '</span><span>失败 ' + Number(task.failed_count || 0) + '</span>' +
+                (task.total ? '<span>文件 ' + Number(task.total) + '</span>' : '') +
+                '</div>' +
+                '<div class="mt-2 text-[11px] ' + ((task.status === 'failed' || task.last_error) ? 'text-rose-400' : 'text-slate-500') + '">' + escapeTask(task.message || task.last_error || '') + '</div>' +
+                '</div>' +
+                '<div class="flex shrink-0 flex-wrap content-start justify-end gap-2">' +
+                '<button data-action="detail" data-id="' + escapeTask(task.id) + '" class="rounded-xl border border-slate-700/70 bg-slate-950/55 px-3 py-2 text-[11px] text-slate-300 hover:bg-slate-800/80"><i class="fa-solid fa-circle-info mr-1"></i>详情</button>' +
+                (task.type === 'subscription' ? '<button data-action="run-sub" data-id="' + escapeTask(task.subscription_id) + '" class="rounded-xl bg-purple-600/90 px-3 py-2 text-[11px] font-medium text-white shadow-lg shadow-purple-600/15 hover:bg-purple-500"><i class="fa-solid fa-play mr-1"></i>立即检查</button>' : '') +
+                ((task.type === 'subscription' || task.status === 'success' || task.status === 'failed' || task.status === 'error') ? '<button data-action="delete" data-id="' + escapeTask(task.id) + '" class="rounded-xl border border-slate-700/70 bg-slate-950/55 px-3 py-2 text-[11px] text-slate-400 hover:bg-slate-800 hover:text-rose-300"><i class="fa-solid fa-trash mr-1"></i>删除</button>' : '') +
+                (retryable ? '<button data-action="retry" data-id="' + escapeTask(task.id) + '" class="rounded-xl border border-amber-800/70 bg-amber-950/35 px-3 py-2 text-[11px] text-amber-300 hover:bg-amber-900/60"><i class="fa-solid fa-rotate-right mr-1"></i>失败重试</button>' : '') +
+                '</div></div>';
             list.appendChild(card);
         });
     });
-    list.querySelectorAll('[data-action="detail"]').forEach(btn => btn.onclick = () => openTaskDetail(btn.dataset.id));
-    list.querySelectorAll('[data-action="run-sub"]').forEach(btn => btn.onclick = () => runSubscription(btn.dataset.id));
-    list.querySelectorAll('[data-action="retry"]').forEach(btn => btn.onclick = () => retryTask(btn.dataset.id));
-    list.querySelectorAll('[data-action="delete"]').forEach(btn => btn.onclick = () => deleteTask(btn.dataset.id));
+
+    document.querySelectorAll('[data-action="detail"]').forEach(btn => btn.onclick = () => openTaskDetail(btn.dataset.id));
+    document.querySelectorAll('[data-action="run-sub"]').forEach(btn => btn.onclick = () => runSubscription(btn.dataset.id));
+    document.querySelectorAll('[data-action="retry"]').forEach(btn => btn.onclick = () => retryTask(btn.dataset.id));
+    document.querySelectorAll('[data-action="delete"]').forEach(btn => btn.onclick = () => deleteTask(btn.dataset.id));
 }
 
 async function openTaskDetail(id) {
@@ -218,7 +232,7 @@ function renderTaskProgressBar(task) {
             ['transfer', '转存'],
             ['completed', '完成']
         ];
-    const current = task.status === 'success' ? 4 : phases.findIndex(p => p[0] === task.phase);
+    const current = task.status === 'success' ? phases.length : phases.findIndex(p => p[0] === task.phase);
     const failed = task.status === 'failed' || task.status === 'error';
     return '<div class="mt-3 rounded-xl border border-slate-800 bg-slate-950/60 px-3 py-2.5">' +
         '<div class="flex items-center gap-1.5">' +
