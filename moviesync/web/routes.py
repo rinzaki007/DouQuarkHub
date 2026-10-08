@@ -64,6 +64,33 @@ def _normalize_fid(
     return fid
 
 
+def _subscription_task_state(sub: dict) -> dict:
+    status = str(sub.get("status") or "").strip()
+    if not status:
+        status = "error" if sub.get("last_error") else (
+            "pending" if sub.get("pending_save_keys") else "waiting"
+        )
+
+    phase = str(sub.get("phase") or "").strip()
+    if not phase:
+        phase = "pending" if sub.get("pending_save_keys") else "waiting"
+
+    phase_label = str(sub.get("phase_label") or "").strip()
+    if not phase_label:
+        phase_label = (
+            "等待存储目标确认"
+            if sub.get("pending_save_keys")
+            else "等待下次检查"
+        )
+
+    return {
+        "status": status,
+        "phase": phase,
+        "phase_label": phase_label,
+        "progress": 100 if status == "success" else 0,
+    }
+
+
 def require_csrf(view):
     @wraps(view)
     def wrapped(*args, **kwargs):
@@ -899,15 +926,14 @@ def get_tasks():
 
     for sub in subscriptions:
         history = sub.get("run_history", []) or []
+        task_state = _subscription_task_state(sub)
         items.append({
             "id": "subscription:" + str(sub.get("id")),
             "type": "subscription",
             "kind": "智能追剧",
             "title": sub.get("title", "未命名任务"),
-            "status": "error" if sub.get("last_error") else (
-                "pending" if sub.get("pending_save_keys") else "waiting"
-            ),
-            "progress": 100,
+            "status": task_state["status"],
+            "progress": task_state["progress"],
             "total": len(sub.get("tracked_file_keys", []) or []),
             "success_count": len(sub.get("saved_episodes", []) or []),
             "skipped_count": 0,
@@ -922,8 +948,8 @@ def get_tasks():
             "subscription_id": sub.get("id"),
             "retry_count": sub.get("retry_count", 0),
             "pending_save_keys": sub.get("pending_save_keys", []) or [],
-            "phase": "pending" if sub.get("pending_save_keys") else "waiting",
-            "phase_label": "等待存储目标确认" if sub.get("pending_save_keys") else "等待下次检查",
+            "phase": task_state["phase"],
+            "phase_label": task_state["phase_label"],
         })
 
     items.sort(key=lambda item: float(item.get("updated_at") or item.get("created_at") or 0), reverse=True)
@@ -965,15 +991,16 @@ def get_task_detail(task_id):
         )
         if not sub:
             return _json_error("未找到任务", 404)
+        task_state = _subscription_task_state(sub)
         task = {
             "id": "subscription:" + sub_id,
             "type": "subscription",
             "kind": "智能追剧",
             "title": sub.get("title", "未命名任务"),
-            "status": "failed" if sub.get("last_error") else ("pending" if sub.get("pending_save_keys") else "waiting"),
-            "phase": "pending" if sub.get("pending_save_keys") else "waiting",
-            "phase_label": "等待存储目标确认" if sub.get("pending_save_keys") else "等待下次检查",
-            "progress": 100,
+            "status": task_state["status"],
+            "phase": task_state["phase"],
+            "phase_label": task_state["phase_label"],
+            "progress": task_state["progress"],
             "total": len(sub.get("tracked_file_keys", []) or []),
             "success_count": len(sub.get("saved_episodes", []) or []),
             "skipped_count": 0,
