@@ -10,6 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 from threading import RLock
 from typing import Any
 
+from ..cards import Card, CardManifest, CardRegistry
 from ..clients.telegram import TelegramClient
 
 
