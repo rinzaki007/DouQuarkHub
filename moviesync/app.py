@@ -93,6 +93,7 @@ def create_app(
         "douban": douban,
         "telegram": telegram,
         "resource_sources": resource_sources,
+        "card_registry": resource_sources.registry,
         "http": http,
         "subscriptions": subscriptions,
         "tasks": tasks,
