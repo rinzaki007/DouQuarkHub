@@ -14,12 +14,21 @@ from ..cards import CardManifest, CardRegistry, ResourceSourceCard
 from ..clients.telegram import TelegramClient
 
 
-class ResourceSource:
-    """资源发现源的统一接口。"""
+class ResourceSource(ResourceSourceCard):
+    """资源发现卡片的兼容基类。
+
+    旧代码仍可继续通过 ResourceSource 使用，新的实现统一遵循 Card 接口。
+    """
 
     source_id = "unknown"
     name = "未命名资源源"
     source_type = "custom"
+    manifest = CardManifest(
+        id="unknown.resource",
+        name="未命名资源源",
+        type="resource_source",
+        capabilities=("resource.search", "resource.health_check"),
+    )
 
     def search(self, movie: object, config: dict) -> list[dict[str, Any]]:
         raise NotImplementedError
@@ -138,10 +147,19 @@ class ResourceSourceManager:
     def __init__(self, telegram: TelegramClient, config_store, logger):
         self.logger = logger
         self.config_store = config_store
+        self.registry = CardRegistry()
+        self.registry.register(TelegramResourceSource(telegram))
+        # 保留 sources 属性，兼容现有调用方；新代码优先通过 registry 发现卡片。
         self.sources: dict[str, ResourceSource] = {
-            "telegram": TelegramResourceSource(telegram),
+            card.card_id: card
+            for card in self.registry.list()
+            if isinstance(card, ResourceSource)
         }
         self.lock = RLock()
+
+    def get_cards(self) -> list[dict[str, Any]]:
+        """返回已加载资源卡片的 Manifest。"""
+        return self.registry.manifests()
 
     def _enabled_sources(self, config: dict) -> list[ResourceSource]:
         definitions = {
