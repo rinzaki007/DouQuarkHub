@@ -18,7 +18,7 @@ DEFAULT_CATEGORY_FIDS = {
     "综艺": "6999ba53a9384525881f785976bd09f1",
     "动漫": "55a44b99fac641679e1ebf55dcb38be9",
 }
-DEFAULT_OPENLIST_URL = "https://openlist.88888807.xyz:8807/"
+DEFAULT_OPENLIST_URL = ""
 
 
 @dataclass(frozen=True)
