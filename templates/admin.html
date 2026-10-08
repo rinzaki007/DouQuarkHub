@@ -1023,7 +1023,7 @@
             document.getElementById("card-info-title").textContent = card.name || card.id;
             document.getElementById("card-info-subtitle").textContent = (card.id || "") + " · v" + (card.version || "1.0.0") + " · " + (CARD_TYPE_LABELS[card.type] || card.type || "未知类型");
             const health = card.health || {};
-            const healthMap = {healthy:["正常","text-emerald-300"],unconfigured:["未配置","text-amber-300"],idle:["未配置","text-slate-400"],unavailable:["不可用","text-rose-300"],degraded:["部分可用","text-amber-300"]};
+            const healthMap = {healthy:["正常","text-emerald-300"],configured:["已配置","text-blue-300"],unconfigured:["未配置","text-amber-300"],idle:["未配置","text-slate-400"],unavailable:["不可用","text-rose-300"],degraded:["部分可用","text-amber-300"]};
             const meta = healthMap[health.status] || ["未知","text-slate-400"];
             document.getElementById("card-info-health").innerHTML = '<div class="glass-panel rounded-xl p-3 border border-slate-800"><div class="flex justify-between text-xs"><span class="text-slate-400">状态</span><span class="' + meta[1] + '">' + meta[0] + '</span></div><div class="mt-2 text-[10px] text-slate-500">' + escapeHtml(health.message || "暂无状态") + '</div></div>';
             document.getElementById("card-info-capabilities").innerHTML = (card.capabilities || []).map(cap => '<span class="resource-chip">' + escapeHtml(cap) + '</span>').join("");
