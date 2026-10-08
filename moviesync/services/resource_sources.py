@@ -87,6 +87,10 @@ class TelegramResourceSource(ResourceSource):
                     continue
         return results
 
+    def search_channel(self, channel: object, title: str, config: dict) -> list[dict[str, Any]]:
+        return self.client.search_channel(channel, title)
+
+
     def check(self, config: dict) -> dict[str, Any]:
         channels = config.get("channels") or []
         if not channels:
@@ -206,6 +210,26 @@ class ResourceSourceManager:
                     exc,
                 )
         return results
+
+    def search_channel(self, source_id: str, channel: object, title: str) -> list[dict[str, Any]]:
+        config = self.config_store.load()
+        source = self.sources.get(str(source_id))
+        if not source:
+            return []
+        cards = config.get("cards") if isinstance(config, dict) else {}
+        card = cards.get(source.card_id) if isinstance(cards, dict) else {}
+        if isinstance(card, dict) and not card.get("enabled", True):
+            return []
+        try:
+            return source.search_channel(
+                channel,
+                str(title or "").strip(),
+                self._card_config(config, source.card_id),
+            )
+        except Exception as exc:
+            self.logger.exception("资源源 %s 频道检索异常: %s", source.card_id, exc)
+            return []
+
 
     def check_all(self) -> list[dict[str, Any]]:
         config = self.config_store.load()

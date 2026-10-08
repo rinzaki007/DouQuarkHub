@@ -16,6 +16,7 @@ from threading import Event, RLock, Thread
 from ..storage import JsonStore
 
 SUBSCRIPTION_SCHEMA_VERSION = 4
+VIDEO_EXTENSIONS = (".mp4", ".mkv", ".avi", ".mov", ".flv", ".wmv", ".m4v", ".ts", ".m2ts", ".iso")
 
 
 def _normalize_resource_id(value: object) -> str:
@@ -72,15 +73,22 @@ class SubscriptionManager:
         self,
         subscriptions_file,
         storage_targets,
-        logger,
+        resource_sources=None,
+        logger=None,
         max_interval_hours: int = 168,
     ):
+        # 兼容旧调用方式：SubscriptionManager(file, storage_target, logger)
+        if logger is None:
+            logger = resource_sources
+            resource_sources = None
         self.store = JsonStore(
             subscriptions_file,
             lambda: [],
         )
 
         self.storage_targets = storage_targets
+        self.resource_sources = resource_sources
+        self.config_store = getattr(resource_sources, "config_store", None)
         self.logger = logger
         self.max_interval_hours = (
             max_interval_hours
@@ -132,6 +140,8 @@ class SubscriptionManager:
             item["schema_version"] = SUBSCRIPTION_SCHEMA_VERSION
             item.setdefault("storage_target_id", "")
             item.setdefault("cover", "")
+            item.setdefault("source_id", "")
+            item.setdefault("initial_file_keys", [])
             item.setdefault("tracking_mode", "legacy")
             tracked = item.get("tracked_file_keys")
             if not isinstance(tracked, list):
@@ -181,6 +191,7 @@ class SubscriptionManager:
         files=None,
         storage_target_id: str = "",
         cover: str = "",
+        source_id: str = "",
     ) -> dict:
         title = str(
             title or ""
@@ -256,9 +267,11 @@ class SubscriptionManager:
             "channel": str(
                 channel or ""
             ).strip()[:100],
+            "source_id": str(source_id or "").strip()[:100],
             "cover": str(cover or "").strip()[:1000],
-            "tracking_mode": "all" if target_fids else "legacy",
-            "tracked_file_keys": target_fids,
+            "tracking_mode": "channel" if source_id and channel else ("all" if target_fids else "legacy"),
+            "tracked_file_keys": [f"{pwd_id}:{fid}" for fid in target_fids] if source_id and channel else target_fids,
+            "initial_file_keys": target_fids,
             "files": [],
             "saved_episodes": [],
             "last_check": "从未检测",
@@ -394,6 +407,9 @@ class SubscriptionManager:
         self,
         sub: dict,
     ) -> tuple[bool, str]:
+        if sub.get("tracking_mode") == "channel" and sub.get("source_id") and sub.get("channel"):
+            return self._check_channel_subscription(sub)
+
         resource = {
             "pwd_id": str(sub.get("pwd_id") or "").strip(),
             "storage_target_id": str(sub.get("storage_target_id") or "").strip(),
@@ -415,16 +431,6 @@ class SubscriptionManager:
             for key in (sub.get("tracked_file_keys", []) or [])
             if str(key).strip()
         }
-
-        # 追剧任务选择的是一个持续更新的分享源。创建任务时已有文件作为基线，
-        # 后续检查只处理该分享源新增的文件，不再依赖创建时勾选的文件列表。
-        if not tracked_keys and sub.get("files"):
-            tracked_keys = {
-                str(item.get("fid")).strip()
-                for item in (sub.get("files") or [])
-                if isinstance(item, dict) and item.get("fid")
-            }
-
         selected = []
         found_keys = []
         if sub.get("tracking_mode") == "all":
@@ -434,7 +440,6 @@ class SubscriptionManager:
                     selected.append({"fid": fid})
                     found_keys.append(fid)
         elif sub.get("files"):
-            # 兼容旧订阅：继续只监控创建时指定的文件。
             saved = {
                 item for item in (sub.get("saved_episodes", []) or [])
                 if isinstance(item, (str, int))
@@ -450,7 +455,6 @@ class SubscriptionManager:
                     selected.append({"fid": fid})
                     found_keys.append(fid)
         else:
-            # 兼容更早的旧订阅：没有初始文件基线时按集数判断。
             saved = {
                 item for item in (sub.get("saved_episodes", []) or [])
                 if isinstance(item, (str, int))
@@ -466,12 +470,7 @@ class SubscriptionManager:
                     found_keys.append(ep_num)
 
         if not selected:
-            return self._finish(
-                sub,
-                True,
-                f"《{sub.get('title', '')}》暂无新更新",
-                success_keys=[],
-            )
+            return self._finish(sub, True, f"《{sub.get('title', '')}》暂无新更新", success_keys=[])
 
         target_fid = _normalize_fid(sub.get("target_fid"))
         try:
@@ -486,10 +485,7 @@ class SubscriptionManager:
         pending_keys = list(dict.fromkeys(str(key) for key in found_keys))[:200]
         with self.lock:
             subscriptions = self._load_subscriptions()
-            current = next(
-                (item for item in subscriptions if item.get("id") == sub.get("id")),
-                None,
-            )
+            current = next((item for item in subscriptions if item.get("id") == sub.get("id")), None)
             if current is not None:
                 current["pending_save_keys"] = pending_keys
                 current["storage_target_id"] = target_id
@@ -510,6 +506,103 @@ class SubscriptionManager:
             True,
             f"🎉 成功追更 {len(found_keys)} 项，已存入专属文件夹【{sub.get('title', '')}】！",
             success_keys=found_keys,
+        )
+
+    def _check_channel_subscription(self, sub: dict) -> tuple[bool, str]:
+        source_id = str(sub.get("source_id") or "").strip()
+        channel = str(sub.get("channel") or "").strip()
+        title = str(sub.get("title") or "").strip()
+        sources = self.resource_sources.search_channel(source_id, channel, title) if self.resource_sources else []
+
+        if not sources:
+            return self._finish(sub, True, f"《{title}》频道暂未发现新资源", success_keys=[])
+
+        tracked = {
+            str(key).strip()
+            for key in (sub.get("tracked_file_keys", []) or [])
+            if str(key).strip()
+        }
+        grouped: dict[tuple[str, str], dict] = {}
+
+        for source in sources:
+            pwd_id = str(source.get("pwd_id") or "").strip()
+            if not pwd_id:
+                continue
+            resource = {
+                **source,
+                "pwd_id": pwd_id,
+                "storage_target_id": str(
+                    source.get("storage_target_id")
+                    or sub.get("storage_target_id")
+                    or ""
+                ).strip(),
+            }
+            resolved = self.storage_targets.resolve_resource(
+                resource,
+                resource.get("storage_target_id") or None,
+            )
+            files = resolved.get("files") or []
+            token = resolved.get("token")
+            target_id = str(
+                resolved.get("target_id")
+                or resource.get("storage_target_id")
+                or ""
+            ).strip()
+            if resolved.get("error") or not files or not token:
+                continue
+
+            for item in files:
+                fid = str(item.get("fid") or "").strip()
+                if not fid:
+                    continue
+                key = f"{pwd_id}:{fid}"
+                if key in tracked:
+                    continue
+                if not str(item.get("file_name") or "").lower().endswith(VIDEO_EXTENSIONS):
+                    continue
+                grouped.setdefault((pwd_id, target_id), {
+                    "resource": resource,
+                    "token": token,
+                    "target_id": target_id,
+                    "files": [],
+                    "keys": [],
+                })["files"].append({"fid": fid})
+                grouped[(pwd_id, target_id)]["keys"].append(key)
+
+        if not grouped:
+            return self._finish(sub, True, f"《{title}》暂无新更新", success_keys=[])
+
+        target_fid = _normalize_fid(sub.get("target_fid"))
+        try:
+            default_target = next(iter(grouped.values()))
+            folder_fid = self.storage_targets.create_folder(
+                title,
+                target_fid,
+                default_target["target_id"] or None,
+            )
+        except Exception as exc:
+            return self._finish(sub, False, f"创建专属文件夹失败: {exc}")
+
+        all_keys: list[str] = []
+        total = 0
+        for group in grouped.values():
+            ok, msg = self.storage_targets.transfer(
+                group["resource"],
+                group["files"],
+                folder_fid,
+                group["target_id"] or None,
+                group["token"],
+            )
+            if not ok:
+                return self._finish(sub, False, f"转存失败: {msg}")
+            all_keys.extend(group["keys"])
+            total += len(group["files"])
+
+        return self._finish(
+            sub,
+            True,
+            f"🎉 成功追更 {total} 项，已存入专属文件夹【{title}】！",
+            success_keys=all_keys,
         )
 
     def _finish(

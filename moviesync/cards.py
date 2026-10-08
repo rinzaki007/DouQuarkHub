@@ -109,6 +109,10 @@ class ResourceSourceCard(Card):
     def check(self, config: dict) -> dict[str, Any]:
         raise NotImplementedError
 
+    def search_channel(self, channel: object, title: str, config: dict) -> list[dict[str, Any]]:
+        """在指定资源源频道中搜索资源；没有频道级能力的卡片返回空列表。"""
+        return []
+
 
 class StorageTargetCard(Card):
     """存储/转存目标卡片接口。"""
