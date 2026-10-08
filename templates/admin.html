@@ -244,7 +244,16 @@
 
                 <div class="space-y-1">
                     <label for="openlist-url" class="block text-xs text-slate-400 font-semibold">OpenList 访问地址:</label>
-                    <input type="text" id="openlist-url" value="https://openlist.88888807.xyz:8807/" class="glass-input w-full border border-slate-800 rounded px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-blue-500">
+                    <input type="text" id="openlist-url" value="" placeholder="例如：https://你的-openlist.example.com/" class="glass-input w-full border border-slate-800 rounded px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-blue-500">
+                    <p class="mt-1 text-[10px] text-slate-500">仅用于后台的 OpenList 跳转按钮，MovieSync 不连接或操作 OpenList。</p>
+                </div>
+
+                <div class="space-y-1">
+                    <label for="default-storage-target" class="block text-xs text-slate-400 font-semibold">默认存储目标:</label>
+                    <select id="default-storage-target" class="glass-input w-full border border-slate-800 rounded px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-blue-500">
+                        <option value="">自动使用第一个可用存储目标</option>
+                    </select>
+                    <p class="mt-1 text-[10px] text-slate-500">资源源只负责发现资源；未指定目标时由这里决定实际存储平台。</p>
                 </div>
 
                 <div class="glass-shell rounded-2xl border border-slate-800/80 p-4">
@@ -810,13 +819,15 @@
 
             try {
 
-                const [configResp, sourceResp] = await Promise.all([
+                const [configResp, sourceResp, targetResp] = await Promise.all([
                     apiFetch('/api/config'),
-                    apiFetch('/api/resource-sources')
+                    apiFetch('/api/resource-sources'),
+                    apiFetch('/api/storage-targets')
                 ]);
 
                 const res = await configResp.json();
                 const sourceRes = await sourceResp.json();
+                const targetRes = await targetResp.json();
 
                 if (
                     res.success &&
@@ -831,13 +842,13 @@
                     );
 
                     loadCards();
+                    renderStorageTargets(targetRes.targets || [], cfg.default_storage_target_id || targetRes.default_target_id || "");
 
 
                     document.getElementById(
                         'openlist-url'
                     ).value =
-                        cfg.openlist_url ||
-                        'https://openlist.88888807.xyz:8807/';
+                        cfg.openlist_url || '';
 
 
                     tgChannels =
@@ -1208,6 +1219,11 @@
                         'openlist-url'
                     ).value.trim(),
 
+                default_storage_target_id:
+                    document.getElementById(
+                        'default-storage-target'
+                    ).value,
+
             };
 
             try {
@@ -1264,6 +1280,15 @@
 
         }
 
+
+        async function renderStorageTargets(targets, selectedId) {
+            const select = document.getElementById('default-storage-target');
+            if (!select) return;
+            const enabled = (targets || []).filter(item => item.enabled !== false);
+            select.innerHTML = '<option value="">自动使用第一个可用存储目标</option>' +
+                enabled.map(item => '<option value="' + escapeHtml(item.id) + '">' + escapeHtml(item.name || item.id) + '</option>').join('');
+            select.value = selectedId || '';
+        }
 
         /* ==========================================================
            导出配置
