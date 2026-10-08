@@ -236,6 +236,7 @@ class SubscriptionManager:
 
         target_fids = []
         selected_episode_numbers: list[int] = []
+        initial_tracked_keys: list[str] = []
         seen = set()
 
         for item in (files or [])[:200]:
@@ -268,6 +269,8 @@ class SubscriptionManager:
                 )
                 if ep_num is not None:
                     selected_episode_numbers.append(ep_num)
+                elif source_id and channel:
+                    initial_tracked_keys.append(f"{pwd_id}:{fid}")
 
         subscription = {
             "id": uuid.uuid4().hex,
@@ -294,7 +297,7 @@ class SubscriptionManager:
             "phase": "waiting",
             "phase_label": "等待下次检查",
             "tracked_file_keys": (
-                [f"{pwd_id}:{fid}" for fid in target_fids]
+                initial_tracked_keys
                 if source_id and channel
                 else target_fids
             ),
