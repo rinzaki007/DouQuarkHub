@@ -87,27 +87,22 @@ class TelegramClient:
         else:
             channel_id = normalize_channel_id(channel)
             channel_name = channel_id
-        if not channel_id:
+        if not channel_id or not str(title or "").strip():
             return []
 
+        title = str(title).strip()
         simple_target = self._simplify(title)
         results: list[dict] = []
         seen_shares: set[str] = set()
         before: str | None = None
 
-        for page_index in range(MAX_CHANNEL_PAGES):
-            params = []
-            if page_index == 0:
-                params.append(("q", title))
-            if before:
-                params.append(("before", before))
-            query = "&".join(f"{key}={quote(value)}" for key, value in params)
+        for _ in range(MAX_CHANNEL_PAGES):
             url = f"https://t.me/s/{quote(channel_id)}"
-            if query:
-                url += "?" + query
+            if before:
+                url += f"?before={quote(before)}"
 
             try:
-                response = self.http.session.get(url, timeout=5)
+                response = self.http.session.get(url, timeout=8)
             except Exception:
                 return results
 
@@ -116,18 +111,6 @@ class TelegramClient:
 
             soup = BeautifulSoup(response.text, "html.parser")
             messages = soup.select("div.tgme_widget_message")
-            if not messages and page_index == 0 and title:
-                try:
-                    response = self.http.session.get(
-                        f"https://t.me/s/{quote(channel_id)}",
-                        timeout=5,
-                    )
-                except Exception:
-                    return results
-                if response.status_code != 200:
-                    return results
-                soup = BeautifulSoup(response.text, "html.parser")
-                messages = soup.select("div.tgme_widget_message")
             if not messages:
                 return results
 
@@ -146,6 +129,7 @@ class TelegramClient:
                 text_node = message.select_one("div.tgme_widget_message_text")
                 if not text_node:
                     continue
+
                 plain_text = text_node.get_text(" ", strip=True)
                 simple_plain = self._simplify(plain_text)
                 if (
@@ -154,17 +138,23 @@ class TelegramClient:
                 ):
                     continue
 
-                links = [anchor.get("href", "") for anchor in message.select("a[href]")]
+                links = [
+                    anchor.get("href", "")
+                    for anchor in message.select("a[href]")
+                ]
                 raw_sources = links + [plain_text]
                 for raw in raw_sources:
                     for pwd_id in QUARK_RE.findall(raw or ""):
                         if pwd_id in seen_shares:
                             continue
                         seen_shares.add(pwd_id)
-                        results.append({
-                            "channel": channel_name,
-                            "pwd_id": pwd_id,
-                        })
+                        results.append(
+                            {
+                                "channel": channel_name,
+                                "channel_id": channel_id,
+                                "pwd_id": pwd_id,
+                            }
+                        )
                         if len(results) >= MAX_SHARES_PER_CHANNEL:
                             return results
 

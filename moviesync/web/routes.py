@@ -943,7 +943,7 @@ def get_tasks():
             "updated_at": sub.get("last_check_at") or 0,
             "run_history": history[-10:],
             "cover": sub.get("cover", ""),
-            "source_channel": sub.get("channel", ""),
+            "source_channel": sub.get("channel_name") or sub.get("channel", ""),
             "tracked_file_count": len(sub.get("tracked_file_keys", []) or []),
             "subscription_id": sub.get("id"),
             "retry_count": sub.get("retry_count", 0),
@@ -1132,6 +1132,10 @@ def subscriptions():
                 ),
                 channel=data.get(
                     "channel",
+                    "",
+                ),
+                channel_name=data.get(
+                    "channel_name",
                     "",
                 ),
                 files=data.get(

@@ -127,7 +127,7 @@ function setFilter(filter) {
 
 function renderTasks() {
     const list = document.getElementById('task-list');
-    let visible = tasks.filter(t => t.type === 'subscription');
+    let visible = tasks.slice();
     if (taskFilter === 'error') visible = visible.filter(t => ['error','failed'].includes(t.status) || !!t.last_error);
     if (taskFilter === 'waiting') visible = visible.filter(t => ['waiting','queued'].includes(t.status));
     if (taskFilter === 'running') visible = visible.filter(t => ['running','pending'].includes(taskState(t).key) || t.status === 'running');
@@ -136,7 +136,18 @@ function renderTasks() {
         return;
     }
     list.innerHTML = '';
-    visible.forEach(task => {
+    const groups = [
+        {type: 'subscription', title: '智能追剧', desc: '频道持续监控与自动追更'},
+        {type: 'transfer', title: '普通转存', desc: '手动选择资源后的转存任务'}
+    ];
+    groups.forEach(group => {
+        const groupTasks = visible.filter(task => task.type === group.type);
+        if (!groupTasks.length) return;
+        const header = document.createElement('div');
+        header.className = 'px-3 pt-5 pb-2';
+        header.innerHTML = '<div class="flex items-center gap-2"><h2 class="text-sm font-semibold text-slate-200">' + group.title + '</h2><span class="text-[10px] text-slate-600">' + group.desc + '</span></div>';
+        list.appendChild(header);
+        groupTasks.forEach(task => {
         const state = taskState(task);
         const progress = Math.max(0, Math.min(100, Number(task.progress || 0)));
         const retryable = task.type === 'transfer' && task.status === 'failed';
@@ -167,7 +178,8 @@ function renderTasks() {
             ((task.type === 'subscription' || task.status === 'success' || task.status === 'failed' || task.status === 'error') ? '<button data-action="delete" data-id="' + escapeTask(task.id) + '" class="rounded-xl border border-slate-700/70 bg-slate-950/55 px-3 py-2 text-[11px] text-slate-400 hover:bg-slate-800 hover:text-rose-300"><i class="fa-solid fa-trash mr-1"></i>删除</button>' : '') +
             (retryable ? '<button data-action="retry" data-id="' + escapeTask(task.id) + '" class="rounded-xl border border-amber-800/70 bg-amber-950/35 px-3 py-2 text-[11px] text-amber-300 hover:bg-amber-900/60"><i class="fa-solid fa-rotate-right mr-1"></i>失败重试</button>' : '') +
             '</div></div>';
-        list.appendChild(card);
+            list.appendChild(card);
+        });
     });
     list.querySelectorAll('[data-action="detail"]').forEach(btn => btn.onclick = () => openTaskDetail(btn.dataset.id));
     list.querySelectorAll('[data-action="run-sub"]').forEach(btn => btn.onclick = () => runSubscription(btn.dataset.id));
@@ -447,7 +459,8 @@ async function createTask() {
     if (!files.length) return taskToast('请至少选择 1 集作为首次处理基线');
     const payload = {
         title:title,
-        channel:selectedCandidate.candidate.channel,
+        channel:selectedCandidate.candidate.channel_id || selectedCandidate.candidate.channel || '',
+        channel_name:selectedCandidate.candidate.channel || '',
         source_id:selectedCandidate.candidate.source_id || 'telegram',
         pwd_id:selectedCandidate.candidate.pwd_id,
         files:files,
