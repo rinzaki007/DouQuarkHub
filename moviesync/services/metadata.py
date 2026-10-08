@@ -18,7 +18,12 @@ class MetadataProviderManager:
             return card if isinstance(card, MetadataProviderCard) else None
         return cards[0] if cards else None
 
-    def list_movies(self, tag: str = "电影", sort_type: str = "U", provider_id: str | None = None) -> list[dict[str, Any]]:
+    def list_movies(
+        self,
+        tag: str = "电影",
+        sort_type: str = "U",
+        provider_id: str | None = None,
+    ) -> list[dict[str, Any]]:
         card = self._get(provider_id)
         if not card:
             return []
