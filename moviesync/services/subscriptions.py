@@ -624,7 +624,7 @@ class SubscriptionManager:
                 episode, _ = _clean_tv_filename(file_name, title)
                 if episode is None:
                     continue
-                if episode <= baseline_episode:
+                if episode < baseline_episode:
                     continue
                 grouped.setdefault((pwd_id, target_id), {
                     "resource": resource,
