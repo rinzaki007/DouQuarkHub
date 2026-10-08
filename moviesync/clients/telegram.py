@@ -16,7 +16,8 @@ CHANNEL_RE = re.compile(r"^[A-Za-z0-9_]{2,64}$")
 QUARK_RE = re.compile(r"(?:https?://)?(?:pan\.)?quark\.cn/s/([A-Za-z0-9]{1,128})(?![A-Za-z0-9])", re.IGNORECASE)
 
 MAX_SEARCH_MESSAGES = 100
-MAX_SHARES_PER_CHANNEL = 20
+MAX_SHARES_PER_CHANNEL = 50
+MAX_CHANNEL_PAGES = 6
 TG_HEADERS = {"User-Agent": "Mozilla/5.0"}
 
 
@@ -89,35 +90,73 @@ class TelegramClient:
         if not channel_id:
             return []
 
-        response = self.http.session.get(
-            f"https://t.me/s/{quote(channel_id)}?q={quote(title)}",
-            timeout=5,
-        )
-        if response.status_code != 200:
-            return []
-
-        soup = BeautifulSoup(response.text, "html.parser")
-        results: list[dict] = []
         simple_target = self._simplify(title)
-        for message in soup.select("div.tgme_widget_message_text")[:MAX_SEARCH_MESSAGES]:
-            plain_text = message.get_text(" ", strip=True)
-            simple_plain = self._simplify(plain_text)
-            if title not in plain_text and (not simple_target or simple_target not in simple_plain):
-                continue
+        results: list[dict] = []
+        seen_shares: set[str] = set()
+        before: str | None = None
 
-            links = [anchor.get("href", "") for anchor in message.select("a[href]")]
-            raw_sources = links + [plain_text]
-            pwd_ids: list[str] = []
-            seen: set[str] = set()
-            for raw in raw_sources:
-                for pwd_id in QUARK_RE.findall(raw or ""):
-                    if pwd_id not in seen:
-                        seen.add(pwd_id)
-                        pwd_ids.append(pwd_id)
-            for pwd_id in pwd_ids:
-                results.append({"channel": channel_name, "pwd_id": pwd_id})
-                if len(results) >= MAX_SHARES_PER_CHANNEL:
-                    return results
+        for page_index in range(MAX_CHANNEL_PAGES):
+            params = []
+            if page_index == 0:
+                params.append(("q", title))
+            if before:
+                params.append(("before", before))
+            query = "&".join(f"{key}={quote(value)}" for key, value in params)
+            url = f"https://t.me/s/{quote(channel_id)}"
+            if query:
+                url += "?" + query
+
+            try:
+                response = self.http.session.get(url, timeout=5)
+            except Exception:
+                return results
+
+            if response.status_code != 200:
+                return results
+
+            soup = BeautifulSoup(response.text, "html.parser")
+            messages = soup.select("div.tgme_widget_message")
+            if not messages:
+                return results
+
+            oldest_post_id = None
+            for message in messages:
+                data_post = str(message.get("data-post") or "")
+                match = re.search(r"/(\\d+)$", data_post)
+                if match:
+                    post_id = int(match.group(1))
+                    oldest_post_id = post_id if oldest_post_id is None else min(oldest_post_id, post_id)
+
+                text_node = message.select_one("div.tgme_widget_message_text")
+                if not text_node:
+                    continue
+                plain_text = text_node.get_text(" ", strip=True)
+                simple_plain = self._simplify(plain_text)
+                if title not in plain_text and (not simple_target or simple_target not in simple_plain):
+                    continue
+
+                links = [anchor.get("href", "") for anchor in message.select("a[href]")]
+                raw_sources = links + [plain_text]
+                for raw in raw_sources:
+                    for pwd_id in QUARK_RE.findall(raw or ""):
+                        if pwd_id in seen_shares:
+                            continue
+                        seen_shares.add(pwd_id)
+                        results.append({
+                            "channel": channel_name,
+                            "pwd_id": pwd_id,
+                        })
+                        if len(results) >= MAX_SHARES_PER_CHANNEL:
+                            return results
+
+            if oldest_post_id is None:
+                return results
+
+            next_before = str(oldest_post_id)
+            if next_before == before:
+                return results
+            before = next_before
+
         return results
 
     @staticmethod
