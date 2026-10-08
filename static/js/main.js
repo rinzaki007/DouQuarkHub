@@ -119,15 +119,6 @@ async function checkSystemHealth() {
         console.error("初始化检测异常", err);
     }
 
-    try {
-        const resp = await apiFetch('/api/check-channels');
-        const res = await resp.json();
-        if (res.success) {
-            document.getElementById('channel-count-text').innerText = `频道 ${res.valid_count}/${res.total}`;
-        }
-    } catch (err) {
-        console.error("频道检测异常", err);
-    }
 }
 
 function changeTag(tag) {
