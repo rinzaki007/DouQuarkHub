@@ -92,3 +92,49 @@ def test_legacy_quark_config_is_migrated_on_load(tmp_path):
     assert quark["cookie"] == "legacy-cookie"
     assert quark["default_fid"] == "789"
     assert quark["category_fids"]["电影"] == "101112"
+
+
+def test_telegram_settings_are_stored_inside_card_config(tmp_path):
+    store = ConfigStore(tmp_path / "config.json", tmp_path / "legacy")
+    saved = store.save_telegram_config({
+        "channels": [{"name": "Telegram", "id": "@movie_channel"}],
+    })
+    assert saved["config"]["channels"] == [
+        {"id": "movie_channel", "name": "Telegram"}
+    ]
+    config = store.load()
+    assert config["cards"]["telegram"]["config"]["channels"] == [
+        {"id": "movie_channel", "name": "Telegram"}
+    ]
+    assert "channels" not in config
+    assert "resource_sources" not in config
+
+
+def test_legacy_telegram_config_is_migrated_on_load(tmp_path):
+    import json
+
+    config_file = tmp_path / "config.json"
+    config_file.write_text(
+        json.dumps({
+            "channels": [{"name": "旧频道", "id": "@legacy_channel"}],
+            "resource_sources": [{
+                "id": "telegram",
+                "enabled": False,
+                "health": {"status": "healthy", "message": "旧状态"},
+            }],
+            "schema_version": 3,
+        }),
+        encoding="utf-8",
+    )
+
+    store = ConfigStore(config_file, tmp_path / "legacy")
+    config = store.load()
+    telegram = config["cards"]["telegram"]
+
+    assert telegram["enabled"] is False
+    assert telegram["config"]["channels"] == [
+        {"id": "legacy_channel", "name": "旧频道"}
+    ]
+    assert telegram["config"]["health"]["status"] == "healthy"
+    assert "channels" not in config
+    assert "resource_sources" not in config
