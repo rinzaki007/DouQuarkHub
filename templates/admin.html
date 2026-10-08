@@ -1088,11 +1088,16 @@
         }
         async function loadTelegramCard() {
             try {
-                const result = await (await apiFetch("/api/config")).json();
+                const [cardResp, healthResp] = await Promise.all([
+                    apiFetch("/api/cards/telegram/config"),
+                    apiFetch("/api/resource-sources")
+                ]);
+                const result = await cardResp.json();
+                const healthResult = await healthResp.json();
                 if (!result.success) throw new Error(result.message || "读取 Telegram 配置失败");
                 tgChannels = Array.isArray(result.config?.channels) ? result.config.channels : [];
                 renderTelegramChannels();
-                const source = (result.config?.resource_sources || []).find(x => x.id === "telegram");
+                const source = (healthResult.resource_sources || []).find(x => x.id === "telegram");
                 if (source) renderTelegramHealth({resource_sources:[source]});
                 else document.getElementById("telegram-card-summary").textContent = "已配置 " + tgChannels.length + " 个频道";
             } catch (e) { document.getElementById("telegram-card-summary").textContent = e.message || "读取失败"; }
@@ -1124,7 +1129,7 @@
         }
         async function saveTelegramCard() {
             try {
-                const result = await (await apiFetch("/api/channels", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({channels:tgChannels})})).json();
+                const result = await (await apiFetch("/api/cards/telegram/config", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({channels:tgChannels})})).json();
                 if (!result.success) throw new Error(result.message || "保存失败");
                 tgChannels = result.channels || tgChannels;
                 renderTelegramChannels();
