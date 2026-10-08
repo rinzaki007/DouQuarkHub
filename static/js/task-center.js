@@ -228,7 +228,7 @@ function renderTaskDetail(task) {
         '<div class="min-w-0 flex-1"><div class="flex flex-wrap items-center gap-2"><span class="rounded-full border px-2 py-0.5 text-[10px] ' + state.cls + '">' + state.label + '</span><span class="text-[11px] text-slate-500">' + escapeTask(task.kind || '任务') + '</span></div>' +
         '<div class="mt-3 text-lg font-semibold text-white">' + escapeTask(task.phase_label || task.message || '等待执行') + '</div>' +
         renderTaskProgressBar(task) +
-        '<div class="mt-2 text-[11px] text-slate-400">' + escapeTask(task.message || '') + '</div></div></div>'
+        '<div class="mt-2 text-[11px] text-slate-400">' + escapeTask(task.message || '') + '</div></div></div>' +
         '<div class="rounded-2xl border border-slate-800 bg-slate-950 p-4"><div class="text-xs font-semibold text-slate-200">执行阶段</div><div class="mt-4 space-y-3">' +
         phases.map((p,i) => {
             const done = task.status === 'success' || (phaseIndex >= 0 && i < phaseIndex);
