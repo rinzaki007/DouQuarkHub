@@ -498,10 +498,27 @@ def set_default_storage_target():
 def cards():
     """返回当前进程已加载的卡片 Manifest。动态安装暂未开放。"""
     registry = _services()["card_registry"]
+    config_store = _services()["config"]
+    config = config_store.load()
+    card_configs = config.get("cards") if isinstance(config, dict) else {}
+    cards = []
+    for card in registry.list():
+        saved = card_configs.get(card.card_id) if isinstance(card_configs, dict) else {}
+        saved = saved if isinstance(saved, dict) else {}
+        item = card.manifest.to_dict()
+        item["enabled"] = bool(saved.get("enabled", True))
+        try:
+            item["health"] = card.check(saved.get("config", {}))
+        except Exception as exc:
+            item["health"] = {
+                "status": "unavailable",
+                "message": f"卡片检查失败: {exc}",
+            }
+        cards.append(item)
     return jsonify(
         {
             "success": True,
-            "cards": registry.manifests(),
+            "cards": cards,
             "dynamic_install_enabled": False,
         }
     )
