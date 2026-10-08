@@ -366,7 +366,11 @@ async function searchTaskCandidates() {
                 updateSelectionUi();
             };
             row.querySelector('.candidate-select').onclick = function() {
-                selectedCandidate = {candidate:candidate,row:row,selectedFids:new Set(selectedFids)};
+                const currentSelected = new Set([...row.querySelectorAll('.task-episode-checkbox:checked')].map(input => {
+                    const file = files[Number(input.dataset.fileIndex)];
+                    return String(file?.fid || '').trim();
+                }).filter(Boolean));
+                selectedCandidate = {candidate:candidate,row:row,selectedFids:currentSelected};
                 document.querySelectorAll('.candidate-select').forEach(b => { b.className='candidate-select shrink-0 rounded-xl border border-slate-700 bg-slate-900 px-4 py-2.5 text-[11px] text-slate-400'; b.textContent='选择此源'; });
                 this.className='candidate-select shrink-0 rounded-xl bg-emerald-600 px-4 py-2.5 text-[11px] font-medium text-white';
                 this.textContent='已选择';
