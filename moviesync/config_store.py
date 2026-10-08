@@ -212,12 +212,15 @@ class ConfigStore:
         cards = defaults.get("cards") if isinstance(defaults.get("cards"), dict) else {}
         quark = cards.get("quark") if isinstance(cards.get("quark"), dict) else {}
         quark_config = quark.get("config") if isinstance(quark.get("config"), dict) else {}
-        if "quark_cookie" in defaults and "cookie" not in quark_config:
+        # 兼容旧版顶层夸克配置：如果配置文件仍保留旧字段，优先迁移到卡片配置。
+        if "quark_cookie" in defaults:
             quark_config["cookie"] = str(defaults.get("quark_cookie") or "")
-        if "default_fid" in defaults and "default_fid" not in quark_config:
+        if "default_fid" in defaults:
             quark_config["default_fid"] = defaults.get("default_fid") or "0"
-        if "category_fids" in defaults and "category_fids" not in quark_config:
-            quark_config["category_fids"] = deepcopy(defaults.get("category_fids") or DEFAULT_CATEGORY_FIDS)
+        if "category_fids" in defaults:
+            quark_config["category_fids"] = deepcopy(
+                defaults.get("category_fids") or DEFAULT_CATEGORY_FIDS
+            )
         quark["enabled"] = bool(quark.get("enabled", True))
         quark["config"] = quark_config
         cards["quark"] = quark
@@ -361,26 +364,6 @@ class ConfigStore:
             current["openlist_url"] = self._normalize_openlist(
                 incoming["openlist_url"]
             )
-
-        if "category_fids" in incoming:
-            category_fids = incoming["category_fids"] or {}
-
-            if not isinstance(category_fids, dict):
-                raise ConfigValidationError(
-                    "category_fids 必须是对象"
-                )
-
-            current["category_fids"] = {
-                key: self._normalize_fid(
-                    category_fids.get(
-                        key,
-                        current["category_fids"].get(key, ""),
-                    ),
-                    f"category_fids.{key}",
-                    allow_empty=True,
-                )
-                for key in DEFAULT_CATEGORY_FIDS
-            }
 
         if "channels" in incoming:
             current["channels"] = self._normalize_channels(
