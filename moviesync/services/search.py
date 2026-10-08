@@ -58,7 +58,7 @@ class SearchService:
         self.resource_sources = resource_sources
         self.storage_targets = storage_targets
         self.logger = logger
-        self._share_cache: dict[str, tuple[list[dict[str, Any]], str | None, str | None]] = {}
+        self._share_cache: dict[str, tuple[list[dict[str, Any]], str | None, str | None, str]] = {}
         self._share_lock = threading.Lock()
 
     @staticmethod
@@ -73,7 +73,9 @@ class SearchService:
 
     def _get_resource_files(self, resource: dict):
         storage_target_id = str(resource.get("storage_target_id") or "").strip()
-        pwd_id = sanitize_pwd_id(resource.get("pwd_id"))
+        pwd_id = str(resource.get("pwd_id") or "").strip()
+        if not pwd_id:
+            return [], None, "资源标识无效", storage_target_id
         cache_key = f"{storage_target_id}:{pwd_id}"
         with self._share_lock:
             cached = self._share_cache.get(cache_key)
