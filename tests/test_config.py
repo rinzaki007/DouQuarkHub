@@ -12,7 +12,7 @@ def test_config_preserves_secret_when_not_replaced(tmp_path):
     assert store.get_cookie() == "secret-cookie"
     public = store.public()
     assert "quark_cookie" not in public
-    assert public["has_quark_cookie"] is True
+    assert public["cards"]["quark"]["config"]["has_cookie"] is True
 
 
 def test_channels_are_normalized_and_deduplicated(tmp_path):
