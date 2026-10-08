@@ -97,6 +97,12 @@ def create_app(
         logger,
     )
 
+    search_service = SearchService(
+        resource_sources,
+        storage_targets,
+        logger,
+    )
+
     services = {
         "logger": logger,
         "logs": recent_logs,
@@ -112,11 +118,7 @@ def create_app(
         "subscriptions": subscriptions,
         "tasks": tasks,
         "quark_factory": lambda cookie: QuarkClient(cookie),
-        "search_factory": lambda _cookie: SearchService(
-            resource_sources,
-            storage_targets,
-            logger,
-        ),
+        "search": search_service,
         "csrf": lambda: secrets.token_urlsafe(32),
         "login_limiter": LoginRateLimiter(),
         "scheduler_enabled": bool(start_scheduler),
