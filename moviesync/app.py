@@ -12,6 +12,7 @@ from pathlib import Path
 from flask import Flask, session
 
 from .auth import AuthStore
+from .cards import QuarkStorageCard
 from .clients.douban import DoubanClient
 from .clients.http import HttpClient
 from .clients.quark import QuarkClient
@@ -72,6 +73,8 @@ def create_app(
         config_store,
         logger,
     )
+    quark_card = QuarkStorageCard(config_store)
+    resource_sources.registry.register(quark_card)
     http = HttpClient()
 
     tasks = TaskManager(
