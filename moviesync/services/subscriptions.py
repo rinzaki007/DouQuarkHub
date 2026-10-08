@@ -24,18 +24,24 @@ def _normalize_resource_id(value: object) -> str:
         raise ValueError("分享资源 ID 无效")
     return value
 
-def _clean_tv_filename(file_name: str, title: str) -> tuple[int | None, str]:
-    text = str(file_name or "")
-    match = re.search(r"(?:S\d{1,2}E(\d{1,4})|(?:EP|E)\s*(\d{1,4})|第\s*(\d+)\s*[集话])", text, re.IGNORECASE)
-    if not match:
-        return None, text
-    for group in match.groups():
-        if group:
-            try:
-                return int(group), text
-            except ValueError:
-                break
-    return None, text
+def _clean_tv_filename(file_name: str, title: str = "") -> tuple[int | None, str]:
+    if not file_name:
+        return None, file_name
+    patterns = [
+        r"\bS\d{1,2}E(\d{1,4})\b",
+        r"\bEP?\s*(\d{1,4})\b",
+        r"第\s*(\d{1,4})\s*[集话期]",
+        r"[\[(【](\d{1,4})[\])】]",
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, file_name, re.IGNORECASE)
+        if not match:
+            continue
+        episode = int(match.group(1))
+        if 1900 <= episode <= 2030 or episode in {720, 1080, 2160}:
+            continue
+        return episode, file_name
+    return None, file_name
 
 def _normalize_fid(value: object) -> str:
     fid = str(
