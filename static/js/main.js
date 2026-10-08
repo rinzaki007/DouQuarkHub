@@ -51,7 +51,7 @@ function applyGlassmorphismStyles() {
 
 async function loadCategoryOptions() {
     try {
-        const resp = await apiFetch('/api/config');
+        const resp = await apiFetch('/api/cards/quark/config');
         const res = await resp.json();
         if (res.success && res.config) {
             const cfg = res.config;
@@ -63,7 +63,7 @@ async function loadCategoryOptions() {
                 const defaultFid = cfg.default_fid || '0';
                 const optDefault = document.createElement('option');
                 optDefault.value = defaultFid;
-                optDefault.textContent = `默认全局目录 (FID: ${defaultFid})`;
+                optDefault.textContent = `默认目录 (FID: ${defaultFid})`;
                 selectEl.appendChild(optDefault);
 
                 const catFids = cfg.category_fids || {};
@@ -71,7 +71,7 @@ async function loadCategoryOptions() {
                     if (fid) {
                         const opt = document.createElement('option');
                         opt.value = fid;
-                        opt.textContent = `${catName}专属目录 (FID: ${fid})`;
+                        opt.textContent = `${catName}目录 (FID: ${fid})`;
                         selectEl.appendChild(opt);
                     }
                 }
@@ -79,7 +79,7 @@ async function loadCategoryOptions() {
                 if (selectEl.id === 'batch-target-fid') {
                     let matched = false;
                     for (let opt of selectEl.options) {
-                        if (opt.textContent.includes(currentTag + '专属')) {
+                        if (opt.textContent.includes(currentTag + '目录')) {
                             opt.selected = true;
                             matched = true;
                             break;
