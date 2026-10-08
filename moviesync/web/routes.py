@@ -516,14 +516,17 @@ def cards():
         item = card.manifest.to_dict()
         item["enabled"] = bool(saved.get("enabled", True))
         card_config = saved.get("config", {})
+        item["configured"] = False
         if card.card_id == "telegram":
             health = card_config.get("health", {}) if isinstance(card_config, dict) else {}
+            item["configured"] = bool(card_config.get("channels"))
             item["health"] = health or {
                 "status": "idle",
                 "message": "尚未检查",
             }
         elif card.card_id == "quark":
             has_cookie = bool(card_config.get("cookie")) if isinstance(card_config, dict) else False
+            item["configured"] = has_cookie
             item["health"] = {
                 "status": "configured" if has_cookie else "unconfigured",
                 "message": "Cookie 已配置，可检查连接状态" if has_cookie else "尚未配置夸克 Cookie",
@@ -531,6 +534,7 @@ def cards():
         else:
             try:
                 item["health"] = card.check(card_config)
+                item["configured"] = item["health"].get("status") not in {"unconfigured", "idle"} if isinstance(item["health"], dict) else True
             except Exception as exc:
                 item["health"] = {
                     "status": "unavailable",
