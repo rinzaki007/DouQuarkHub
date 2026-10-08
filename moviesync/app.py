@@ -15,7 +15,6 @@ from .auth import AuthStore
 from .cards import CardRegistry, QuarkStorageCard
 from .clients.douban import DoubanClient
 from .clients.http import HttpClient
-from .clients.quark import QuarkClient
 from .clients.telegram import TelegramClient
 from .config_store import ConfigStore
 from .logging_setup import configure_logging, recent_logs
@@ -117,7 +116,6 @@ def create_app(
         "http": http,
         "subscriptions": subscriptions,
         "tasks": tasks,
-        "quark_factory": lambda cookie: QuarkClient(cookie),
         "search": search_service,
         "csrf": lambda: secrets.token_urlsafe(32),
         "login_limiter": LoginRateLimiter(),
