@@ -393,6 +393,21 @@ class ConfigStore:
                 raise ConfigValidationError("默认存储目标 ID 无效")
             current["default_storage_target_id"] = target_id
 
+        imported_cards = incoming.get("cards")
+        if isinstance(imported_cards, dict):
+            if isinstance(imported_cards.get("quark"), dict):
+                quark = imported_cards["quark"]
+                self.save_quark_config(quark.get("config") or {})
+                current = self.load()
+                if "enabled" in quark:
+                    current["cards"]["quark"]["enabled"] = bool(quark["enabled"])
+            if isinstance(imported_cards.get("telegram"), dict):
+                telegram = imported_cards["telegram"]
+                self.save_telegram_config(telegram.get("config") or {})
+                current = self.load()
+                if "enabled" in telegram:
+                    current["cards"]["telegram"]["enabled"] = bool(telegram["enabled"])
+
         if "channels" in incoming:
             self.save_telegram_config({"channels": incoming["channels"]})
             current = self.load()
