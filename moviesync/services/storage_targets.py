@@ -34,9 +34,14 @@ class StorageTargetManager:
     def get(self, target_id: str | None = None) -> StorageTargetCard | None:
         if target_id:
             card = self.registry.get(str(target_id))
-            if isinstance(card, StorageTargetCard):
-                return card
-            return None
+            if not isinstance(card, StorageTargetCard):
+                return None
+            config = self.config_store.load()
+            card_configs = config.get("cards") if isinstance(config, dict) else {}
+            saved = card_configs.get(card.card_id) if isinstance(card_configs, dict) else {}
+            if isinstance(saved, dict) and not saved.get("enabled", True):
+                return None
+            return card
         cards = self._enabled_cards()
         return cards[0] if cards else None
 
