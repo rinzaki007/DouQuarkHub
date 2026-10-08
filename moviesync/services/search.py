@@ -156,6 +156,7 @@ class SearchService:
                 "cover": str(movie.get("cover", "") if isinstance(movie, dict) else "").strip()[:1000],
                 "storage_target_id": storage_target_id,
                 "channel": source.get("channel", ""),
+                "channel_id": source.get("channel_id", ""),
                 "pwd_id": pwd_id,
                 "files": videos,
                 "file_count": len(videos),
