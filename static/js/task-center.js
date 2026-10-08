@@ -1,6 +1,7 @@
 let tasks = [];
 let taskFilter = 'all';
 let selectedCandidate = null;
+let taskRefreshTimer = null;
 
 document.addEventListener('DOMContentLoaded', () => {
     loadTasks();
@@ -71,6 +72,13 @@ async function loadTasks() {
         renderStats();
         renderTasks();
         renderHistory();
+        const running = tasks.some(t => t.status === 'running' || t.status === 'queued');
+        if (running && !taskRefreshTimer) {
+            taskRefreshTimer = setInterval(() => loadTasks(), 2000);
+        } else if (!running && taskRefreshTimer) {
+            clearInterval(taskRefreshTimer);
+            taskRefreshTimer = null;
+        }
     } catch (err) {
         list.innerHTML = '<div class="p-10 text-center text-xs text-rose-400">任务加载失败，请刷新重试。</div>';
     }
@@ -97,8 +105,9 @@ function formatNextRun(ts) {
 }
 
 function renderStats() {
-    const total = tasks.length;
-    const error = tasks.filter(t => ['error','failed'].includes(t.status) || !!t.last_error).length;
+    const smartTasks = tasks.filter(t => t.type === 'subscription');
+    const total = smartTasks.length;
+    const error = smartTasks.filter(t => ['error','failed'].includes(t.status) || !!t.last_error).length;
     const waiting = tasks.filter(t => ['waiting','queued'].includes(t.status)).length;
     const soon = tasks.filter(t => ['soon','pending','running'].includes(taskState(t).key) || ['running','pending'].includes(t.status)).length;
     document.getElementById('stat-total').textContent = total;
@@ -118,10 +127,10 @@ function setFilter(filter) {
 
 function renderTasks() {
     const list = document.getElementById('task-list');
-    let visible = tasks;
-    if (taskFilter === 'error') visible = tasks.filter(t => ['error','failed'].includes(t.status) || !!t.last_error);
-    if (taskFilter === 'waiting') visible = tasks.filter(t => ['waiting','queued'].includes(t.status));
-    if (taskFilter === 'running') visible = tasks.filter(t => ['running','pending'].includes(taskState(t).key) || t.status === 'running');
+    let visible = tasks.filter(t => t.type === 'subscription');
+    if (taskFilter === 'error') visible = visible.filter(t => ['error','failed'].includes(t.status) || !!t.last_error);
+    if (taskFilter === 'waiting') visible = visible.filter(t => ['waiting','queued'].includes(t.status));
+    if (taskFilter === 'running') visible = visible.filter(t => ['running','pending'].includes(taskState(t).key) || t.status === 'running');
     if (!visible.length) {
         list.innerHTML = '<div class="p-12 text-center text-xs text-slate-500">暂无符合条件的任务。</div>';
         return;
@@ -183,13 +192,20 @@ function closeTaskDetail() {
 }
 
 function renderTaskProgressBar(task) {
-    const phases = [
-        ['validate', '校验'],
-        ['list_files', '获取文件'],
-        ['create_folder', '准备目录'],
-        ['transfer', '转存'],
-        ['completed', '完成']
-    ];
+    const phases = task.type === 'subscription'
+        ? [
+            ['searching', '搜刮'],
+            ['resolve', '解析'],
+            ['transfer', '转存'],
+            ['completed', '完成']
+        ]
+        : [
+            ['validate', '校验'],
+            ['list_files', '获取文件'],
+            ['create_folder', '准备目录'],
+            ['transfer', '转存'],
+            ['completed', '完成']
+        ];
     const current = task.status === 'success' ? 4 : phases.findIndex(p => p[0] === task.phase);
     const failed = task.status === 'failed' || task.status === 'error';
     return '<div class="mt-3 rounded-xl border border-slate-800 bg-slate-950/60 px-3 py-2.5">' +
@@ -214,13 +230,20 @@ function renderTaskDetail(task) {
     const state = taskState(task);
     const progress = Math.max(0, Math.min(100, Number(task.progress || 0)));
     title.textContent = task.title || '任务详情';
-    const phases = [
-        ['validate','校验资源'],
-        ['list_files','获取文件列表'],
-        ['create_folder','准备目标文件夹'],
-        ['transfer','提交夸克转存'],
-        ['completed','转存完成']
-    ];
+    const phases = task.type === 'subscription'
+        ? [
+            ['searching','搜刮频道资源'],
+            ['resolve','解析新资源'],
+            ['transfer','转存新资源'],
+            ['completed','检查完成']
+        ]
+        : [
+            ['validate','校验资源'],
+            ['list_files','获取文件列表'],
+            ['create_folder','准备目标文件夹'],
+            ['transfer','提交夸克转存'],
+            ['completed','转存完成']
+        ];
     const phaseIndex = task.status === 'failed' ? -1 : phases.findIndex(x => x[0] === task.phase);
     body.innerHTML =
         '<div class="flex gap-4 rounded-2xl border border-slate-700/60 bg-slate-950/55 p-4 backdrop-blur-xl">' +
@@ -449,6 +472,9 @@ async function createTask() {
 }
 
 async function runSubscription(id) {
+    if (!taskRefreshTimer) {
+        taskRefreshTimer = setInterval(() => loadTasks(), 2000);
+    }
     try {
         const resp = await apiFetchTask('/api/subscriptions/run-now', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({id})});
         const res = await resp.json();
