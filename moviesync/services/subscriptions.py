@@ -143,6 +143,9 @@ class SubscriptionManager:
             item.setdefault("source_id", "")
             item.setdefault("initial_file_keys", [])
             item.setdefault("tracking_mode", "legacy")
+            item.setdefault("status", "waiting")
+            item.setdefault("phase", "waiting")
+            item.setdefault("phase_label", "等待下次检查")
             tracked = item.get("tracked_file_keys")
             if not isinstance(tracked, list):
                 item["tracked_file_keys"] = []
@@ -270,6 +273,9 @@ class SubscriptionManager:
             "source_id": str(source_id or "").strip()[:100],
             "cover": str(cover or "").strip()[:1000],
             "tracking_mode": "channel" if source_id and channel else ("all" if target_fids else "legacy"),
+            "status": "waiting",
+            "phase": "waiting",
+            "phase_label": "等待下次检查",
             "tracked_file_keys": [f"{pwd_id}:{fid}" for fid in target_fids] if source_id and channel else target_fids,
             "initial_file_keys": target_fids,
             "files": [],
@@ -380,6 +386,12 @@ class SubscriptionManager:
                 sub_id
             )
 
+        self._set_status(
+            subscription,
+            "running",
+            "searching",
+            "正在搜刮频道新资源…",
+        )
         try:
             return self._check(
                 subscription
@@ -402,6 +414,19 @@ class SubscriptionManager:
                 self.running_ids.discard(
                     sub_id
                 )
+
+    def _set_status(self, sub: dict, status: str, phase: str, phase_label: str) -> None:
+        with self.lock:
+            subscriptions = self._load_subscriptions()
+            current = next((item for item in subscriptions if item.get("id") == sub.get("id")), None)
+            if current is None:
+                return
+            current["status"] = status
+            current["phase"] = phase
+            current["phase_label"] = phase_label
+            if status == "running":
+                current["last_error"] = ""
+            self.store.write(subscriptions)
 
     def _check(
         self,
@@ -512,6 +537,7 @@ class SubscriptionManager:
         source_id = str(sub.get("source_id") or "").strip()
         channel = str(sub.get("channel") or "").strip()
         title = str(sub.get("title") or "").strip()
+        self._set_status(sub, "running", "searching", "正在搜刮频道资源…")
         sources = self.resource_sources.search_channel(source_id, channel, title) if self.resource_sources else []
 
         if not sources:
@@ -525,6 +551,7 @@ class SubscriptionManager:
         grouped: dict[tuple[str, str], dict] = {}
 
         for source in sources:
+            self._set_status(sub, "running", "resolve", "正在解析发现的资源…")
             pwd_id = str(source.get("pwd_id") or "").strip()
             if not pwd_id:
                 continue
@@ -585,6 +612,7 @@ class SubscriptionManager:
 
         all_keys: list[str] = []
         total = 0
+        self._set_status(sub, "running", "transfer", "正在转存新资源…")
         for group in grouped.values():
             ok, msg = self.storage_targets.transfer(
                 group["resource"],
@@ -635,6 +663,9 @@ class SubscriptionManager:
                     message,
                 )
 
+            current["status"] = "success" if success else "failed"
+            current["phase"] = "completed" if success else "failed"
+            current["phase_label"] = "检查完成" if success else "检查失败"
             current["last_check"] = (
                 self._now_string()
                 + (
