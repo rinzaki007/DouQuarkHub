@@ -443,46 +443,6 @@ def admin_logs():
     )
 
 
-@api.post("/check-cookie")
-@require_csrf
-def check_cookie():
-    data = (
-        request.get_json(
-            silent=True
-        )
-        or {}
-    )
-
-    cookie = (
-        str(
-            data.get("cookie")
-            or ""
-        ).strip()
-        or _services()[
-            "config"
-        ].get_cookie()
-    )
-
-    valid = (
-        _services()["quark_factory"](
-            cookie
-        ).check_cookie_valid()
-        if cookie
-        else False
-    )
-
-    return jsonify(
-        {
-            "valid": valid,
-            "message": (
-                "Cookie 有效"
-                if valid
-                else "Cookie 已失效或未配置"
-            ),
-        }
-    )
-
-
 @api.get("/check-channels")
 def check_channels_health():
     results = _services()["resource_sources"].check_all()
@@ -985,7 +945,7 @@ def retry_task(task_id):
                 movie,
                 candidate,
                 payload.get("target_fid") or "0",
-                _services()["config"].get_quark_config().get("category_fids", {}),
+                {},
                 progress,
             )
 
