@@ -679,6 +679,21 @@
     </div>
 
 
+    <div id="card-info-modal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm p-4" onclick="if(event.target===this) closeCardInfo()">
+        <div class="max-w-xl mx-auto mt-12 glass-panel rounded-2xl border border-slate-700 shadow-2xl">
+            <div class="flex items-center justify-between p-5 border-b border-slate-800">
+                <div><h3 id="card-info-title" class="text-base font-bold text-white"></h3><p id="card-info-subtitle" class="text-[10px] text-slate-500 mt-1"></p></div>
+                <button type="button" onclick="closeCardInfo()" class="text-slate-400 hover:text-white text-xl">×</button>
+            </div>
+            <div class="p-5 space-y-4">
+                <div id="card-info-health"></div>
+                <div><div class="text-xs font-semibold text-slate-300 mb-2">能力</div><div id="card-info-capabilities" class="flex flex-wrap gap-2"></div></div>
+                <div id="card-info-description" class="text-xs leading-5 text-slate-500"></div>
+                <div class="text-[10px] text-slate-500">配置与专属操作仍由该卡片自己的接口负责；这里是统一卡片总览。</div>
+            </div>
+        </div>
+    </div>
+
     <div id="quark-card-modal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm p-4">
         <div class="max-w-2xl mx-auto mt-8 max-h-[90vh] overflow-y-auto glass-panel rounded-2xl border border-slate-700 shadow-2xl">
             <div class="flex items-center justify-between p-5 border-b border-slate-800">
@@ -981,9 +996,9 @@
             container.innerHTML = cards.map(card => {
                 const typeLabel = CARD_TYPE_LABELS[card.type] || card.type || "未知类型";
                 const capabilities = Array.isArray(card.capabilities) ? card.capabilities : [];
-                const clickable = (card.id === "quark" || card.id === "telegram") ? "cursor-pointer hover:border-blue-400/40" : "";
+                const clickable = "cursor-pointer hover:border-blue-400/40";
                 return '<button type="button" class="glass-shell rounded-2xl p-4 text-left w-full transition ' + clickable + '" ' +
-                    (card.id === "quark" ? 'onclick="openQuarkCard()"' : (card.id === "telegram" ? 'onclick="openTelegramCard()"' : "")) + ">" +
+                    'onclick="openCardFromRegistry(' + JSON.stringify(card.id).replace(/"/g, '&quot;') + ')"' + ">" +
                     '<div class="flex items-start justify-between gap-3">' +
                         '<div class="flex items-center gap-2 min-w-0">' +
                             '<span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-500/10 border border-blue-400/15 text-blue-300"><i class="fa-solid fa-puzzle-piece"></i></span>' +
@@ -993,9 +1008,31 @@
                     '</div><div class="mt-3 flex flex-wrap gap-2"><span class="resource-chip resource-chip-accent">' + escapeHtml(typeLabel) + "</span>" +
                     capabilities.map(cap => '<span class="resource-chip">' + escapeHtml(cap) + "</span>").join("") + "</div>" +
                     (card.description ? '<div class="mt-3 text-[11px] leading-5 text-slate-500">' + escapeHtml(card.description) + "</div>" : "") +
-                    (card.id === "quark" ? '<div class="mt-3 text-[10px] text-blue-300"><i class="fa-solid fa-arrow-right mr-1"></i>点击配置 Quark</div>' : (card.id === "telegram" ? '<div class="mt-3 text-[10px] text-blue-300"><i class="fa-solid fa-arrow-right mr-1"></i>点击管理 Telegram 频道</div>' : "")) +
+                    (card.id === "quark" ? '<div class="mt-3 text-[10px] text-blue-300"><i class="fa-solid fa-arrow-right mr-1"></i>' +
+                        (card.id === "quark" ? "点击配置 Quark" : (card.id === "telegram" ? "点击管理 Telegram 频道" : "点击查看卡片详情")) +
+                        "</div>") +
                     "</button>";
             }).join("");
+        }
+
+        function openCardFromRegistry(cardId) {
+            if (cardId === "quark") return openQuarkCard();
+            if (cardId === "telegram") return openTelegramCard();
+            const card = window.moviesyncCards && window.moviesyncCards.find(item => item.id === cardId);
+            if (!card) return;
+            document.getElementById("card-info-title").textContent = card.name || card.id;
+            document.getElementById("card-info-subtitle").textContent = (card.id || "") + " · v" + (card.version || "1.0.0") + " · " + (CARD_TYPE_LABELS[card.type] || card.type || "未知类型");
+            const health = card.health || {};
+            const healthMap = {healthy:["正常","text-emerald-300"],unconfigured:["未配置","text-amber-300"],idle:["未配置","text-slate-400"],unavailable:["不可用","text-rose-300"],degraded:["部分可用","text-amber-300"]};
+            const meta = healthMap[health.status] || ["未知","text-slate-400"];
+            document.getElementById("card-info-health").innerHTML = '<div class="glass-panel rounded-xl p-3 border border-slate-800"><div class="flex justify-between text-xs"><span class="text-slate-400">状态</span><span class="' + meta[1] + '">' + meta[0] + '</span></div><div class="mt-2 text-[10px] text-slate-500">' + escapeHtml(health.message || "暂无状态") + '</div></div>';
+            document.getElementById("card-info-capabilities").innerHTML = (card.capabilities || []).map(cap => '<span class="resource-chip">' + escapeHtml(cap) + '</span>').join("");
+            document.getElementById("card-info-description").textContent = card.description || "";
+            document.getElementById("card-info-modal").classList.remove("hidden");
+        }
+
+        function closeCardInfo() {
+            document.getElementById("card-info-modal").classList.add("hidden");
         }
 
         async function loadCards() {
@@ -1003,7 +1040,8 @@
                 const resp = await apiFetch("/api/cards");
                 const result = await resp.json();
                 if (!result.success) throw new Error(result.message || "读取卡片失败");
-                renderCards(result.cards || []);
+                window.moviesyncCards = result.cards || [];
+                renderCards(window.moviesyncCards);
             } catch (error) {
                 document.getElementById("cards-summary").textContent = "读取卡片失败";
                 document.getElementById("cards-list").innerHTML = '<div class="glass-panel rounded-xl p-4 text-xs text-rose-300 lg:col-span-2">' + escapeHtml(error.message || "读取卡片失败") + "</div>";
