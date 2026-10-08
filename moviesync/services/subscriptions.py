@@ -191,6 +191,7 @@ class SubscriptionManager:
         interval_hours: int = 6,
         start_ep: int = 0,
         channel: str = "",
+        channel_name: str = "",
         files=None,
         storage_target_id: str = "",
         cover: str = "",
@@ -269,6 +270,9 @@ class SubscriptionManager:
             "start_ep": start_ep,
             "channel": str(
                 channel or ""
+            ).strip()[:100],
+            "channel_name": str(
+                channel_name or channel or ""
             ).strip()[:100],
             "source_id": str(source_id or "").strip()[:100],
             "cover": str(cover or "").strip()[:1000],
@@ -398,7 +402,7 @@ class SubscriptionManager:
             subscription,
             "running",
             "searching",
-            "正在搜刮频道新资源…",
+            "正在搜刮频道资源…",
         )
         try:
             return self._check(
