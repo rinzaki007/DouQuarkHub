@@ -68,6 +68,7 @@ def test_storage_target_manager_discovers_enabled_cards():
         "disabled-storage",
     ]
     assert manager.get().card_id == "demo-storage"
+    assert manager.get("disabled-storage") is None
 
 
 def test_storage_target_manager_routes_resource_and_transfer():
