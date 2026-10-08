@@ -119,11 +119,16 @@ class StorageTargetCard(Card):
         type="storage_target",
         capabilities=(
             "storage.check",
+            "storage.resolve_resource",
             "storage.list_files",
             "storage.create_folder",
             "storage.transfer",
         ),
     )
+
+    def resolve_resource(self, resource: object) -> dict[str, Any]:
+        """解析一个资源并返回可供核心业务使用的标准结果。"""
+        raise NotImplementedError
 
     def list_files(self, resource: object) -> list[dict[str, Any]]:
         raise NotImplementedError
@@ -180,10 +185,21 @@ class QuarkStorageCard(StorageTargetCard):
             "message": "夸克 Cookie 有效" if valid else "夸克 Cookie 无效或已过期",
         }
 
+    def resolve_resource(self, resource: object) -> dict[str, Any]:
+        if not isinstance(resource, dict):
+            return {"files": [], "token": None, "error": "资源参数无效"}
+        pwd_id = resource.get("pwd_id")
+        if not pwd_id:
+            return {"files": [], "token": None, "error": "缺少分享资源 ID"}
+        files, stoken, error = self._client().get_share_files(str(pwd_id))
+        return {
+            "files": files or [],
+            "token": stoken,
+            "error": error,
+        }
+
     def list_files(self, resource: object) -> list[dict[str, Any]]:
-        pwd_id = resource.get("pwd_id") if isinstance(resource, dict) else resource
-        files, _stoken, _error = self._client().get_share_files(pwd_id)
-        return files or []
+        return self.resolve_resource(resource).get("files") or []
 
     def create_folder(self, name: str, parent_id: str = "0") -> str:
         fid, error = self._client().get_or_create_subfolder(name, parent_id)
