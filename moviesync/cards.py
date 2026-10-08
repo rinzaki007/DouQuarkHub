@@ -91,6 +91,84 @@ class Card:
         return self.manifest.capabilities
 
 
+class ResourceSourceCard(Card):
+    """资源发现卡片接口。"""
+
+    manifest = CardManifest(
+        id="unknown.resource",
+        name="未命名资源源",
+        type="resource_source",
+        capabilities=("resource.search", "resource.health_check"),
+    )
+
+    def search(self, movie: object, config: dict) -> list[dict[str, Any]]:
+        raise NotImplementedError
+
+    def check(self, config: dict) -> dict[str, Any]:
+        raise NotImplementedError
+
+
+class StorageTargetCard(Card):
+    """存储/转存目标卡片接口。"""
+
+    manifest = CardManifest(
+        id="unknown.storage",
+        name="未命名存储目标",
+        type="storage_target",
+        capabilities=(
+            "storage.check",
+            "storage.list_files",
+            "storage.create_folder",
+            "storage.transfer",
+        ),
+    )
+
+    def list_files(self, resource: object) -> list[dict[str, Any]]:
+        raise NotImplementedError
+
+    def create_folder(self, name: str, parent_id: str = "0") -> str:
+        raise NotImplementedError
+
+    def transfer(
+        self,
+        resource: object,
+        files: list[dict[str, Any]],
+        target_id: str = "0",
+    ) -> tuple[bool, str]:
+        raise NotImplementedError
+
+
+class MetadataProviderCard(Card):
+    """影视/媒体元数据卡片接口。"""
+
+    manifest = CardManifest(
+        id="unknown.metadata",
+        name="未命名元数据源",
+        type="metadata_provider",
+        capabilities=("metadata.search", "metadata.detail"),
+    )
+
+    def search(self, query: str) -> list[dict[str, Any]]:
+        raise NotImplementedError
+
+    def get_detail(self, item_id: str) -> dict[str, Any] | None:
+        raise NotImplementedError
+
+
+class NotificationCard(Card):
+    """通知卡片接口。"""
+
+    manifest = CardManifest(
+        id="unknown.notification",
+        name="未命名通知服务",
+        type="notification",
+        capabilities=("notification.send",),
+    )
+
+    def send(self, message: str, **kwargs: Any) -> bool:
+        raise NotImplementedError
+
+
 class CardRegistry:
     """进程内卡片注册表。
 
