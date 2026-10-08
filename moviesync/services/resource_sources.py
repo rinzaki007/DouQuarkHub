@@ -169,16 +169,20 @@ class ResourceSourceManager:
         """返回已加载资源卡片的 Manifest。"""
         return self.registry.manifests()
 
+    def _card_config(self, config: dict, source_id: str) -> dict[str, Any]:
+        cards = config.get("cards") if isinstance(config, dict) else {}
+        card = cards.get(source_id) if isinstance(cards, dict) else {}
+        if not isinstance(card, dict):
+            return {}
+        card_config = card.get("config")
+        return dict(card_config) if isinstance(card_config, dict) else {}
+
     def _enabled_sources(self, config: dict) -> list[ResourceSource]:
-        definitions = {
-            str(item.get("id")): item
-            for item in config.get("resource_sources", [])
-            if isinstance(item, dict)
-        }
         enabled = []
+        cards = config.get("cards") if isinstance(config, dict) else {}
         for source_id, source in self.sources.items():
-            item = definitions.get(source_id, {})
-            if item.get("enabled", True):
+            card = cards.get(source_id) if isinstance(cards, dict) else {}
+            if not isinstance(card, dict) or card.get("enabled", True):
                 enabled.append(source)
         return enabled
 
@@ -186,7 +190,7 @@ class ResourceSourceManager:
         results: list[dict[str, Any]] = []
         for source in self._enabled_sources(config):
             try:
-                results.extend(source.search(movie, config))
+                results.extend(source.search(movie, self._card_config(config, source.source_id)))
             except Exception as exc:
                 self.logger.exception(
                     "资源源 %s 搜索异常: %s",
@@ -197,16 +201,13 @@ class ResourceSourceManager:
 
     def check_all(self) -> list[dict[str, Any]]:
         config = self.config_store.load()
-        definitions = {
-            str(item.get("id")): item
-            for item in config.get("resource_sources", [])
-            if isinstance(item, dict)
-        }
+        cards = config.get("cards") if isinstance(config, dict) else {}
         results = []
 
         for source_id, source in self.sources.items():
-            definition = definitions.get(source_id, {})
-            if not definition.get("enabled", True):
+            card = cards.get(source_id) if isinstance(cards, dict) else {}
+            enabled = not isinstance(card, dict) or bool(card.get("enabled", True))
+            if not enabled:
                 result = {
                     "id": source_id,
                     "name": source.name,
@@ -219,7 +220,7 @@ class ResourceSourceManager:
                 }
             else:
                 try:
-                    check = source.check(config)
+                    check = source.check(self._card_config(config, source_id))
                     result = {
                         "id": source_id,
                         "name": source.name,
@@ -254,6 +255,4 @@ class ResourceSourceManager:
         return results
 
     def get_status(self) -> list[dict[str, Any]]:
-        config = self.config_store.load()
-        definitions = config.get("resource_sources") or []
-        return [dict(item) for item in definitions if isinstance(item, dict)]
+        return self.config_store.get_resource_sources()
