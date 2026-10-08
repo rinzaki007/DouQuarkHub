@@ -659,12 +659,7 @@ def get_movies():
     )
 
     try:
-        movies = _services()[
-            "douban"
-        ].get_movies(
-            tag,
-            sort_type,
-        )
+        movies = _services()["metadata"].list_movies(tag, sort_type)
 
         return jsonify(
             {
@@ -706,9 +701,7 @@ def search_douban():
         return jsonify(
             {
                 "success": True,
-                "movies": _services()[
-                    "douban"
-                ].search(query),
+                "movies": _services()["metadata"].search(query),
             }
         )
 
@@ -824,9 +817,7 @@ def transfer_selected():
     config_store = _services()["config"]
     try:
         target_fid = _normalize_fid(
-            data.get("target_fid")
-            or config_store.get_default_storage_target_id()
-            or "0"
+            data.get("target_fid") or "0"
         )
     except ValueError as exc:
         return _json_error(str(exc))
@@ -848,7 +839,7 @@ def transfer_selected():
                 movie,
                 candidate,
                 target_fid,
-                _services()["config"].get_quark_config().get("category_fids", {}),
+                {},
                 progress,
             )
 
