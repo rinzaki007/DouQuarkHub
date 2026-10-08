@@ -447,7 +447,8 @@ async function createTask() {
     if (!files.length) return taskToast('请至少选择 1 集作为首次处理基线');
     const payload = {
         title:title,
-        channel:selectedCandidate.candidate.channel,
+        channel:selectedCandidate.candidate.channel_id || selectedCandidate.candidate.channel || '',
+        channel_name:selectedCandidate.candidate.channel || '',
         source_id:selectedCandidate.candidate.source_id || 'telegram',
         pwd_id:selectedCandidate.candidate.pwd_id,
         files:files,
