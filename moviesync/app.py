@@ -19,6 +19,8 @@ from .clients.quark import QuarkClient
 from .clients.telegram import TelegramClient
 from .config_store import ConfigStore
 from .logging_setup import configure_logging, recent_logs
+from .services.metadata import MetadataProviderManager
+from .cards_metadata import DoubanMetadataCard
 from .services.resource_sources import ResourceSourceManager
 from .services.search import SearchService
 from .services.storage_targets import StorageTargetManager
@@ -91,7 +93,7 @@ def create_app(
 
     subscriptions = SubscriptionManager(
         settings.subscriptions_file,
-        config_store.get_cookie,
+        storage_targets,
         logger,
     )
 
@@ -101,6 +103,7 @@ def create_app(
         "auth": auth,
         "config": config_store,
         "douban": douban,
+        "metadata": metadata,
         "telegram": telegram,
         "resource_sources": resource_sources,
         "card_registry": card_registry,
