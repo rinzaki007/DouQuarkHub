@@ -87,3 +87,13 @@ def test_quark_storage_card_uses_storage_target_interface():
     assert card.card_type == "storage_target"
     assert "storage.transfer" in card.capabilities
     assert card.check()["status"] == "unconfigured"
+
+
+def test_registry_contains_unified_card_manifest_contract():
+    from moviesync.cards_metadata import DoubanMetadataCard
+    from moviesync.services.resource_sources import TelegramResourceSource
+
+    assert DoubanMetadataCard.manifest.type == "metadata_provider"
+    assert TelegramResourceSource.manifest.type == "resource_source"
+    assert "metadata.search" in DoubanMetadataCard.manifest.capabilities
+    assert "resource.search" in TelegramResourceSource.manifest.capabilities
