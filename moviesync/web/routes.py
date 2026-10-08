@@ -353,6 +353,16 @@ def get_config():
     )
 
 
+@api.get("/config/export")
+def export_config():
+    return jsonify(
+        {
+            "success": True,
+            "config": _services()["config"].load(),
+        }
+    )
+
+
 @api.post("/config")
 @require_csrf
 def save_config():
