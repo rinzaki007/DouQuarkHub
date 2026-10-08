@@ -79,7 +79,7 @@ class TelegramResourceSource(ResourceSource):
                                 **item,
                                 "source_id": self.source_id,
                                 "source_name": self.name,
-                                "storage_target_id": item.get("storage_target_id", "quark"),
+                                "storage_target_id": item.get("storage_target_id", ""),
                             }
                         )
                 except Exception:
