@@ -9,10 +9,10 @@ import re
 import threading
 from typing import Any
 
-from ..clients.quark import VIDEO_EXTENSIONS, sanitize_pwd_id
 from .resource_sources import ResourceSourceManager
 from .storage_targets import StorageTargetManager
 
+VIDEO_EXTENSIONS = (".mp4", ".mkv", ".avi", ".mov", ".flv", ".wmv", ".m4v", ".ts", ".m2ts", ".iso")
 MAX_VIDEO_FILES_PER_CANDIDATE = 200
 MAX_CANDIDATES_PER_MOVIE = 20
 
@@ -104,7 +104,7 @@ class SearchService:
         seen_pwd_ids: set[str] = set()
 
         for source in discovered:
-            pwd_id = sanitize_pwd_id(source.get("pwd_id"))
+            pwd_id = str(source.get("pwd_id") or "").strip()
             if not pwd_id or pwd_id in seen_pwd_ids:
                 continue
             resource = {
@@ -193,7 +193,7 @@ class SearchService:
         # 前端传入 target_fid 即表示用户明确选择了目标目录；分类目录仅作为资源选择页的默认值。
         # 不再在服务层强制覆盖用户选择，避免“下拉框看似可选但实际始终按分类目录转存”。
         parent_fid = str(target_fid or (category_fids or {}).get(tag) or "0").strip() or "0"
-        pwd_id = sanitize_pwd_id(candidate.get("pwd_id"))
+        pwd_id = str(candidate.get("pwd_id") or "").strip()
         selected_fids = [
             str(item.get("fid"))
             for item in candidate.get("files", [])
