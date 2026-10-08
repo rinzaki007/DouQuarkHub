@@ -132,7 +132,7 @@ class SubscriptionManager:
             item["schema_version"] = SUBSCRIPTION_SCHEMA_VERSION
             item.setdefault("storage_target_id", "")
             item.setdefault("cover", "")
-            item.setdefault("tracking_mode", "all")
+            item.setdefault("tracking_mode", "legacy")
             tracked = item.get("tracked_file_keys")
             if not isinstance(tracked, list):
                 item["tracked_file_keys"] = []
@@ -427,14 +427,30 @@ class SubscriptionManager:
 
         selected = []
         found_keys = []
-        if tracked_keys or sub.get("files") or sub.get("tracking_mode") == "all":
+        if sub.get("tracking_mode") == "all":
             for item in files:
                 fid = str(item.get("fid") or "").strip()
                 if fid and fid not in tracked_keys:
                     selected.append({"fid": fid})
                     found_keys.append(fid)
+        elif sub.get("files"):
+            # 兼容旧订阅：继续只监控创建时指定的文件。
+            saved = {
+                item for item in (sub.get("saved_episodes", []) or [])
+                if isinstance(item, (str, int))
+            }
+            target_fids = {
+                str(item.get("fid"))
+                for item in (sub.get("files") or [])
+                if isinstance(item, dict) and item.get("fid")
+            }
+            for item in files:
+                fid = str(item.get("fid") or "")
+                if fid in target_fids and fid not in saved:
+                    selected.append({"fid": fid})
+                    found_keys.append(fid)
         else:
-            # 兼容旧订阅：没有初始文件基线时继续按集数判断，避免历史任务行为改变。
+            # 兼容更早的旧订阅：没有初始文件基线时按集数判断。
             saved = {
                 item for item in (sub.get("saved_episodes", []) or [])
                 if isinstance(item, (str, int))
