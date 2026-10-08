@@ -17,7 +17,7 @@ CHANNEL_ID_RE = re.compile(r"^[A-Za-z0-9_]{2,64}$")
 FID_RE = re.compile(r"^[A-Za-z0-9_-]{1,128}$")
 
 MAX_CHANNELS = 100
-CONFIG_SCHEMA_VERSION = 3
+CONFIG_SCHEMA_VERSION = 4
 
 
 class ConfigValidationError(ValueError):
@@ -42,24 +42,22 @@ class ConfigStore:
                         "category_fids": deepcopy(DEFAULT_CATEGORY_FIDS),
                     },
                 },
+                "telegram": {
+                    "enabled": True,
+                    "config": {
+                        "channels": [],
+                        "health": {
+                            "status": "unknown",
+                            "message": "尚未检查",
+                            "last_checked_at": None,
+                            "last_success_at": None,
+                            "failure_count": 0,
+                            "channels": [],
+                        },
+                    },
+                },
             },
             "openlist_url": DEFAULT_OPENLIST_URL,
-            "channels": [],
-            "resource_sources": [
-                {
-                    "id": "telegram",
-                    "name": "Telegram",
-                    "type": "telegram",
-                    "enabled": True,
-                    "health": {
-                        "status": "unknown",
-                        "message": "尚未检查",
-                        "last_checked_at": None,
-                        "last_success_at": None,
-                        "failure_count": 0,
-                    },
-                }
-            ],
             "schema_version": CONFIG_SCHEMA_VERSION,
         }
 
@@ -203,16 +201,13 @@ class ConfigStore:
 
     def load(self) -> dict:
         data = self.store.read()
-
         defaults = self._defaults()
-
         if isinstance(data, dict):
             defaults.update(data)
 
         cards = defaults.get("cards") if isinstance(defaults.get("cards"), dict) else {}
         quark = cards.get("quark") if isinstance(cards.get("quark"), dict) else {}
         quark_config = quark.get("config") if isinstance(quark.get("config"), dict) else {}
-        # 兼容旧版顶层夸克配置：如果配置文件仍保留旧字段，优先迁移到卡片配置。
         if "quark_cookie" in defaults:
             quark_config["cookie"] = str(defaults.get("quark_cookie") or "")
         if "default_fid" in defaults:
@@ -224,23 +219,39 @@ class ConfigStore:
         quark["enabled"] = bool(quark.get("enabled", True))
         quark["config"] = quark_config
         cards["quark"] = quark
-        defaults["cards"] = cards
-        defaults.pop("quark_cookie", None)
-        defaults.pop("default_fid", None)
-        defaults.pop("category_fids", None)
 
-        # 旧版本没有 schema_version；读取时自动补齐，后续保存即完成升级。
+        telegram = cards.get("telegram") if isinstance(cards.get("telegram"), dict) else {}
+        telegram_config = telegram.get("config") if isinstance(telegram.get("config"), dict) else {}
+        if "channels" in defaults and not telegram_config.get("channels"):
+            telegram_config["channels"] = defaults.get("channels") or []
+        old_sources = defaults.get("resource_sources")
+        source = next(
+            (item for item in old_sources if isinstance(item, dict) and item.get("id") == "telegram"),
+            None,
+        ) if isinstance(old_sources, list) else None
+        if source:
+            telegram["enabled"] = bool(source.get("enabled", telegram.get("enabled", True)))
+            if source.get("health"):
+                telegram_config["health"] = dict(source["health"])
+        telegram["enabled"] = bool(telegram.get("enabled", True))
+        telegram_config["channels"] = self._normalize_channels(
+            telegram_config.get("channels", [])
+        )
+        health = dict(self._defaults()["cards"]["telegram"]["config"]["health"])
+        health.update(telegram_config.get("health") or {})
+        telegram_config["health"] = health
+        telegram["config"] = telegram_config
+        cards["telegram"] = telegram
+
+        defaults["cards"] = cards
+        for key in ("quark_cookie", "default_fid", "category_fids", "channels", "resource_sources"):
+            defaults.pop(key, None)
+
         try:
-            schema_version = int(
-                defaults.get("schema_version", 1)
-            )
+            schema_version = int(defaults.get("schema_version", 1))
         except (TypeError, ValueError):
             schema_version = 1
-
-        defaults["schema_version"] = max(
-            schema_version,
-            CONFIG_SCHEMA_VERSION,
-        )
+        defaults["schema_version"] = max(schema_version, CONFIG_SCHEMA_VERSION)
 
         quark_config = defaults["cards"]["quark"].setdefault("config", {})
         quark_config["default_fid"] = self._normalize_fid(
@@ -256,28 +267,6 @@ class ConfigStore:
             )
             for key in DEFAULT_CATEGORY_FIDS
         }
-
-        defaults["channels"] = self._normalize_channels(
-            defaults.get("channels", [])
-        )
-
-        source_defaults = self._defaults()["resource_sources"]
-        incoming_sources = defaults.get("resource_sources") or []
-        source_map = {
-            str(item.get("id")): item
-            for item in incoming_sources
-            if isinstance(item, dict) and item.get("id")
-        }
-        defaults["resource_sources"] = []
-        for source in source_defaults:
-            item = dict(source)
-            saved = source_map.get(source["id"], {})
-            item["enabled"] = bool(saved.get("enabled", item["enabled"]))
-            health = dict(item["health"])
-            health.update(saved.get("health") or {})
-            item["health"] = health
-            defaults["resource_sources"].append(item)
-
         return defaults
 
     def get_quark_config(self) -> dict:
@@ -325,7 +314,25 @@ class ConfigStore:
         ).strip()
 
     def get_channels(self) -> list[dict[str, str]]:
-        return self.load()["channels"]
+        return self.load()["cards"]["telegram"]["config"]["channels"]
+
+    def get_telegram_config(self) -> dict:
+        return deepcopy(self.load()["cards"]["telegram"]["config"])
+
+    def save_telegram_config(self, incoming: dict) -> dict:
+        if not isinstance(incoming, dict):
+            raise ConfigValidationError("Telegram 卡片配置必须是 JSON 对象")
+        current = self.load()
+        card = current["cards"]["telegram"]
+        config = card["config"]
+        if "channels" in incoming:
+            config["channels"] = self._normalize_channels(incoming["channels"])
+        if "enabled" in incoming:
+            card["enabled"] = bool(incoming["enabled"])
+        current["cards"]["telegram"] = card
+        current["schema_version"] = CONFIG_SCHEMA_VERSION
+        self.store.write(current)
+        return deepcopy(card)
 
     def public(self) -> dict:
         config = self.load()
@@ -366,31 +373,8 @@ class ConfigStore:
             )
 
         if "channels" in incoming:
-            current["channels"] = self._normalize_channels(
-                incoming["channels"]
-            )
-
-        if "resource_sources" in incoming:
-            source_items = incoming["resource_sources"]
-            if not isinstance(source_items, list):
-                raise ConfigValidationError("resource_sources 必须是数组")
-            normalized_sources = []
-            for item in source_items:
-                if not isinstance(item, dict):
-                    raise ConfigValidationError("资源源配置无效")
-                source_id = str(item.get("id") or "").strip().lower()
-                if source_id != "telegram":
-                    continue
-                normalized_sources.append({
-                    "id": "telegram",
-                    "name": "Telegram",
-                    "type": "telegram",
-                    "enabled": bool(item.get("enabled", True)),
-                    "health": current["resource_sources"][0].get("health", {}),
-                })
-                break
-            if normalized_sources:
-                current["resource_sources"] = normalized_sources
+            self.save_telegram_config({"channels": incoming["channels"]})
+            current = self.load()
 
         current["schema_version"] = CONFIG_SCHEMA_VERSION
         self.store.write(current)
@@ -398,7 +382,15 @@ class ConfigStore:
         return current
 
     def get_resource_sources(self) -> list[dict]:
-        return self.load().get("resource_sources", [])
+        config = self.get_telegram_config()
+        card = self.load()["cards"]["telegram"]
+        return [{
+            "id": "telegram",
+            "name": "Telegram",
+            "type": "telegram",
+            "enabled": bool(card.get("enabled", True)),
+            "health": config.get("health", {}),
+        }]
 
     def update_resource_source_health(
         self,
@@ -411,42 +403,32 @@ class ConfigStore:
         import time
 
         now = time.time()
-        for item in current.get("resource_sources", []):
-            if item.get("id") != source_id:
-                continue
-            health = item.setdefault("health", {})
-            health["status"] = str(status or "unknown")
-            health["message"] = str(message or "")[:200]
-            health["last_checked_at"] = now
-            if channels is not None:
-                health["channels"] = [
-                    {
-                        "id": str(channel.get("id") or ""),
-                        "name": str(channel.get("name") or ""),
-                        "status": str(channel.get("status") or "unknown"),
-                        "message": str(channel.get("message") or "")[:200],
-                    }
-                    for channel in channels
-                    if isinstance(channel, dict)
-                ]
-            if status == "healthy":
-                health["last_success_at"] = now
-            elif status == "unavailable":
-                health["failure_count"] = int(
-                    health.get("failure_count", 0) or 0
-                ) + 1
-            self.store.write(current)
+        if source_id != "telegram":
             return
+        card = current["cards"]["telegram"]
+        health = card["config"].setdefault("health", {})
+        health["status"] = str(status or "unknown")
+        health["message"] = str(message or "")[:200]
+        health["last_checked_at"] = now
+        if channels is not None:
+            health["channels"] = [
+                {
+                    "id": str(channel.get("id") or ""),
+                    "name": str(channel.get("name") or ""),
+                    "status": str(channel.get("status") or "unknown"),
+                    "message": str(channel.get("message") or "")[:200],
+                }
+                for channel in channels
+                if isinstance(channel, dict)
+            ]
+        if status == "healthy":
+            health["last_success_at"] = now
+        elif status == "unavailable":
+            health["failure_count"] = int(health.get("failure_count", 0) or 0) + 1
+        self.store.write(current)
 
     def save_channels(
         self,
         channels: object,
     ) -> list[dict[str, str]]:
-        normalized = self._normalize_channels(channels)
-
-        current = self.load()
-        current["channels"] = normalized
-
-        self.store.write(current)
-
-        return normalized
+        return self.save_telegram_config({"channels": channels})["config"]["channels"]
