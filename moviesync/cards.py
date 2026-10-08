@@ -235,8 +235,11 @@ class MetadataProviderCard(Card):
         id="unknown.metadata",
         name="未命名元数据源",
         type="metadata_provider",
-        capabilities=("metadata.search", "metadata.detail"),
+        capabilities=("metadata.list", "metadata.search", "metadata.detail"),
     )
+
+    def list_movies(self, tag: str, sort_type: str) -> list[dict[str, Any]]:
+        raise NotImplementedError
 
     def search(self, query: str) -> list[dict[str, Any]]:
         raise NotImplementedError
