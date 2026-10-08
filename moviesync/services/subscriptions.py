@@ -294,7 +294,7 @@ class SubscriptionManager:
             "phase": "waiting",
             "phase_label": "等待下次检查",
             "tracked_file_keys": (
-                [f"{pwd_id}:{fid}" for fid in target_fids]
+                []
                 if source_id and channel
                 else target_fids
             ),
