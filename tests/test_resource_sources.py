@@ -1,3 +1,7 @@
+import pytest
+
+from moviesync.cards import Card, CardManifest, ResourceSourceCard
+from moviesync.services import resource_sources as resource_sources_module
 from moviesync.services.resource_sources import ResourceSourceManager
 
 
@@ -205,9 +209,6 @@ def test_manager_registers_direct_resource_source_card():
 
 
 def test_manager_rejects_non_resource_card_registration():
-    import pytest
-    from moviesync.cards import Card
-
     class OtherCard(Card):
         pass
 
@@ -217,9 +218,6 @@ def test_manager_rejects_non_resource_card_registration():
 
 
 def test_manager_loads_installed_resource_card_entry_points(monkeypatch):
-    from moviesync.cards import CardManifest, ResourceSourceCard
-    from moviesync.services import resource_sources as module
-
     class PluginCard(ResourceSourceCard):
         manifest = CardManifest(
             id="entrypoint-source",
@@ -240,7 +238,7 @@ def test_manager_loads_installed_resource_card_entry_points(monkeypatch):
         def load(self):
             return lambda context: PluginCard()
 
-    monkeypatch.setattr(module, "entry_points", lambda **kwargs: [FakeEntryPoint()])
+    monkeypatch.setattr(resource_sources_module, "entry_points", lambda **kwargs: [FakeEntryPoint()])
     manager = ResourceSourceManager(FakeTelegramClient(), object(), FakeLogger())
 
     assert manager.load_plugins({"example": True}) == ["entrypoint-source"]
