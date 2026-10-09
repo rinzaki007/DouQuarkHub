@@ -557,11 +557,12 @@ def cards():
         item = card.manifest.to_dict()
         item["enabled"] = bool(saved.get("enabled", True))
         card_config = saved.get("config", {})
+        card_config = card_config if isinstance(card_config, dict) else {}
         item["configured"] = False
         if card.card_id == "telegram":
             health = card_config.get("health", {}) if isinstance(card_config, dict) else {}
             item["configured"] = bool(card_config.get("channels"))
-            item["health"] = health or {
+            item["health"] = health if isinstance(health, dict) and health else {
                 "status": "idle",
                 "message": "尚未检查",
             }
@@ -676,7 +677,16 @@ def resource_card_config(card_id):
         return _json_error("包含未声明的配置字段: " + ", ".join(sorted(unknown)))
 
     merged, persisted_incoming = dict(raw_config), {}
-    sensitive_markers = ("cookie", "token", "secret", "password", "api_key", "authorization", "credential")
+    sensitive_markers = (
+        "cookie",
+        "token",
+        "secret",
+        "password",
+        "api_key",
+        "authorization",
+        "credential",
+        "private_key",
+    )
     for key, value in incoming.items():
         field = fields_by_key[key]
         field_type = field.get("type", "string")

@@ -527,3 +527,65 @@ def test_private_key_fields_are_redacted_from_card_config_api(tmp_path):
     assert card.public_config({"nested": {"private_key": "test-value"}}) == {
         "nested": {"has_private_key": True}
     }
+
+
+
+def test_card_list_handles_malformed_persisted_card_config(tmp_path):
+    from moviesync.app import create_app
+
+    app = create_app({"MOVIESYNC_DATA_DIR": str(tmp_path)}, start_scheduler=False)
+    services = app.extensions["moviesync"]
+    config = services["config"].load()
+    config["cards"]["telegram"]["config"] = []
+    services["config"].store.write(config)
+
+    client = app.test_client()
+    client.post("/api/setup", json={"username": "admin", "password": "password123"})
+    response = client.get("/api/cards")
+
+    assert response.status_code == 200
+    body = response.get_json()
+    telegram = next(card for card in body["cards"] if card["id"] == "telegram")
+    assert telegram["configured"] is False
+    assert isinstance(telegram["health"], dict)
+    assert telegram["health"]["status"] == "unknown"
+    assert telegram["health"]["message"] == "尚未检查"
+
+
+def test_private_key_config_empty_submission_preserves_saved_secret(tmp_path):
+    from moviesync.app import create_app
+    from moviesync.cards import CardManifest, ResourceSourceCard
+
+    app = create_app({"MOVIESYNC_DATA_DIR": str(tmp_path)}, start_scheduler=False)
+    services = app.extensions["moviesync"]
+
+    class PrivateKeyCard(ResourceSourceCard):
+        manifest = CardManifest(
+            id="private-key-source",
+            name="Private Key Source",
+            type="resource_source",
+            config_fields=({"key": "private_key", "type": "string"},),
+        )
+
+        def search(self, movie, config):
+            return []
+
+        def check(self, config):
+            return {"status": "healthy"}
+
+    services["resource_sources"].register(PrivateKeyCard())
+    services["config"].save_card_config("private-key-source", {"private_key": "KEEP_ME"})
+    client = app.test_client()
+    client.post("/api/setup", json={"username": "admin", "password": "password123"})
+    with client.session_transaction() as session:
+        csrf = session["csrf_token"]
+
+    response = client.post(
+        "/api/cards/private-key-source/config",
+        json={"config": {"private_key": ""}},
+        headers={"X-CSRF-Token": csrf},
+    )
+
+    assert response.status_code == 200
+    assert services["config"].load()["cards"]["private-key-source"]["config"]["private_key"] == "KEEP_ME"
+    assert "KEEP_ME" not in response.get_data(as_text=True)
