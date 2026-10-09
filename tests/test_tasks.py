@@ -135,3 +135,60 @@ def test_duplicate_retry_reuses_existing_active_retry(tmp_path):
     finally:
         release.set()
         manager.executor.shutdown(wait=True)
+
+
+def test_restart_recovery_only_allows_retry_when_task_never_started(tmp_path):
+    import json
+
+    path = tmp_path / "tasks.json"
+    payload = {
+        "movie": {"title": "恢复测试"},
+        "candidate": {"pwd_id": "share-1", "files": [{"fid": "file-1"}]},
+        "target_fid": "target-1",
+    }
+    path.write_text(
+        json.dumps([
+            {
+                "id": "queued-before-restart",
+                "type": "transfer",
+                "status": "queued",
+                "title": "排队任务",
+                "events": [],
+                "retry_payload": payload,
+            },
+            {
+                "id": "running-before-restart",
+                "type": "transfer",
+                "status": "running",
+                "title": "执行中任务",
+                "events": [],
+                "retry_payload": payload,
+            },
+        ]),
+        encoding="utf-8",
+    )
+
+    manager = TaskManager(path, logging.getLogger("test"))
+    try:
+        recovered = {task["id"]: task for task in manager.list_tasks()}
+        assert recovered["queued-before-restart"]["status"] == "failed"
+        assert recovered["queued-before-restart"]["recovery_uncertain"] is False
+        assert recovered["running-before-restart"]["status"] == "failed"
+        assert recovered["running-before-restart"]["recovery_uncertain"] is True
+        assert "检查目标网盘" in recovered["running-before-restart"]["message"]
+
+        assert manager.retry_transfer(
+            "running-before-restart",
+            lambda progress: (True, "不应执行", {"success": 1}),
+        ) is None
+
+        retry = manager.retry_transfer(
+            "queued-before-restart",
+            lambda progress: (True, "安全重试成功", {"success": 1}),
+        )
+        assert retry is not None
+        assert retry["status"] == "queued"
+        manager.executor.shutdown(wait=True)
+        assert manager.get_task(retry["id"])["status"] == "success"
+    finally:
+        manager.shutdown()

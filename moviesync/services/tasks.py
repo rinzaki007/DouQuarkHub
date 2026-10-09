@@ -32,11 +32,30 @@ class TaskManager:
             for item in items:
                 if not isinstance(item, dict):
                     continue
-                if item.get("status") in {"queued", "running"}:
+                if item.get("status") == "queued":
+                    # queued means the worker had not marked the task as running;
+                    # it is safe to retry because the transfer runner had not started.
                     item["status"] = "failed"
                     item["phase"] = "failed"
                     item["phase_label"] = "任务中断"
-                    item["message"] = "服务重启导致任务中断，可执行失败重试"
+                    item["message"] = "服务重启时任务仍在排队，未开始执行，可安全重试"
+                    item["recovery_uncertain"] = False
+                    item["failed_count"] = max(1, int(item.get("failed_count", 0) or 0))
+                    item["updated_at"] = time.time()
+                    self._append_event(item, "error", item["message"])
+                    changed = True
+                elif item.get("status") == "running":
+                    # A running transfer may already have reached the remote drive.
+                    # Never offer a blind retry after a process crash.
+                    item["status"] = "failed"
+                    item["phase"] = "failed"
+                    item["phase_label"] = "结果待核实"
+                    item["message"] = (
+                        "服务在任务执行中重启，网盘端可能已完成转存。"
+                        "请先检查目标网盘；确认未转存后再手动重新创建任务。"
+                        "为避免重复转存，系统已禁用此任务的直接重试。"
+                    )
+                    item["recovery_uncertain"] = True
                     item["failed_count"] = max(1, int(item.get("failed_count", 0) or 0))
                     item["updated_at"] = time.time()
                     self._append_event(item, "error", item["message"])
@@ -222,7 +241,12 @@ class TaskManager:
         with self.lock:
             items = self.list_tasks()
             old = next((item for item in items if str(item.get("id")) == str(task_id)), None)
-            if not old or old.get("type") != "transfer" or old.get("status") != "failed":
+            if (
+                not old
+                or old.get("type") != "transfer"
+                or old.get("status") != "failed"
+                or old.get("recovery_uncertain")
+            ):
                 return None
             payload = old.get("retry_payload") or {}
             dedupe_key = old.get("dedupe_key") or self._payload_key(payload)
