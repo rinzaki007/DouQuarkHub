@@ -6,10 +6,34 @@
 from __future__ import annotations
 
 import logging
+import re
 from collections import deque
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from threading import Lock
+
+
+class RedactingFormatter(logging.Formatter):
+    """格式化后统一脱敏，覆盖普通日志消息和异常 traceback。"""
+
+    _quoted_secret = re.compile(
+        r"""(?i)((?:["']?)(?:cookie|set-cookie|token|access_token|refresh_token|api[_-]?key|secret|password|authorization|credential|private[_-]?key|client_secret)(?:["']?)\s*[:=]\s*)(["'])([^"'\\r\\n]*)\\2"""
+    )
+    _authorization = re.compile(
+        r"(?i)(\\bauthorization\\s*[:=]\\s*)(?:bearer\\s+)?[^\\s,;\\]}]+"
+    )
+    _plain_secret = re.compile(
+        r"(?i)(\\b(?:cookie|set-cookie|token|access_token|refresh_token|api[_-]?key|secret|password|authorization|credential|private[_-]?key|client_secret)\\b\\s*[:=]\\s*)[^\\s,;\\]}]+"
+    )
+
+    @classmethod
+    def redact(cls, message: str) -> str:
+        message = cls._quoted_secret.sub(r"\\1[REDACTED]", message)
+        message = cls._authorization.sub(r"\\1[REDACTED]", message)
+        return cls._plain_secret.sub(r"\\1[REDACTED]", message)
+
+    def format(self, record: logging.LogRecord) -> str:
+        return self.redact(super().format(record))
 
 
 class RingBufferHandler(logging.Handler):
@@ -45,7 +69,7 @@ def configure_logging(log_dir: Path) -> logging.Logger:
         return logger
 
     log_dir.mkdir(parents=True, exist_ok=True)
-    formatter = logging.Formatter("[%(asctime)s] [%(levelname)s] %(message)s", "%Y-%m-%d %H:%M:%S")
+    formatter = RedactingFormatter("[%(asctime)s] [%(levelname)s] %(message)s", "%Y-%m-%d %H:%M:%S")
 
     _ring_handler = RingBufferHandler(300)
     _ring_handler.setFormatter(formatter)
