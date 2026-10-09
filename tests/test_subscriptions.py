@@ -545,7 +545,7 @@ class SelectiveResolutionStorageTargets(ChannelStorageTargets):
 
 
 def test_channel_subscription_does_not_report_no_updates_when_all_shares_fail_resolution(tmp_path):
-    storage = SelectiveResolutionStorage({"share1", "share2"})
+    storage = SelectiveResolutionStorageTargets({"share1", "share2"})
     sources = FakeResourceSources()
     manager = SubscriptionManager(
         tmp_path / "all-shares-failed.json",
@@ -575,7 +575,7 @@ def test_channel_subscription_does_not_report_no_updates_when_all_shares_fail_re
 
 
 def test_channel_subscription_reports_partial_resolution_failure_without_resaving_successes(tmp_path):
-    storage = SelectiveResolutionStorage({"share2"})
+    storage = SelectiveResolutionStorageTargets({"share2"})
     sources = FakeResourceSources()
     manager = SubscriptionManager(
         tmp_path / "partial-share-failure.json",

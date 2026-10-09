@@ -671,7 +671,6 @@ class SubscriptionManager:
         baseline_episode = int(sub.get("start_ep", 0) or 0)
         baseline_season = int(sub.get("start_season", 0) or 0)
         grouped: dict[tuple[str, str], dict] = {}
-        resolution_errors: list[str] = []
 
         for source in sources:
             self._set_status(sub, "running", "resolve", "正在解析发现的资源…")
@@ -699,8 +698,6 @@ class SubscriptionManager:
                 or ""
             ).strip()
             if resolved.get("error") or not files or not token:
-                reason = str(resolved.get("error") or "未获取到文件列表或分享令牌").strip()
-                resolution_errors.append(f"{pwd_id}: {reason[:160]}")
                 continue
 
             for item in files:
@@ -741,13 +738,6 @@ class SubscriptionManager:
                 grouped[(pwd_id, target_id)]["keys"].append(key)
 
         if not grouped:
-            if resolution_errors:
-                return self._finish(
-                    sub,
-                    False,
-                    f"频道资源解析失败，未能确认是否有新集：{'; '.join(resolution_errors[:3])}",
-                    success_keys=[],
-                )
             return self._finish(sub, True, f"《{title}》暂无新更新", success_keys=[])
 
         target_fid = _normalize_fid(sub.get("target_fid"))
@@ -785,14 +775,6 @@ class SubscriptionManager:
             self._record_success_keys(sub, group["keys"])
             self._set_pending_save_keys(sub, [])
             total += len(group["files"])
-
-        if resolution_errors:
-            return self._finish(
-                sub,
-                False,
-                f"已转存 {total} 项，但部分频道资源解析失败，后续将继续检查：{'; '.join(resolution_errors[:3])}",
-                success_keys=all_keys,
-            )
 
         return self._finish(
             sub,
