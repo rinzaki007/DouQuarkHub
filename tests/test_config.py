@@ -151,3 +151,28 @@ def test_openlist_url_can_be_empty(tmp_path):
     store = ConfigStore(tmp_path / "config.json", tmp_path / "legacy")
     saved = store.save({"openlist_url": ""})
     assert saved["openlist_url"] == ""
+
+
+def test_full_config_save_preserves_telegram_magic_regex(tmp_path):
+    store = ConfigStore(tmp_path / "config.json", tmp_path / "legacy")
+    channels = [{"id": "movie_channel", "name": "电影频道"}]
+    magic_regex = {
+        "pattern": r"(?i)\bS\d{2}E\d{2}\b",
+        "replace": r"\g<0>",
+    }
+
+    store.save({
+        "cards": {
+            "telegram": {
+                "enabled": True,
+                "config": {
+                    "channels": channels,
+                    "magic_regex": magic_regex,
+                },
+            },
+        },
+    })
+
+    config = store.get_telegram_config()
+    assert config["channels"] == channels
+    assert config["magic_regex"] == magic_regex
