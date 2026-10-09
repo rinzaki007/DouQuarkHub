@@ -57,6 +57,42 @@ def test_resource_source_uses_telegram_card_config():
     assert results[0]["channel"] == "电影频道"
 
 
+
+def test_resource_source_parses_episode_using_card_magic_regex():
+    class Store:
+        def load(self):
+            return {
+                "cards": {
+                    "telegram": {
+                        "enabled": True,
+                        "config": {
+                            "channels": [],
+                            "magic_regex": {
+                                "pattern": r".*?(?<!\\d)([Ss]\\d{1,2})?([Ee]?[Pp]?[Xx]?\\d{1,3})(?!\\d).*?\\.(mp4|mkv)",
+                                "replace": r"\\1\\2.\\3",
+                            },
+                        },
+                    }
+                }
+            }
+
+        def update_resource_source_health(self, *args, **kwargs):
+            pass
+
+        def get_resource_sources(self):
+            return []
+
+    manager = ResourceSourceManager(FakeTelegramClient(), Store(), FakeLogger())
+    assert manager.parse_tv_episode(
+        "telegram",
+        "Stranger.Things.S04E01.2022.NF.WEB-DL.2160p.HEVC.HDR.DDP.mkv",
+    ) == (4, 1)
+    assert manager.parse_tv_episode(
+        "telegram",
+        "Stranger.Things.S02E09.2160p.BluRay.x265.10bit.DTS.mkv",
+    ) == (2, 9)
+
+
 def test_resource_source_health_uses_telegram_card_config():
     class Store:
         def load(self):
