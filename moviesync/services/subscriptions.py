@@ -239,16 +239,25 @@ class SubscriptionManager:
                 if item.get("status") != "running":
                     continue
                 pending = list(item.get("pending_save_keys", []) or [])
+                invalid_pending = bool(item.get("pending_save_keys_invalid"))
+                uncertain_pending = bool(pending) or invalid_pending
                 item["status"] = "failed"
                 item["phase"] = "failed"
                 item["last_check_at"] = time.time()
                 item["last_error"] = (
-                    "服务重启时转存请求结果不明确，请核对网盘后手动确认。"
-                    if pending
-                    else "服务重启导致检查中断，可安全重新检查。"
+                    "服务重启时待确认转存记录格式异常，无法安全重试；请检查网盘并修复订阅记录。"
+                    if invalid_pending
+                    else (
+                        "服务重启时转存请求结果不明确，请核对网盘后手动确认。"
+                        if pending
+                        else "服务重启导致检查中断，可安全重新检查。"
+                    )
                 )
-                item["phase_label"] = "转存结果待核实" if pending else "检查中断"
-                item["pending_save_uncertain"] = bool(pending)
+                item["phase_label"] = "转存结果待核实" if uncertain_pending else "检查中断"
+                # A malformed pending-key list is still evidence of an
+                # ambiguous remote side effect. Do not clear the guard merely
+                # because normalization removed every unusable key.
+                item["pending_save_uncertain"] = uncertain_pending
                 item["last_check"] = self._now_string() + " (中断)"
                 changed = True
             if changed:
