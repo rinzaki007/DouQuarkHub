@@ -446,3 +446,82 @@ def test_channel_subscription_checkpoints_successful_share_before_later_share_fa
     assert "成功追更 1 项" in message
     assert storage.transfers.count(("share1", ["ep1"])) == 1
     assert storage.transfers.count(("share2", ["ep2"])) == 2
+
+
+def test_uncertain_subscription_transfer_is_held_until_user_confirms(tmp_path):
+    class UncertainStorage(ChannelStorageTargets):
+        def __init__(self):
+            super().__init__()
+            self.calls = 0
+
+        def transfer(self, resource, files, target_id="0", storage_target_id=None, token=None):
+            self.calls += 1
+            return False, "转存结果不确定：请求可能已到达网盘"
+
+    storage = UncertainStorage()
+    storage.shares = {
+        "share-selected": [{"fid": "ep1", "file_name": "Show.S01E01.mkv"}],
+    }
+    sources = FakeResourceSources()
+    sources.shares = [{"channel": "demo", "pwd_id": "share-selected"}]
+    manager = SubscriptionManager(
+        tmp_path / "uncertain-transfer.json",
+        storage,
+        sources,
+        FakeLogger(),
+    )
+    sub = manager.add_subscription(
+        title="Show",
+        pwd_id="share-selected",
+        target_fid="0",
+        storage_target_id="demo-storage",
+        source_id="telegram",
+        channel="demo",
+        files=[{"fid": "ep1", "file_name": "Show.S01E01.mkv"}],
+    )
+
+    ok, message = manager.check_subscription_now(sub["id"])
+    assert ok is False
+    assert "转存结果不确定" in message
+    saved = manager.get_subscriptions()[0]
+    assert saved["pending_save_uncertain"] is True
+    assert saved["pending_save_keys"] == ["share-selected:ep1"]
+
+    ok, message = manager.check_subscription_now(sub["id"])
+    assert ok is False
+    assert "待核实" in message
+    assert storage.calls == 1
+
+    ok, message = manager.resolve_pending_save(sub["id"], "saved")
+    assert ok is True
+    saved = manager.get_subscriptions()[0]
+    assert saved["pending_save_keys"] == []
+    assert saved["pending_save_uncertain"] is False
+    assert "share-selected:ep1" in saved["tracked_file_keys"]
+    assert storage.calls == 1
+
+
+def test_interrupted_subscription_with_pending_files_recovers_as_uncertain(tmp_path):
+    import json
+
+    path = tmp_path / "interrupted-subscriptions.json"
+    path.write_text(
+        json.dumps([{
+            "id": "interrupted",
+            "title": "Show",
+            "pwd_id": "share",
+            "status": "running",
+            "pending_save_keys": ["share:file1"],
+            "tracked_file_keys": [],
+            "saved_episodes": [],
+            "run_history": [],
+        }]),
+        encoding="utf-8",
+    )
+    manager = SubscriptionManager(path, ChannelStorageTargets(), FakeResourceSources(), FakeLogger())
+    recovered = manager.get_subscriptions()[0]
+    assert recovered["status"] == "failed"
+    assert recovered["pending_save_uncertain"] is True
+    ok, message = manager.check_subscription_now("interrupted")
+    assert ok is False
+    assert "待核实" in message

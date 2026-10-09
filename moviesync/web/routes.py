@@ -1089,6 +1089,7 @@ def get_tasks():
             "subscription_id": sub.get("id"),
             "retry_count": sub.get("retry_count", 0),
             "pending_save_keys": sub.get("pending_save_keys", []) or [],
+            "pending_save_uncertain": bool(sub.get("pending_save_uncertain")),
             "phase": task_state["phase"],
             "phase_label": task_state["phase_label"],
         })
@@ -1376,6 +1377,20 @@ def run_subscription_now():
             "message": message,
         }
     )
+
+
+@api.post("/subscriptions/resolve-pending")
+@require_csrf
+def resolve_pending_subscription():
+    data = request.get_json(silent=True) or {}
+    sub_id = str(data.get("id") or "").strip()
+    action = str(data.get("action") or "").strip()
+    if not sub_id:
+        return _json_error("未提供订阅 ID")
+    if action not in {"saved", "not_saved"}:
+        return _json_error("确认操作无效")
+    success, message = _services()["subscriptions"].resolve_pending_save(sub_id, action)
+    return jsonify({"success": success, "message": message})
 
 
 @api.get("/proxy-img")

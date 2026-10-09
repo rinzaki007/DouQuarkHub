@@ -14,8 +14,9 @@ from threading import Event, RLock, Thread
 
 from ..storage import JsonStore
 from .filename_rules import parse_tv_episode
+from .transfer_outcome import is_uncertain_transfer_message
 
-SUBSCRIPTION_SCHEMA_VERSION = 4
+SUBSCRIPTION_SCHEMA_VERSION = 5
 VIDEO_EXTENSIONS = (".mp4", ".mkv", ".avi", ".mov", ".flv", ".wmv", ".m4v", ".ts", ".m2ts", ".iso")
 
 
@@ -89,6 +90,7 @@ class SubscriptionManager:
         self.stop_event = Event()
         self.worker: Thread | None = None
         self.schema_version = SUBSCRIPTION_SCHEMA_VERSION
+        self._recover_interrupted_subscriptions()
 
     @staticmethod
     def _now_string() -> str:
@@ -136,6 +138,7 @@ class SubscriptionManager:
             item.setdefault("status", "waiting")
             item.setdefault("phase", "waiting")
             item.setdefault("phase_label", "等待下次检查")
+            item.setdefault("pending_save_uncertain", False)
             tracked = item.get("tracked_file_keys")
             if not isinstance(tracked, list):
                 item["tracked_file_keys"] = []
@@ -165,6 +168,31 @@ class SubscriptionManager:
             self.store.write(normalized)
 
         return normalized
+
+
+    def _recover_interrupted_subscriptions(self) -> None:
+        """Recover persisted running subscriptions conservatively after process restart."""
+        with self.lock:
+            subscriptions = self._load_subscriptions()
+            changed = False
+            for item in subscriptions:
+                if item.get("status") != "running":
+                    continue
+                pending = list(item.get("pending_save_keys", []) or [])
+                item["status"] = "failed"
+                item["phase"] = "failed"
+                item["last_check_at"] = time.time()
+                item["last_error"] = (
+                    "服务重启时转存请求结果不明确，请核对网盘后手动确认。"
+                    if pending
+                    else "服务重启导致检查中断，可安全重新检查。"
+                )
+                item["phase_label"] = "转存结果待核实" if pending else "检查中断"
+                item["pending_save_uncertain"] = bool(pending)
+                item["last_check"] = self._now_string() + " (中断)"
+                changed = True
+            if changed:
+                self.store.write(subscriptions)
 
     def get_subscriptions(
         self,
@@ -402,6 +430,11 @@ class SubscriptionManager:
                 False,
                 "未找到订阅任务",
             )
+        if subscription.get("pending_save_uncertain") and subscription.get("pending_save_keys"):
+            return (
+                False,
+                "转存结果待核实：请先在任务中心确认已转存，或确认未转存后再允许重试。",
+            )
 
         sub_id = str(sub_id)
 
@@ -550,6 +583,7 @@ class SubscriptionManager:
             current = next((item for item in subscriptions if item.get("id") == sub.get("id")), None)
             if current is not None:
                 current["pending_save_keys"] = pending_keys
+                current["pending_save_uncertain"] = False
                 current["storage_target_id"] = target_id
                 self.store.write(subscriptions)
 
@@ -561,7 +595,12 @@ class SubscriptionManager:
             fetched_stoken,
         )
         if not ok:
-            return self._finish(sub, False, f"转存失败: {msg}")
+            return self._finish(
+                sub,
+                False,
+                f"转存失败: {msg}",
+                outcome_uncertain=is_uncertain_transfer_message(msg),
+            )
 
         return self._finish(
             sub,
@@ -716,6 +755,7 @@ class SubscriptionManager:
         total = 0
         self._set_status(sub, "running", "transfer", "正在转存新资源…")
         for group in grouped.values():
+            self._set_pending_save_keys(sub, group["keys"])
             ok, msg = self.storage_targets.transfer(
                 group["resource"],
                 group["files"],
@@ -724,9 +764,16 @@ class SubscriptionManager:
                 group["token"],
             )
             if not ok:
-                return self._finish(sub, False, f"转存失败: {msg}", success_keys=all_keys)
+                return self._finish(
+                    sub,
+                    False,
+                    f"转存失败: {msg}",
+                    success_keys=all_keys,
+                    outcome_uncertain=is_uncertain_transfer_message(msg),
+                )
             all_keys.extend(group["keys"])
             self._record_success_keys(sub, group["keys"])
+            self._set_pending_save_keys(sub, [])
             total += len(group["files"])
 
         return self._finish(
@@ -735,6 +782,69 @@ class SubscriptionManager:
             f"🎉 成功追更 {total} 项，已存入专属文件夹【{title}】！",
             success_keys=all_keys,
         )
+
+    def _set_pending_save_keys(self, sub: dict, pending_keys) -> None:
+        keys = list(dict.fromkeys(str(key).strip() for key in (pending_keys or []) if str(key).strip()))[:200]
+        with self.lock:
+            subscriptions = self._load_subscriptions()
+            current = next((item for item in subscriptions if item.get("id") == sub.get("id")), None)
+            if current is None:
+                return
+            current["pending_save_keys"] = keys
+            current["pending_save_uncertain"] = False
+            self.store.write(subscriptions)
+
+    def resolve_pending_save(self, sub_id: str, action: str) -> tuple[bool, str]:
+        """Resolve an ambiguous transfer only after an explicit user confirmation."""
+        with self.lock:
+            subscriptions = self._load_subscriptions()
+            current = next((item for item in subscriptions if str(item.get("id")) == str(sub_id)), None)
+            if current is None:
+                return False, "未找到订阅任务"
+            if str(sub_id) in self.running_ids:
+                return False, "该订阅正在执行，请稍后再确认"
+            keys = list(current.get("pending_save_keys", []) or [])
+            if not current.get("pending_save_uncertain") or not keys:
+                return False, "该任务没有待确认的转存结果"
+            if action not in {"saved", "not_saved"}:
+                return False, "不支持的确认操作"
+            current["pending_save_keys"] = []
+            current["pending_save_uncertain"] = False
+            current["last_error"] = ""
+            current["next_run_at"] = time.time()
+            if action == "saved":
+                tracked = list(current.get("tracked_file_keys", []) or [])
+                tracked_seen = {str(key) for key in tracked}
+                tracked.extend(key for key in keys if str(key) not in tracked_seen)
+                current["tracked_file_keys"] = tracked[-1000:]
+                saved = list(current.get("saved_episodes", []) or [])
+                saved_seen = {str(key) for key in saved}
+                for key in keys:
+                    if ":" in str(key):
+                        continue
+                    value = int(key) if str(key).isdigit() else key
+                    if str(value) not in saved_seen:
+                        saved.append(value)
+                        saved_seen.add(str(value))
+                current["saved_episodes"] = sorted(saved, key=lambda value: (isinstance(value, str), str(value)))
+                current["status"] = "success"
+                current["phase"] = "completed"
+                current["phase_label"] = "已人工确认转存"
+                current["last_check"] = self._now_string() + " (已确认转存)"
+                current["last_check_at"] = time.time()
+                interval = max(1, min(self.max_interval_hours, int(current.get("interval_hours", 6) or 6)))
+                current["next_run_at"] = time.time() + interval * 3600
+                history = list(current.get("run_history", []) or [])
+                history.append({"at": time.time(), "success": True, "message": "用户已确认网盘端转存成功", "success_count": len(keys), "failed_count": 0})
+                current["run_history"] = history[-50:]
+                self.store.write(subscriptions)
+                return True, "已记录转存成功，后续检查不会重复提交这些文件"
+            current["status"] = "waiting"
+            current["phase"] = "waiting"
+            current["phase_label"] = "用户确认未转存，正在重新检查"
+            current["last_check"] = self._now_string() + " (确认未转存)"
+            self.store.write(subscriptions)
+        return self.check_subscription_now(str(sub_id))
 
     def _record_success_keys(self, sub: dict, success_keys) -> None:
         """逐组持久化已确认转存的文件，避免后续组失败或进程中断后重复转存。"""
@@ -762,6 +872,7 @@ class SubscriptionManager:
         success: bool,
         message: str,
         success_keys=None,
+        outcome_uncertain: bool = False,
     ) -> tuple[bool, str]:
         success_keys = (
             success_keys or []
@@ -825,8 +936,15 @@ class SubscriptionManager:
             if success:
                 current["retry_count"] = 0
                 current["pending_save_keys"] = []
+                current["pending_save_uncertain"] = False
                 delay_seconds = interval_hours * 3600
             else:
+                if outcome_uncertain:
+                    current["pending_save_uncertain"] = True
+                    current["phase_label"] = "转存结果待核实"
+                else:
+                    current["pending_save_keys"] = []
+                    current["pending_save_uncertain"] = False
                 try:
                     retry_count = int(
                         current.get(

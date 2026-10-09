@@ -11,6 +11,7 @@ from typing import Any
 
 from .resource_sources import ResourceSourceManager
 from .storage_targets import StorageTargetManager
+from .transfer_outcome import is_uncertain_transfer_message
 
 VIDEO_EXTENSIONS = (".mp4", ".mkv", ".avi", ".mov", ".flv", ".wmv", ".m4v", ".ts", ".m2ts", ".iso")
 MAX_VIDEO_FILES_PER_CANDIDATE = 200
@@ -253,5 +254,11 @@ class SearchService:
             progress(100, "转存完成")
             return True, f"《{title}》转存成功！已精准归档至专属文件夹", {"success": total, "skipped": 0, "failed": 0}
         self.logger.warning("《%s》转存失败: %s", title, msg)
-        return False, f"转存失败: {msg}", {"success": 0, "skipped": 0, "failed": total}
+        uncertain = is_uncertain_transfer_message(msg)
+        return False, f"转存失败: {msg}", {
+            "success": 0,
+            "skipped": 0,
+            "failed": total,
+            "uncertain": uncertain,
+        }
 

@@ -192,3 +192,25 @@ def test_restart_recovery_only_allows_retry_when_task_never_started(tmp_path):
         assert manager.get_task(retry["id"])["status"] == "success"
     finally:
         manager.shutdown()
+
+
+def test_uncertain_transfer_failure_disables_direct_retry(tmp_path):
+    manager = TaskManager(tmp_path / "tasks.json", logging.getLogger("test"))
+    payload = {"movie": {"title": "不确定结果"}, "candidate": {"pwd_id": "share", "files": [{"fid": "f1"}]}}
+    try:
+        task = manager.create_transfer_task(
+            payload,
+            lambda progress: (
+                False,
+                "转存结果不确定：请求可能已到达网盘",
+                {"success": 0, "skipped": 0, "failed": 1, "uncertain": True},
+            ),
+        )
+        manager.executor.shutdown(wait=True)
+        failed = manager.get_task(task["id"])
+        assert failed["status"] == "failed"
+        assert failed["recovery_uncertain"] is True
+        assert failed["phase_label"] == "结果待核实"
+        assert manager.retry_transfer(task["id"], lambda progress: (True, "不应重试", {"success": 1})) is None
+    finally:
+        manager.shutdown()
