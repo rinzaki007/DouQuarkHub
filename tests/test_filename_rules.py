@@ -44,3 +44,20 @@ def test_episode_parser_supports_pure_numeric_filenames():
     assert parse_tv_episode("1080.mkv") == (None, None)
     assert parse_tv_episode("2024.mp4") == (None, None)
     assert parse_tv_episode("Show.1080p.mkv") == (None, None)
+
+def test_quark_legacy_episode_parser_uses_shared_filename_rules():
+    from moviesync.clients.quark import clean_tv_filename
+
+    cases = [
+        ("Show.S02E09.mkv", 9),
+        ("Show.EP12.mp4", 12),
+        ("兰香如故 第47集.mkv", 47),
+        ("1.mkv", 1),
+        ("Show.1080p.mkv", None),
+        ("2024.mp4", None),
+    ]
+    for file_name, expected_episode in cases:
+        episode, unchanged_name = clean_tv_filename(file_name)
+        assert episode == expected_episode
+        assert unchanged_name == file_name
+
