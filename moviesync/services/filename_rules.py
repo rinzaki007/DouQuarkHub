@@ -7,7 +7,6 @@ from __future__ import annotations
 import re
 from datetime import datetime
 from pathlib import PurePosixPath
-from typing import Any
 
 DEFAULT_TV_MAGIC_REGEX = {
     "pattern": r".*?(?<!\d)([Ss]\d{1,2})?([Ee]?[Pp]?[Xx]?\d{1,3})(?!\d).*?\.(mp4|mkv)",
