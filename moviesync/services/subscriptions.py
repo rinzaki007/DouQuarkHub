@@ -839,7 +839,13 @@ class SubscriptionManager:
                 interval = max(1, min(self.max_interval_hours, interval))
                 current["next_run_at"] = time.time() + interval * 3600
                 history = list(current.get("run_history", []) or [])
-                history.append({"at": time.time(), "success": True, "message": "用户已确认网盘端转存成功", "success_count": len(keys), "failed_count": 0})
+                history.append({
+                    "at": time.time(),
+                    "success": True,
+                    "message": "用户已确认网盘端转存成功",
+                    "success_count": len(keys),
+                    "failed_count": 0,
+                })
                 current["run_history"] = history[-50:]
                 self.store.write(subscriptions)
                 return True, "已记录转存成功，后续检查不会重复提交这些文件"
