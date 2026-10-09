@@ -46,6 +46,10 @@ class ConfigStore:
                     "enabled": True,
                     "config": {
                         "channels": [],
+                        "magic_regex": {
+                            "pattern": ".*?(?<!\\\\d)([Ss]\\\\d{1,2})?([Ee]?[Pp]?[Xx]?\\\\d{1,3})(?!\\\\d).*?\\\\.(mp4|mkv)",
+                            "replace": "\\\\1\\\\2.\\\\3",
+                        },
                         "health": {
                             "status": "unknown",
                             "message": "尚未检查",
