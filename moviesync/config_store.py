@@ -517,6 +517,49 @@ class ConfigStore:
                     current["cards"]["telegram"]["enabled"] = bool(telegram["enabled"])
                     self.store.write(current)
 
+        # Restore third-party card settings too. Keep entries for cards that
+        # are not currently installed so their configuration survives backups.
+        if isinstance(imported_cards, dict):
+            current_cards = current.setdefault("cards", {})
+            sensitive_markers = (
+                "cookie",
+                "token",
+                "secret",
+                "password",
+                "api_key",
+                "authorization",
+                "credential",
+                "private_key",
+            )
+            for card_id, imported_card in imported_cards.items():
+                if card_id in {"quark", "telegram"} or not isinstance(imported_card, dict):
+                    continue
+                if not re.fullmatch(r"[a-z0-9][a-z0-9._-]{0,63}", str(card_id)):
+                    continue
+                imported_config = imported_card.get("config")
+                if not isinstance(imported_config, dict):
+                    continue
+                saved_card = current_cards.get(card_id)
+                saved_card = dict(saved_card) if isinstance(saved_card, dict) else {}
+                saved_config = saved_card.get("config")
+                saved_config = dict(saved_config) if isinstance(saved_config, dict) else {}
+                for key, value in imported_config.items():
+                    lowered_key = str(key).lower()
+                    is_secret = any(marker in lowered_key for marker in sensitive_markers)
+                    # Public/redacted exports can contain empty secret fields;
+                    # don't erase a credential that is already stored locally.
+                    if is_secret and (
+                        value is None or (isinstance(value, str) and not value.strip())
+                    ):
+                        continue
+                    saved_config[key] = deepcopy(value)
+                saved_card["config"] = saved_config
+                if isinstance(imported_card.get("enabled"), bool):
+                    saved_card["enabled"] = imported_card["enabled"]
+                else:
+                    saved_card["enabled"] = bool(saved_card.get("enabled", True))
+                current_cards[card_id] = saved_card
+
         if "channels" in incoming:
             self.save_telegram_config({"channels": incoming["channels"]})
             current = self.load()
