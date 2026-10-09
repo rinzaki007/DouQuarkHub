@@ -790,12 +790,19 @@ class SubscriptionManager:
                 group["token"],
             )
             if not ok:
+                self.logger.warning("频道追剧转存失败: %s", msg)
+                uncertain = is_uncertain_transfer_message(msg)
+                safe_message = (
+                    "转存结果待核实，请检查目标网盘后再决定是否重试"
+                    if uncertain
+                    else "转存失败，请检查存储目标配置或查看服务日志"
+                )
                 return self._finish(
                     sub,
                     False,
-                    f"转存失败: {msg}",
+                    safe_message,
                     success_keys=all_keys,
-                    outcome_uncertain=is_uncertain_transfer_message(msg),
+                    outcome_uncertain=uncertain,
                 )
             all_keys.extend(group["keys"])
             self._record_success_keys(sub, group["keys"])
