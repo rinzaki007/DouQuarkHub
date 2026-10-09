@@ -878,7 +878,7 @@ def get_movies():
             }
         )
 
-    except Exception as exc:
+    except Exception:
         _services()["logger"].exception(
             "获取豆瓣影片失败"
         )
@@ -887,7 +887,7 @@ def get_movies():
             {
                 "success": False,
                 "movies": [],
-                "message": str(exc),
+                "message": "获取影片数据失败，请稍后重试",
             }
         )
 
