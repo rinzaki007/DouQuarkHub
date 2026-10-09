@@ -93,3 +93,60 @@ def create_card(context):
 ## 存储卡片停用与任务状态
 
 停用存储目标不会撤回已经发出的网盘请求，也不会强制终止 Python 中正在执行的卡片调用；但每个后续存储操作都会重新检查卡片启用状态，因此同一任务的后续步骤可能因卡片已停用而失败。任务中心会保留失败结果，重新启用卡片后可手动重试。若任务显示“结果待核实”，必须先核对网盘，不能盲目重试。删除排队任务会阻止其 worker 开始执行；运行中的任务不能删除。任务历史上限只裁剪终态记录，不会驱逐排队或运行中的任务。
+
+
+
+## 已安装存储卡片插件入口（3.0 首期）
+
+MovieSync 支持通过 Python 包的 entry point 加载可信存储目标插件，组名为
+`moviesync.storage_targets`。每个入口必须指向一个工厂函数，接收单个
+`context` 字典并返回 `StorageTargetCard` 实例。当前上下文包含
+`config_store` 与 `logger`，插件可按需使用这些共享服务。
+
+例如，插件包的 `pyproject.toml` 可声明：
+
+```toml
+[project.entry-points."moviesync.storage_targets"]
+example = "my_storage_plugin:create_card"
+```
+
+工厂函数形状：
+
+```python
+from moviesync.cards import CardManifest, StorageTargetCard
+
+class ExampleStorage(StorageTargetCard):
+    manifest = CardManifest(
+        id="example-storage",
+        name="Example Storage",
+        type="storage_target",
+        capabilities=(
+            "storage.check",
+            "storage.resolve_resource",
+            "storage.list_files",
+            "storage.create_folder",
+            "storage.transfer",
+        ),
+    )
+
+    def resolve_resource(self, resource):
+        return {"files": [], "token": None, "error": None}
+
+    def list_files(self, resource):
+        return []
+
+    def create_folder(self, name, parent_id="0"):
+        return parent_id
+
+    def transfer(self, resource, files, target_id="0"):
+        return True, "ok"
+
+def create_card(context):
+    return ExampleStorage()
+```
+
+存储插件与资源插件一样，必须作为可信 Python 包安装，并随应用启动加载。
+应用启动时会逐个尝试加载；某个插件导入、工厂执行或类型校验失败会被记录，
+不会阻止其他存储插件继续加载。重复卡片 ID 会由注册表拒绝。后台不接收或执行
+上传的 Python 文件；插件依赖需要在构建镜像或安装环境时预先安装。此阶段只提供
+发现与加载能力，动态安装、卸载及热重载不在范围内。

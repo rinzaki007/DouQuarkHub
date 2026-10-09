@@ -16,6 +16,9 @@ class FakeLogger:
     def exception(self, *args, **kwargs):
         pass
 
+    def info(self, *args, **kwargs):
+        pass
+
 
 class DemoStorage(StorageTargetCard):
     manifest = CardManifest(
@@ -119,3 +122,47 @@ def test_storage_target_destination_options():
 
     manager = StorageTargetManager(Registry(), Config(), None)
     assert manager.destination_options("demo") == [{"id": "root", "name": "默认目录", "is_default": True}]
+
+
+
+def test_storage_target_manager_loads_installed_plugins(monkeypatch):
+    from moviesync.services import storage_targets as module
+
+    received_context = {}
+
+    class EntryPoint:
+        name = "external-storage"
+
+        def load(self):
+            def factory(context):
+                received_context.update(context)
+                return DemoStorage()
+
+            return factory
+
+    monkeypatch.setattr(module, "entry_points", lambda group: [EntryPoint()])
+    registry = CardRegistry()
+    store = FakeStore()
+    logger = FakeLogger()
+    manager = StorageTargetManager(registry, store, logger)
+
+    assert manager.load_plugins({"config_store": store, "logger": logger}) == ["demo-storage"]
+    assert manager.get("demo-storage").card_id == "demo-storage"
+    assert received_context == {"config_store": store, "logger": logger}
+
+
+def test_storage_target_manager_isolates_invalid_plugin(monkeypatch):
+    from moviesync.services import storage_targets as module
+
+    class EntryPoint:
+        name = "invalid-storage"
+
+        def load(self):
+            return lambda context: object()
+
+    monkeypatch.setattr(module, "entry_points", lambda group: [EntryPoint()])
+    registry = CardRegistry()
+    manager = StorageTargetManager(registry, FakeStore(), FakeLogger())
+
+    assert manager.load_plugins() == []
+    assert registry.list() == []

@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+from importlib.metadata import entry_points
 from typing import Any
 
 from ..cards import CardRegistry, StorageTargetCard
@@ -18,6 +19,38 @@ class StorageTargetManager:
         self.registry = registry
         self.config_store = config_store
         self.logger = logger
+
+    def load_plugins(self, context: dict[str, Any] | None = None) -> list[str]:
+        """加载已安装可信 Python 包声明的存储卡片插件。
+
+        插件通过 moviesync.storage_targets entry point 暴露工厂函数。
+        工厂接收 context 字典并返回 StorageTargetCard 实例。这里仅发现
+        当前 Python 环境中已安装的包；不接受后台上传或执行任意代码。
+        """
+        loaded: list[str] = []
+        plugin_context = dict(context or {})
+        try:
+            candidates = entry_points(group="moviesync.storage_targets")
+        except Exception:
+            self.logger.exception("读取存储卡片插件入口失败")
+            return loaded
+
+        for entry_point in candidates:
+            try:
+                factory = entry_point.load()
+                if not callable(factory):
+                    raise TypeError("插件入口必须指向可调用的工厂函数")
+                card = factory(plugin_context)
+                if not isinstance(card, StorageTargetCard):
+                    raise TypeError("存储卡片插件工厂必须返回 StorageTargetCard 实例")
+                if card.card_type != "storage_target":
+                    raise ValueError("卡片类型必须是 storage_target")
+                registered = self.registry.register(card)
+                loaded.append(registered.card_id)
+                self.logger.info("已加载存储卡片插件: %s", registered.card_id)
+            except Exception:
+                self.logger.exception("存储卡片插件 %s 加载失败", entry_point.name)
+        return loaded
 
     def _enabled_cards(self) -> list[StorageTargetCard]:
         cards = []
