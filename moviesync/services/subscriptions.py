@@ -621,6 +621,14 @@ class SubscriptionManager:
             for key in (sub.get("tracked_file_keys", []) or [])
             if str(key).strip()
         }
+        # The user-selected files are the initial transfer request, not just a
+        # tracking watermark. Transfer them once even when they equal the baseline.
+        initial_file_keys = {
+            str(fid).strip()
+            for fid in (sub.get("initial_file_keys", []) or [])
+            if str(fid).strip()
+        }
+        selected_pwd_id = str(sub.get("pwd_id") or "").strip()
         baseline_episode = int(sub.get("start_ep", 0) or 0)
         baseline_season = int(sub.get("start_season", 0) or 0)
         grouped: dict[tuple[str, str], dict] = {}
@@ -671,12 +679,16 @@ class SubscriptionManager:
                 )
                 if episode is None:
                     continue
-                if season is not None and baseline_season > 0:
-                    if (season, episode) <= (baseline_season, baseline_episode):
+                is_selected_initial = (
+                    pwd_id == selected_pwd_id and fid in initial_file_keys
+                )
+                if not is_selected_initial:
+                    if season is not None and baseline_season > 0:
+                        if (season, episode) <= (baseline_season, baseline_episode):
+                            continue
+                    elif episode <= baseline_episode:
+                        # 只过滤未选中的基准集及更早集数；选中集需首次转存。
                         continue
-                elif episode <= baseline_episode:
-                    # 基准集及更早的集数不重复转存；旧命名仍按集数比较。
-                    continue
                 grouped.setdefault((pwd_id, target_id), {
                     "resource": resource,
                     "token": token,
