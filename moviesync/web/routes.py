@@ -818,12 +818,16 @@ def search_candidates():
             else str(movie)
         )
 
-        candidates_map[
-            title
-        ] = service.search_movie_candidates(
-            movie,
-            config.load(),
-        )
+        try:
+            candidates_map[
+                title
+            ] = service.search_movie_candidates(
+                movie,
+                config.load(),
+            )
+        except Exception:
+            _services()["logger"].exception("资源检索失败: %s", title)
+            return _json_error("资源检索暂时失败，请稍后重试；若持续出现，请查看服务日志", 502)
 
     source_status = config.get_resource_sources()
     unavailable_sources = [

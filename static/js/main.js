@@ -330,12 +330,35 @@ function movieDetailChase() {
 async function searchAndOpenCandidates(selectedMovies) {
     showToast('正在检索资源，请稍候…', 'info');
     try {
-        const response = await apiFetch('/api/search-candidates', {
+        const requestOptions = {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({movies: selectedMovies})
-        });
-        const res = await response.json();
+        };
+        let response;
+        let res;
+        for (let attempt = 0; attempt < 2; attempt++) {
+            response = await apiFetch('/api/search-candidates', requestOptions);
+            const contentType = response.headers.get('content-type') || '';
+            if (response.status >= 500 || !contentType.toLowerCase().includes('application/json')) {
+                if (attempt === 0) {
+                    await new Promise(resolve => window.setTimeout(resolve, 350));
+                    continue;
+                }
+                throw new Error('资源检索暂时异常（HTTP ' + response.status + '，服务器返回了非预期响应），请稍后重试；若持续出现，请查看服务日志');
+            }
+            try {
+                res = await response.json();
+            } catch (_) {
+                if (attempt === 0) {
+                    await new Promise(resolve => window.setTimeout(resolve, 350));
+                    continue;
+                }
+                throw new Error('资源检索响应格式异常，请稍后重试；若持续出现，请查看服务日志');
+            }
+            break;
+        }
+        if (!res) throw new Error('资源检索暂时失败，请稍后重试');
         if (!res.success) return showToast(res.message || '无法搜索资源', 'error');
         const candidatesMap = res.candidates_map || {};
         const totalFound = selectedMovies.reduce((sum, movie) => sum + ((candidatesMap[movie.title] || []).length), 0);

@@ -35,3 +35,12 @@ def test_filename_template_tokens():
     assert tokens["VER"] == "高清版"
     assert render_filename_template(file_name, "{TASKNAME}.{SXX}E{II}.{EXT}", "黑镜") == "黑镜.S02E03.mkv"
     assert render_filename_template(file_name, "{TASKNAME}.{SXX}E{III}.{EXT}", "黑镜") == "黑镜.S02E003.mkv"
+
+
+def test_episode_parser_supports_pure_numeric_filenames():
+    assert parse_tv_episode("1.mkv") == (None, 1)
+    assert parse_tv_episode("2.mp4") == (None, 2)
+    assert parse_tv_episode("003.avi") == (None, 3)
+    assert parse_tv_episode("1080.mkv") == (None, None)
+    assert parse_tv_episode("2024.mp4") == (None, None)
+    assert parse_tv_episode("Show.1080p.mkv") == (None, None)

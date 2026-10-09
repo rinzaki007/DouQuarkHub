@@ -51,6 +51,14 @@ def parse_tv_episode(
     """解析文件名并返回 (season, episode)，兼容只有集数的旧命名。"""
 
     def parse_normalized(value: str) -> tuple[int | None, int | None]:
+        # Only treat an all-numeric filename stem as an episode.
+        # This avoids mistaking years/resolutions for episode numbers.
+        numeric_stem = PurePosixPath(value.replace("\\", "/")).stem.strip()
+        if re.fullmatch(r"\d{1,4}", numeric_stem):
+            episode = int(numeric_stem)
+            if _valid_episode(episode):
+                return None, episode
+
         match = _SEASON_EPISODE.search(value)
         if match:
             season, episode = int(match.group(1)), int(match.group(2))
