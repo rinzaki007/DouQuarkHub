@@ -54,4 +54,5 @@ def test_json_store_raises_instead_of_returning_default_on_read_error(tmp_path, 
         store.read()
 
     assert path.exists()
-    assert path.read_text(encoding="utf-8") == '{"keep": true}'
+    with original_open(path, "r", encoding="utf-8") as handle:
+        assert handle.read() == '{"keep": true}'
