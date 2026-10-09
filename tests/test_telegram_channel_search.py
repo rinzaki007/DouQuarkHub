@@ -26,6 +26,6 @@ def test_channel_subscription_uses_telegram_title_search():
 
     assert results == [{"pwd_id": "share123"}]
     assert client.title == "怪奇物语"
-    # scan_all=False enables Telegram's ?q=title search instead of only
-    # scanning the latest fixed number of channel pages.
-    assert client.scan_all is False
+    # Automatic tracking scans recent channel messages first so that posts
+    # omitted by Telegram's server-side title query can still be matched.
+    assert client.scan_all is True
