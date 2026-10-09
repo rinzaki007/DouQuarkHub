@@ -414,6 +414,8 @@ class SubscriptionManager:
     def check_subscription_now(
         self,
         sub_id: str,
+        *,
+        only_if_due: bool = False,
     ) -> tuple[bool, str]:
         sub_id = str(sub_id)
 
@@ -439,6 +441,17 @@ class SubscriptionManager:
                     False,
                     "转存结果待核实：请先在任务中心确认已转存，或确认未转存后再允许重试。",
                 )
+
+            # The scheduler iterates a snapshot that can become stale while
+            # another manual check or confirmation updates next_run_at.
+            # Recheck the persisted deadline atomically when claiming a run.
+            if only_if_due:
+                try:
+                    next_run_at = float(subscription.get("next_run_at", 0) or 0)
+                except (TypeError, ValueError):
+                    next_run_at = 0
+                if next_run_at > time.time():
+                    return False, "订阅尚未到计划检查时间"
 
             if sub_id in self.running_ids:
                 return False, "该订阅正在执行，请稍后再试"
@@ -1247,7 +1260,8 @@ class SubscriptionManager:
 
                 try:
                     self.check_subscription_now(
-                        str(sub.get("id") or "")
+                        str(sub.get("id") or ""),
+                        only_if_due=True,
                     )
                 except Exception:
                     self.logger.exception(

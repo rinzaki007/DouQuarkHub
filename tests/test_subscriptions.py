@@ -1045,3 +1045,40 @@ def test_legacy_subscription_deduplicates_repeated_file_ids_before_transfer(tmp_
         assert saved["saved_episodes"] == [1, 2]
     finally:
         manager.stop_scheduler()
+
+
+def test_scheduled_subscription_rechecks_due_time_when_claiming_run(tmp_path, monkeypatch):
+    import time
+
+    manager = SubscriptionManager(
+        tmp_path / "scheduled-due-recheck.json",
+        FakeStorageTargets(),
+        FakeResourceSources(),
+        FakeLogger(),
+    )
+    sub = manager.add_subscription(title="计划时间竞态", pwd_id="share-due")
+    calls = []
+
+    def finish_success(subscription):
+        calls.append(subscription["id"])
+        return manager._finish(subscription, True, "检查完成")
+
+    monkeypatch.setattr(manager, "_check", finish_success)
+
+    try:
+        # A manual check remains immediate and moves next_run_at into the future.
+        ok, message = manager.check_subscription_now(sub["id"])
+        assert ok is True
+        assert message == "检查完成"
+        assert calls == [sub["id"]]
+
+        saved = manager.get_subscriptions()[0]
+        assert saved["next_run_at"] > time.time()
+
+        # A scheduler using an earlier due snapshot must not launch a stale run.
+        ok, message = manager.check_subscription_now(sub["id"], only_if_due=True)
+        assert ok is False
+        assert "计划检查时间" in message
+        assert calls == [sub["id"]]
+    finally:
+        manager.stop_scheduler()
