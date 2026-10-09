@@ -229,8 +229,8 @@ def test_channel_subscription_uses_selected_episode_as_baseline(tmp_path):
     ok, message = manager.check_subscription_now(sub["id"])
 
     assert ok is True
-    assert "成功追更 2 项" in message
-    assert storage.transfers == [("share44", ["ep44"]), ("share45", ["ep45"])]
+    assert "成功追更 1 项" in message
+    assert storage.transfers == [("share45", ["ep45"])]
 
 
 def test_channel_subscription_uses_season_and_episode_baseline(tmp_path):
@@ -238,12 +238,12 @@ def test_channel_subscription_uses_season_and_episode_baseline(tmp_path):
         (
             "season-one",
             "Show.S01E08.mkv",
-            ["ep108", "ep201", "ep202"],
+            ["ep201", "ep202"],
         ),
         (
             "season-two",
             "Show.S02E01.mkv",
-            ["ep201", "ep202"],
+            ["ep202"],
         ),
     ]
 
@@ -317,8 +317,8 @@ def test_channel_subscription_tracks_selected_episode_and_later_seasons_in_one_s
     ok, message = manager.check_subscription_now(sub["id"])
 
     assert ok is True
-    assert "成功追更 3 项" in message
-    assert storage.transfers == [("share-seasons", ["ep207", "ep208", "ep301"])]
+    assert "成功追更 2 项" in message
+    assert storage.transfers == [("share-seasons", ["ep208", "ep301"])]
 
 
 def test_channel_subscription_tracks_later_episodes_across_separate_shares(tmp_path):
@@ -360,9 +360,42 @@ def test_channel_subscription_tracks_later_episodes_across_separate_shares(tmp_p
     ok, message = manager.check_subscription_now(sub["id"])
 
     assert ok is True
-    assert "成功追更 3 项" in message
+    assert "成功追更 2 项" in message
     assert storage.transfers == [
-        ("share-selected", ["ep207"]),
         ("share-next", ["ep208"]),
         ("share-next-season", ["ep301"]),
     ]
+
+
+def test_channel_subscription_checks_selected_share_when_channel_search_is_empty(tmp_path):
+    storage = ChannelStorageTargets()
+    storage.shares = {
+        "share-selected": [
+            {"fid": "ep108", "file_name": "Show.S01E08.mkv"},
+            {"fid": "ep109", "file_name": "Show.S01E09.mkv"},
+        ],
+    }
+    sources = FakeResourceSources()
+    sources.shares = []
+    manager = SubscriptionManager(
+        tmp_path / "empty-channel-search.json",
+        storage,
+        sources,
+        FakeLogger(),
+    )
+
+    sub = manager.add_subscription(
+        title="Show",
+        pwd_id="share-selected",
+        target_fid="0",
+        storage_target_id="demo-storage",
+        source_id="telegram",
+        channel="demo",
+        files=[{"fid": "ep108", "file_name": "Show.S01E08.mkv"}],
+    )
+
+    ok, message = manager.check_subscription_now(sub["id"])
+
+    assert ok is True
+    assert "成功追更 1 项" in message
+    assert storage.transfers == [("share-selected", ["ep109"])]

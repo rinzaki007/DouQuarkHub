@@ -581,6 +581,38 @@ class SubscriptionManager:
             else []
         )
 
+        # 标题搜索可能因频道帖子使用英文名、旧消息超出扫描范围等原因返回空列表。
+        # 用户创建订阅时选中的分享是可靠的起点，至少先检查该分享中的后续集数。
+        selected_pwd_id = str(sub.get("pwd_id") or "").strip()
+        if selected_pwd_id and not any(
+            str(item.get("pwd_id") or "").strip() == selected_pwd_id
+            for item in sources
+            if isinstance(item, dict)
+        ):
+            sources = [
+                {
+                    "pwd_id": selected_pwd_id,
+                    "channel": channel,
+                    "channel_name": str(sub.get("channel_name") or channel),
+                    "source_id": source_id,
+                    "storage_target_id": str(sub.get("storage_target_id") or ""),
+                },
+                *sources,
+            ]
+
+        # 避免同一分享既来自频道扫描、又来自选中的初始分享时被重复处理。
+        unique_sources = []
+        seen_pwd_ids = set()
+        for item in sources:
+            if not isinstance(item, dict):
+                continue
+            item_pwd_id = str(item.get("pwd_id") or "").strip()
+            if not item_pwd_id or item_pwd_id in seen_pwd_ids:
+                continue
+            seen_pwd_ids.add(item_pwd_id)
+            unique_sources.append(item)
+        sources = unique_sources
+
         if not sources:
             return self._finish(sub, True, f"《{title}》频道暂未发现新资源", success_keys=[])
 
@@ -640,10 +672,10 @@ class SubscriptionManager:
                 if episode is None:
                     continue
                 if season is not None and baseline_season > 0:
-                    if (season, episode) < (baseline_season, baseline_episode):
+                    if (season, episode) <= (baseline_season, baseline_episode):
                         continue
-                elif episode < baseline_episode:
-                    # Legacy names without an explicit season retain episode-only behavior.
+                elif episode <= baseline_episode:
+                    # 基准集及更早的集数不重复转存；旧命名仍按集数比较。
                     continue
                 grouped.setdefault((pwd_id, target_id), {
                     "resource": resource,
