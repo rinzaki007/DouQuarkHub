@@ -1267,3 +1267,45 @@ def test_channel_subscription_tracks_same_file_separately_per_storage_target(tmp
         assert storage.transfers == ["target-a", "target-b", "target-b"]
     finally:
         manager.stop_scheduler()
+
+
+def test_subscription_saved_history_normalizes_malformed_entries_before_finish(tmp_path):
+    manager = SubscriptionManager(
+        tmp_path / "malformed-saved-history.json",
+        FakeStorageTargets(),
+        FakeResourceSources(),
+        FakeLogger(),
+    )
+    sub = manager.add_subscription(title="历史兼容测试", pwd_id="share-history")
+
+    try:
+        subscriptions = manager.get_subscriptions()
+        current = next(item for item in subscriptions if item["id"] == sub["id"])
+        current["saved_episodes"] = [
+            {"unexpected": "object"},
+            ["unexpected", "list"],
+            "1",
+            1,
+            "",
+            None,
+            True,
+            2,
+        ]
+        manager.store.write(subscriptions)
+
+        # A successful legacy completion used to build set(saved_episodes),
+        # which raises TypeError if a malformed JSON entry is a list/dict.
+        ok, message = manager._finish(
+            sub,
+            True,
+            "检查完成",
+            success_keys=[3],
+        )
+
+        assert ok is True
+        assert message == "检查完成"
+        saved = manager.get_subscriptions()[0]
+        assert saved["saved_episodes"] == [2, 3, "1"]
+        assert saved["status"] == "success"
+    finally:
+        manager.stop_scheduler()
