@@ -265,15 +265,36 @@ class TaskManager:
             current = self._get(task_id)
             if not current or current.get("status") != "queued":
                 return
-            self._update(
-                task_id,
-                status="running",
-                progress=10,
-                phase="validate",
-                phase_label="校验资源",
-                message="正在重新验证分享资源…",
-                started_at=time.time(),
-            )
+            try:
+                self._update(
+                    task_id,
+                    status="running",
+                    progress=10,
+                    phase="validate",
+                    phase_label="校验资源",
+                    message="正在重新验证分享资源…",
+                    started_at=time.time(),
+                )
+            except Exception:
+                # The remote runner has not started, so this failure is safe to
+                # retry. Do not leave a durable queued task that dedupe will
+                # keep returning without ever submitting again.
+                self.logger.exception("转存任务 %s 启动状态写入失败，远程转存尚未开始", task_id)
+                try:
+                    self._update(
+                        task_id,
+                        status="failed",
+                        phase="failed",
+                        phase_label="启动失败",
+                        progress=0,
+                        recovery_uncertain=False,
+                        message="任务状态写入失败，尚未开始转存，可以安全重试",
+                        failed_count=1,
+                        finished_at=time.time(),
+                    )
+                except Exception:
+                    self.logger.exception("无法保存转存任务 %s 的启动失败状态", task_id)
+                return
         try:
             result = runner(lambda progress, message: self._progress_update(task_id, progress, message))
             ok, message, counts = result

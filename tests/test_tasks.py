@@ -396,3 +396,44 @@ def test_malformed_transfer_runner_counts_are_not_silently_ignored(tmp_path):
         assert failed["message"] == "转存结果待核实，请检查目标网盘后再决定是否重试"
     finally:
         manager.shutdown()
+
+
+def test_transfer_start_status_write_failure_is_safe_and_does_not_run_remote_runner(tmp_path, monkeypatch):
+    manager = TaskManager(tmp_path / "startup-status-write-failure.json", logging.getLogger("test"))
+    calls = []
+    task = {
+        "id": "queued-startup-failure",
+        "type": "transfer",
+        "status": "queued",
+        "phase": "waiting",
+        "phase_label": "等待执行",
+        "progress": 0,
+        "message": "任务已创建，等待执行",
+        "events": [],
+        "created_at": 1,
+        "updated_at": 1,
+    }
+    manager.shutdown()
+    manager.store.write([task])
+    original_update = manager._update
+    failed_once = False
+
+    def fail_running_update(task_id, **changes):
+        nonlocal failed_once
+        if changes.get("status") == "running" and not failed_once:
+            failed_once = True
+            raise OSError("simulated task status persistence failure")
+        return original_update(task_id, **changes)
+
+    monkeypatch.setattr(manager, "_update", fail_running_update)
+    try:
+        manager._run_transfer(task["id"], lambda progress: calls.append("ran"))
+
+        current = manager.get_task(task["id"])
+        assert calls == []
+        assert current["status"] == "failed"
+        assert current["recovery_uncertain"] is False
+        assert current["phase_label"] == "启动失败"
+        assert "尚未开始转存" in current["message"]
+    finally:
+        manager.shutdown()
