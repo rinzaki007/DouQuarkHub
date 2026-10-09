@@ -10,7 +10,7 @@ from __future__ import annotations
 import time
 import uuid
 from datetime import datetime
-from threading import Event, RLock, Thread
+from threading import Event, RLock, Thread, current_thread
 
 from ..storage import JsonStore
 from .filename_rules import parse_tv_episode
@@ -1104,20 +1104,56 @@ class SubscriptionManager:
             message,
         )
 
+    def _run_scheduler_worker(self) -> None:
+        worker = current_thread()
+        try:
+            self._scheduler_loop()
+        finally:
+            # Never let the worker wait on the lifecycle lock: stop_scheduler()
+            # may be joining it while holding that lock.
+            with self.lock:
+                restart_requested = getattr(self, "_scheduler_restart_requested", False)
+                if not restart_requested and self.worker is worker:
+                    self.worker = None
+            if restart_requested:
+                Thread(
+                    target=self._restart_scheduler_after_worker_exit,
+                    args=(worker,),
+                    name="moviesync-scheduler-restart",
+                    daemon=True,
+                ).start()
+
+    def _restart_scheduler_after_worker_exit(self, old_worker: Thread) -> None:
+        # Wait outside the lifecycle lock so the old worker can fully exit.
+        old_worker.join()
+        with self._scheduler_lifecycle_lock:
+            with self.lock:
+                if not getattr(self, "_scheduler_restart_requested", False):
+                    if self.worker is old_worker:
+                        self.worker = None
+                    return
+                self._scheduler_restart_requested = False
+                if self.worker is old_worker:
+                    self.worker = None
+            self.start_scheduler()
+
     def start_scheduler(
         self,
     ) -> None:
-        # Serialize lifecycle transitions. Otherwise a concurrent start can
-        # observe the old worker as alive and return just before stop clears
-        # its reference, accidentally leaving the scheduler stopped.
+        # If stop timed out while a check was in flight, remember the new
+        # start request. The exiting worker will launch its replacement after
+        # it has fully terminated, avoiding both a lost start and overlap.
         with self._scheduler_lifecycle_lock:
             with self.lock:
                 if self.worker and self.worker.is_alive():
+                    if self.stop_event.is_set():
+                        self._scheduler_restart_requested = True
                     return
 
+                self._scheduler_restart_requested = False
                 self.stop_event.clear()
                 self.worker = Thread(
-                    target=self._scheduler_loop,
+                    target=self._run_scheduler_worker,
                     name="moviesync-scheduler",
                     daemon=True,
                 )
@@ -1130,6 +1166,9 @@ class SubscriptionManager:
         self,
     ) -> None:
         with self._scheduler_lifecycle_lock:
+            with self.lock:
+                # An explicit stop cancels any deferred restart request.
+                self._scheduler_restart_requested = False
             self.stop_event.set()
             with self.lock:
                 worker = self.worker
