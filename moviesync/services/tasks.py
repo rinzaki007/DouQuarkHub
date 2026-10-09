@@ -277,7 +277,8 @@ class TaskManager:
         try:
             result = runner(lambda progress, message: self._progress_update(task_id, progress, message))
             ok, message, counts = result
-            counts = counts if isinstance(counts, dict) else {}
+            if not isinstance(ok, bool) or not isinstance(message, str) or not isinstance(counts, dict):
+                raise ValueError("invalid transfer runner result contract")
             uncertain = bool(counts.get("uncertain")) or (not ok and is_uncertain_transfer_message(message))
             now = time.time()
             current = self._get(task_id)

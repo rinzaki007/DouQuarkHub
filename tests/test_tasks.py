@@ -349,3 +349,50 @@ def test_transfer_worker_does_not_expose_exception_details(tmp_path):
         ) is None
     finally:
         manager.shutdown()
+
+
+def test_malformed_transfer_runner_result_is_not_marked_success(tmp_path):
+    manager = TaskManager(tmp_path / "tasks.json", logging.getLogger("test"))
+    payload = {
+        "movie": {"title": "返回值契约测试"},
+        "candidate": {"pwd_id": "share-contract", "files": [{"fid": "file-1"}]},
+    }
+    try:
+        task = manager.create_transfer_task(
+            payload,
+            lambda progress: ("false", "插件返回了非布尔成功标志", {"success": 1}),
+        )
+        manager.executor.shutdown(wait=True)
+        failed = manager.get_task(task["id"])
+
+        assert failed["status"] == "failed"
+        assert failed["recovery_uncertain"] is True
+        assert failed["phase_label"] == "结果待核实"
+        assert failed["message"] == "转存结果待核实，请检查目标网盘后再决定是否重试"
+        assert manager.retry_transfer(
+            task["id"],
+            lambda progress: (True, "不应重试", {"success": 1}),
+        ) is None
+    finally:
+        manager.shutdown()
+
+
+def test_malformed_transfer_runner_counts_are_not_silently_ignored(tmp_path):
+    manager = TaskManager(tmp_path / "tasks.json", logging.getLogger("test"))
+    payload = {
+        "movie": {"title": "统计契约测试"},
+        "candidate": {"pwd_id": "share-counts", "files": [{"fid": "file-1"}]},
+    }
+    try:
+        task = manager.create_transfer_task(
+            payload,
+            lambda progress: (True, "看似成功", None),
+        )
+        manager.executor.shutdown(wait=True)
+        failed = manager.get_task(task["id"])
+
+        assert failed["status"] == "failed"
+        assert failed["recovery_uncertain"] is True
+        assert failed["message"] == "转存结果待核实，请检查目标网盘后再决定是否重试"
+    finally:
+        manager.shutdown()
