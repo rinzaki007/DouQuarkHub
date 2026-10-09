@@ -238,12 +238,12 @@ def test_channel_subscription_uses_season_and_episode_baseline(tmp_path):
         (
             "season-one",
             "Show.S01E08.mkv",
-            ["ep202"],
+            ["ep201", "ep202"],
         ),
         (
             "season-two",
             "Show.S02E01.mkv",
-            ["ep201", "ep202"],
+            ["ep202"],
         ),
     ]
 
