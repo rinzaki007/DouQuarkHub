@@ -298,13 +298,18 @@ class TaskManager:
         except Exception as exc:
             self.logger.exception("一次性转存任务 %s 执行异常", task_id)
             uncertain = is_uncertain_transfer_message(exc)
+            safe_message = (
+                "转存结果待核实，请检查目标网盘后再决定是否重试"
+                if uncertain
+                else "任务执行异常，转存未能完成，请查看服务日志"
+            )
             self._update(
                 task_id,
                 status="failed",
                 phase="failed",
                 phase_label="结果待核实" if uncertain else "执行失败",
                 recovery_uncertain=uncertain,
-                message=f"转存结果待核实: {exc}" if uncertain else f"任务执行异常: {exc}",
+                message=safe_message,
                 failed_count=1,
                 finished_at=time.time(),
             )
