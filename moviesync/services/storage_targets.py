@@ -87,15 +87,21 @@ class StorageTargetManager:
                 return None
             return card
         getter = getattr(self.config_store, "get_default_storage_target_id", None)
-        default_id = getter() if callable(getter) else ""
+        default_id = str(getter() or "").strip() if callable(getter) else ""
         if default_id:
             card = self.registry.get(default_id)
-            if isinstance(card, StorageTargetCard):
-                config = self.config_store.load()
-                card_configs = config.get("cards") if isinstance(config, dict) else {}
-                saved = card_configs.get(card.card_id) if isinstance(card_configs, dict) else {}
-                if not isinstance(saved, dict) or saved.get("enabled", True):
-                    return card
+            if not isinstance(card, StorageTargetCard):
+                # Do not silently send files to another destination when the
+                # configured default plugin is missing or has been removed.
+                return None
+            config = self.config_store.load()
+            card_configs = config.get("cards") if isinstance(config, dict) else {}
+            saved = card_configs.get(card.card_id) if isinstance(card_configs, dict) else {}
+            if isinstance(saved, dict) and not saved.get("enabled", True):
+                # An explicitly selected default that was disabled should fail
+                # safely rather than silently falling back to another cloud.
+                return None
+            return card
         cards = self._enabled_cards()
         return cards[0] if cards else None
 
