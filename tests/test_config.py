@@ -268,7 +268,11 @@ def test_redacted_config_import_does_not_clear_existing_third_party_secrets(tmp_
     store = ConfigStore(tmp_path / "config.json", tmp_path / "legacy")
     store.save_card_config(
         "third-party.storage",
-        {"endpoint": "https://old.example", "cookie": "keep-this-cookie", "auth": {"refresh_token": "keep-this-token", "region": "us-east"}},
+        {
+            "endpoint": "https://old.example",
+            "cookie": "keep-this-cookie",
+            "auth": {"refresh_token": "keep-this-token", "region": "us-east"},
+        },
     )
 
     store.save({
