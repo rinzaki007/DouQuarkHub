@@ -428,8 +428,8 @@ class ConfigStore:
                 key_text = str(key)
                 lowered = key_text.lower()
                 # has_* 是给管理界面使用的布尔状态，不是凭据本身。
-                if lowered.startswith("has_"):
-                    result[key] = deepcopy(item)
+                if lowered.startswith("has_") and isinstance(item, bool):
+                    result[key] = item
                 elif any(marker in lowered for marker in sensitive_markers):
                     result[key] = ""
                     result[f"has_{key_text}"] = bool(item)
