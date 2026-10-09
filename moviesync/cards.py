@@ -202,9 +202,30 @@ class QuarkStorageCard(StorageTargetCard):
             "storage.transfer",
         ),
         config_fields=(
-            {"key": "cookie", "label": "夸克 Cookie", "type": "password", "secret": True, "required": False, "placeholder": "粘贴 Cookie；留空则保留已保存的值", "description": "敏感凭据不会回显到页面。"},
-            {"key": "default_fid", "label": "默认目录 FID", "type": "string", "required": True, "default": "0", "placeholder": "0"},
-            {"key": "category_fids", "label": "分类目录 FID", "type": "json", "default": {}, "description": "JSON 对象，例如电影和电视剧对应的目录 FID。"},
+            {
+                "key": "cookie",
+                "label": "夸克 Cookie",
+                "type": "password",
+                "secret": True,
+                "required": False,
+                "placeholder": "粘贴 Cookie；留空则保留已保存的值",
+                "description": "敏感凭据不会回显到页面。",
+            },
+            {
+                "key": "default_fid",
+                "label": "默认目录 FID",
+                "type": "string",
+                "required": True,
+                "default": "0",
+                "placeholder": "0",
+            },
+            {
+                "key": "category_fids",
+                "label": "分类目录 FID",
+                "type": "json",
+                "default": {},
+                "description": "JSON 对象，例如电影和电视剧对应的目录 FID。",
+            },
         ),
     )
 

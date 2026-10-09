@@ -689,7 +689,11 @@ def check_card_connection(card_id):
     card = _services()["card_registry"].get(card_id)
     if card is None:
         return _json_error("卡片未加载", 404)
-    if not any(capability.endswith(".health_check") or capability.endswith(".check") for capability in card.capabilities):
+    supports_check = any(
+        capability.endswith(".health_check") or capability.endswith(".check")
+        for capability in card.capabilities
+    )
+    if not supports_check:
         return _json_error("该卡片未声明连接检查能力", 400)
     cards_config = _services()["config"].load().get("cards", {})
     saved = cards_config.get(card_id, {}) if isinstance(cards_config, dict) else {}

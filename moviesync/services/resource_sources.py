@@ -52,8 +52,20 @@ class TelegramResourceSource(ResourceSource):
         description="Telegram 公开频道资源发现卡片",
         capabilities=("resource.search", "resource.health_check"),
         config_fields=(
-            {"key": "channels", "label": "资源频道", "type": "json", "default": [], "description": "JSON 数组，每项包含频道 id，可选 name。"},
-            {"key": "magic_regex", "label": "文件名识别增强", "type": "json", "default": {}, "description": "JSON 对象，可配置 pattern 与 replace。"},
+            {
+                "key": "channels",
+                "label": "资源频道",
+                "type": "json",
+                "default": [],
+                "description": "JSON 数组，每项包含频道 id，可选 name。",
+            },
+            {
+                "key": "magic_regex",
+                "label": "文件名识别增强",
+                "type": "json",
+                "default": {},
+                "description": "JSON 对象，可配置 pattern 与 replace。",
+            },
         ),
     )
 
