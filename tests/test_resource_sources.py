@@ -2,7 +2,11 @@ from moviesync.services.resource_sources import ResourceSourceManager
 
 
 class FakeTelegramClient:
-    def search_channel(self, channel, title):
+    def __init__(self):
+        self.last_scan_all = None
+
+    def search_channel(self, channel, title, scan_all=False):
+        self.last_scan_all = scan_all
         return [{
             "pwd_id": "abc123",
             "channel": channel["name"],
@@ -121,3 +125,35 @@ def test_resource_source_health_uses_telegram_card_config():
     assert results[0]["status"] == "healthy"
     assert results[0]["total"] == 1
     assert results[0]["valid_count"] == 1
+
+
+
+def test_channel_search_scans_recent_messages_without_telegram_title_query():
+    class Store:
+        def load(self):
+            return {
+                "cards": {
+                    "telegram": {
+                        "enabled": True,
+                        "config": {"channels": []},
+                    }
+                }
+            }
+
+        def update_resource_source_health(self, *args, **kwargs):
+            pass
+
+        def get_resource_sources(self):
+            return []
+
+    client = FakeTelegramClient()
+    manager = ResourceSourceManager(client, Store(), FakeLogger())
+
+    results = manager.search_channel(
+        "telegram",
+        {"id": "movie_channel", "name": "电影频道"},
+        "测试剧",
+    )
+
+    assert len(results) == 1
+    assert client.last_scan_all is True
