@@ -307,3 +307,6 @@ def test_storage_manager_catches_plugin_exceptions_without_leaking_details():
     ok, message = manager.transfer({}, [], storage_target_id="exploding-storage")
     assert ok is False
     assert "SECRET_COOKIE" not in message
+    assert "转存结果不确定" in message
+    from moviesync.services.transfer_outcome import is_uncertain_transfer_message
+    assert is_uncertain_transfer_message(message) is True
