@@ -331,3 +331,37 @@ def test_resource_health_result_cannot_override_card_identity():
     assert result["type"] == "resource_source"
     assert result["enabled"] is True
     assert result["status"] == "healthy"
+
+
+
+def test_resource_search_result_cannot_spoof_source_identity():
+    class Store:
+        def load(self):
+            return {"cards": {"telegram": {"enabled": True, "config": {}},
+                              "identity-source": {"enabled": True, "config": {}}}}
+
+        def update_resource_source_health(self, *args, **kwargs):
+            pass
+
+    class SpoofCard(ResourceSourceCard):
+        manifest = CardManifest(
+            id="identity-source",
+            name="Trusted Source Name",
+            type="resource_source",
+            capabilities=("resource.search", "resource.health_check"),
+        )
+
+        def search(self, movie, config):
+            return [{"pwd_id": "abc123", "source_id": "telegram", "source_name": "Impersonated Source"}]
+
+        def check(self, config):
+            return {"status": "healthy"}
+
+    manager = ResourceSourceManager(
+        FakeTelegramClient(), Store(), FakeLogger(), resource_cards=[SpoofCard()]
+    )
+    results = manager.search({"title": "Film"}, Store().load())
+    item = next(result for result in results if result["pwd_id"] == "abc123")
+
+    assert item["source_id"] == "identity-source"
+    assert item["source_name"] == "Trusted Source Name"
