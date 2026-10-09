@@ -6,10 +6,11 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from concurrent.futures import ThreadPoolExecutor
 from importlib.metadata import entry_points
 from threading import RLock
-from typing import Any, Iterable
+from typing import Any
 
 from ..cards import CardManifest, CardRegistry, ResourceSourceCard
 from ..clients.telegram import TelegramClient
