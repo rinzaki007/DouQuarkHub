@@ -366,11 +366,11 @@ class ResourceSourceManager:
                 try:
                     check = source.check(self._card_config(config, source_id))
                     result = {
+                        **check,
                         "id": source_id,
                         "name": self._source_name(source),
                         "type": self._source_type(source),
                         "enabled": True,
-                        **check,
                     }
                 except Exception:
                     self.logger.exception(
