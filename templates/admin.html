@@ -775,14 +775,9 @@
             </div>
             <div class="p-5 space-y-5">
                 <label class="flex items-center gap-2 text-xs text-slate-300"><input id="quark-card-enabled" type="checkbox" class="accent-blue-500">启用 Quark 卡片</label>
-                <div class="space-y-2"><label class="text-xs text-slate-400">Cookie</label><textarea id="quark-card-cookie" rows="4" class="glass-input w-full border border-slate-800 rounded p-3 text-xs font-mono text-slate-200 focus:outline-none focus:border-blue-500" placeholder="请粘贴夸克网盘 Cookie…"></textarea></div>
+                <div class="space-y-2"><label for="quark-card-cookie" class="text-xs text-slate-400">夸克 Cookie</label><input id="quark-card-cookie" type="password" autocomplete="new-password" class="glass-input w-full border border-slate-800 rounded px-3 py-2 text-xs font-mono text-slate-200 focus:outline-none focus:border-blue-500" placeholder="请粘贴夸克网盘 Cookie…"><div id="quark-card-cookie-status" class="text-[10px] text-slate-500">Cookie 不会回显；留空保存时会保留现有值。</div></div>
                 <div class="space-y-2"><label class="text-xs text-slate-400">默认目录 FID</label><input id="quark-card-default-fid" class="glass-input w-full border border-slate-800 rounded px-3 py-2 text-xs text-slate-200" value="0"></div>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <input id="quark-card-fid-movie" class="glass-input border border-slate-800 rounded px-3 py-2 text-xs text-slate-200" placeholder="电影目录 FID">
-                    <input id="quark-card-fid-tv" class="glass-input border border-slate-800 rounded px-3 py-2 text-xs text-slate-200" placeholder="电视剧目录 FID">
-                    <input id="quark-card-fid-show" class="glass-input border border-slate-800 rounded px-3 py-2 text-xs text-slate-200" placeholder="综艺目录 FID">
-                    <input id="quark-card-fid-anime" class="glass-input border border-slate-800 rounded px-3 py-2 text-xs text-slate-200" placeholder="动漫目录 FID">
-                </div>
+                <div><div class="text-xs text-slate-400 mb-2">分类目录 FID</div><div id="quark-card-category-fids" class="grid grid-cols-1 md:grid-cols-2 gap-3"></div><p class="mt-2 text-[10px] text-slate-500">分类项由当前版本支持的分类动态生成，不需要编辑 JSON。</p></div>
                 <div class="flex justify-end gap-2 pt-2">
                     <button type="button" id="quark-card-check" onclick="checkQuarkCard()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-4 py-2 rounded">检查连接</button>
                     <button type="button" onclick="closeQuarkCard()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-4 py-2 rounded">取消</button>
@@ -1156,6 +1151,10 @@
                 openTelegramCard();
                 return;
             }
+            if (cardId === "quark") {
+                openQuarkCard();
+                return;
+            }
             openGenericCard(cardId);
         }
 
@@ -1332,26 +1331,37 @@
                 const cfg = result.config || {};
                 document.getElementById("quark-card-enabled").checked = result.enabled !== false;
                 document.getElementById("quark-card-cookie").value = "";
-                document.getElementById("quark-card-cookie").placeholder = cfg.has_cookie ? "Cookie 已保存；需要更换时再粘贴新的 Cookie" : "请粘贴夸克网盘 Cookie…";
+                document.getElementById("quark-card-cookie").placeholder = cfg.has_cookie ? "已保存 Cookie；输入新值即可更新" : "请粘贴夸克网盘 Cookie…";
+                document.getElementById("quark-card-cookie-status").textContent = cfg.has_cookie ? "Cookie 已保存且不会回显；输入新 Cookie 可替换，留空则保持不变。" : "尚未配置 Cookie。保存后会安全存储，不会在页面回显。";
                 document.getElementById("quark-card-default-fid").value = cfg.default_fid || "0";
-                const fids = cfg.category_fids || {};
-                document.getElementById("quark-card-fid-movie").value = fids["电影"] || "";
-                document.getElementById("quark-card-fid-tv").value = fids["电视剧"] || "";
-                document.getElementById("quark-card-fid-show").value = fids["综艺"] || "";
-                document.getElementById("quark-card-fid-anime").value = fids["动漫"] || "";
+                renderQuarkCategoryFids(cfg.category_fids || {});
             } catch (error) { alert(error.message || "读取 Quark 配置失败"); }
         }
 
+        function renderQuarkCategoryFids(categoryFids) {
+            const container = document.getElementById("quark-card-category-fids");
+            if (!container) return;
+            const entries = Object.entries(categoryFids || {});
+            container.innerHTML = entries.map(([category, fid]) =>
+                '<label class="block min-w-0 text-xs text-slate-400">' + escapeHtml(category) +
+                '<input data-quark-category="' + escapeHtml(category) + '" value="' + escapeHtml(fid || '') +
+                '" class="glass-input mt-1 w-full border border-slate-800 rounded px-3 py-2 text-xs text-slate-200" placeholder="' +
+                escapeHtml(category + '目录 FID（可留空）') + '"></label>'
+            ).join("");
+            if (!entries.length) {
+                container.innerHTML = '<div class="text-xs text-slate-500">当前没有可配置的分类目录。</div>';
+            }
+        }
+
         async function saveQuarkCardConfig() {
+            const categoryFids = {};
+            document.querySelectorAll("#quark-card-category-fids [data-quark-category]").forEach(input => {
+                categoryFids[input.dataset.quarkCategory] = input.value.trim();
+            });
             const payload = {
                 enabled: document.getElementById("quark-card-enabled").checked,
                 default_fid: document.getElementById("quark-card-default-fid").value.trim(),
-                category_fids: {
-                    "电影": document.getElementById("quark-card-fid-movie").value.trim(),
-                    "电视剧": document.getElementById("quark-card-fid-tv").value.trim(),
-                    "综艺": document.getElementById("quark-card-fid-show").value.trim(),
-                    "动漫": document.getElementById("quark-card-fid-anime").value.trim()
-                }
+                category_fids: categoryFids
             };
             const cookie = document.getElementById("quark-card-cookie").value.trim();
             if (cookie) payload.cookie = cookie;
