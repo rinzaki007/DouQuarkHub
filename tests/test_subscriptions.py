@@ -755,3 +755,38 @@ def test_channel_subscription_deduplicates_repeated_file_ids_before_transfer(tmp
     saved = manager.get_subscriptions()[0]
     assert saved["saved_episodes"].count("share-selected:ep1") == 1
     manager.stop_scheduler()
+
+
+def test_record_success_keys_atomically_clears_pending_transfer(tmp_path):
+    storage = ChannelStorageTargets()
+    sources = FakeResourceSources()
+    manager = SubscriptionManager(
+        tmp_path / "atomic-success-checkpoint.json",
+        storage,
+        sources,
+        FakeLogger(),
+    )
+    sub = manager.add_subscription(
+        title="Show",
+        pwd_id="share-selected",
+        target_fid="0",
+        storage_target_id="demo-storage",
+        source_id="telegram",
+        channel="demo",
+        files=[{"fid": "ep1", "file_name": "Show.S01E01.mkv"}],
+    )
+
+    try:
+        manager._set_pending_save_keys(sub, ["share-selected:ep1"])
+        before = manager.get_subscriptions()[0]
+        assert before["pending_save_keys"] == ["share-selected:ep1"]
+
+        manager._record_success_keys(sub, ["share-selected:ep1"])
+        saved = manager.get_subscriptions()[0]
+
+        assert "share-selected:ep1" in saved["tracked_file_keys"]
+        assert "share-selected:ep1" in saved["saved_episodes"]
+        assert saved["pending_save_keys"] == []
+        assert saved["pending_save_uncertain"] is False
+    finally:
+        manager.stop_scheduler()
