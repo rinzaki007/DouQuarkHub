@@ -1048,6 +1048,8 @@ def test_legacy_subscription_deduplicates_repeated_file_ids_before_transfer(tmp_
 
 
 def test_scheduled_subscription_rechecks_due_time_when_claiming_run(tmp_path, monkeypatch):
+    import time
+
     manager = SubscriptionManager(
         tmp_path / "scheduled-due-recheck.json",
         FakeStorageTargets(),
