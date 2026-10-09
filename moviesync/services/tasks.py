@@ -295,7 +295,7 @@ class TaskManager:
                 failed_count=int(counts.get("failed", 0)),
                 finished_at=now,
             )
-        except Exception as exc:
+        except Exception:
             self.logger.exception("一次性转存任务 %s 执行异常", task_id)
             # Once the runner has started, an exception alone cannot prove that
             # no remote side effect occurred. Treat the outcome as ambiguous to
