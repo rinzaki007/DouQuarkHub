@@ -832,7 +832,11 @@ class SubscriptionManager:
                 current["phase_label"] = "已人工确认转存"
                 current["last_check"] = self._now_string() + " (已确认转存)"
                 current["last_check_at"] = time.time()
-                interval = max(1, min(self.max_interval_hours, int(current.get("interval_hours", 6) or 6)))
+                try:
+                    interval = int(current.get("interval_hours", 6) or 6)
+                except (TypeError, ValueError):
+                    interval = 6
+                interval = max(1, min(self.max_interval_hours, interval))
                 current["next_run_at"] = time.time() + interval * 3600
                 history = list(current.get("run_history", []) or [])
                 history.append({"at": time.time(), "success": True, "message": "用户已确认网盘端转存成功", "success_count": len(keys), "failed_count": 0})
