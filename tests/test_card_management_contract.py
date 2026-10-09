@@ -315,3 +315,52 @@ def test_installed_storage_card_config_and_enable_lifecycle(tmp_path):
     )
     assert response.status_code == 200
     assert services["storage_targets"].get("demo-storage-plugin") is card
+
+
+
+def test_card_listing_does_not_call_plugin_health_check_and_hides_exception_details(tmp_path):
+    from moviesync.app import create_app
+    from moviesync.cards import CardManifest, ResourceSourceCard
+
+    app = create_app({"MOVIESYNC_DATA_DIR": str(tmp_path)}, start_scheduler=False)
+    services = app.extensions["moviesync"]
+    calls = []
+
+    class UnstablePlugin(ResourceSourceCard):
+        manifest = CardManifest(
+            id="unstable-plugin",
+            name="Unstable Plugin",
+            type="resource_source",
+            capabilities=("resource.search", "resource.health_check"),
+            config_fields=({"key": "api_token", "type": "password", "secret": True},),
+        )
+
+        def search(self, movie, config):
+            return []
+
+        def check(self, config):
+            calls.append(config)
+            raise RuntimeError("upstream rejected token secret-token-value")
+
+    services["card_registry"].register(UnstablePlugin())
+    client = app.test_client()
+    client.post("/api/setup", json={"username": "admin", "password": "password123"})
+    with client.session_transaction() as session:
+        csrf = session["csrf_token"]
+
+    response = client.get("/api/cards")
+    assert response.status_code == 200
+    item = next(card for card in response.get_json()["cards"] if card["id"] == "unstable-plugin")
+    assert item["health"]["status"] == "idle"
+    assert item["configured"] is False
+    assert calls == []
+
+    response = client.post(
+        "/api/cards/unstable-plugin/check",
+        json={},
+        headers={"X-CSRF-Token": csrf},
+    )
+    assert response.status_code == 502
+    assert "secret-token-value" not in response.get_data(as_text=True)
+    assert "请查看服务日志" in response.get_json()["message"]
+    assert len(calls) == 1
