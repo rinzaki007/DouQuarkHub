@@ -3,8 +3,12 @@
 覆盖：原子写入/读取，以及损坏 JSON 回退默认值。
 """
 import json
+from pathlib import Path
 
-from moviesync.storage import JsonStore
+import pytest
+
+import moviesync.storage as storage_module
+from moviesync.storage import JsonStore, JsonStoreReadError
 
 
 def test_json_store_writes_atomically(tmp_path):
@@ -33,11 +37,6 @@ def test_corrupt_json_is_quarantined(tmp_path):
 
 
 def test_json_store_raises_instead_of_returning_default_on_read_error(tmp_path, monkeypatch):
-    import pytest
-    from pathlib import Path
-
-    from moviesync.storage import JsonStoreReadError
-
     path = tmp_path / "protected.json"
     path.write_text('{"keep": true}', encoding="utf-8")
     store = JsonStore(path, lambda: {"fallback": True})
@@ -60,11 +59,6 @@ def test_json_store_raises_instead_of_returning_default_on_read_error(tmp_path, 
 
 
 def test_corrupt_json_is_not_replaced_when_quarantine_fails(tmp_path, monkeypatch):
-    import pytest
-
-    import moviesync.storage as storage_module
-    from moviesync.storage import JsonStoreReadError
-
     path = tmp_path / "broken.json"
     path.write_text("{not-json", encoding="utf-8")
     store = JsonStore(path, lambda: {"fallback": True})
