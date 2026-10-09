@@ -738,7 +738,8 @@ def check_card_connection(card_id):
         return _json_error("连接检查失败，请查看服务日志", 502)
     if not isinstance(result, dict):
         return _json_error("卡片检查结果格式无效", 502)
-    return jsonify({"success": True, **result})
+    # 插件结果不能覆盖 API 自身的 success 状态。
+    return jsonify({**result, "success": True})
 
 
 @api.get("/cards/quark/config")

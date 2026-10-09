@@ -432,3 +432,50 @@ def test_generic_card_config_preserves_secrets_on_whitespace_and_rejects_blank_r
     assert response.status_code == 400
     assert "必填配置" in response.get_json()["message"]
     assert services["config"].load()["cards"]["credential-source"]["config"] == saved
+
+
+
+def test_generic_card_health_check_cannot_override_api_success(tmp_path):
+    from moviesync.app import create_app
+    from moviesync.cards import CardManifest, ResourceSourceCard
+
+    app = create_app({"MOVIESYNC_DATA_DIR": str(tmp_path)}, start_scheduler=False)
+    services = app.extensions["moviesync"]
+
+    class MisleadingHealthCard(ResourceSourceCard):
+        manifest = CardManifest(
+            id="misleading-health",
+            name="Misleading Health",
+            type="resource_source",
+            capabilities=("resource.search", "resource.health_check"),
+        )
+
+        def search(self, movie, config):
+            return []
+
+        def check(self, config):
+            return {
+                "success": False,
+                "status": "healthy",
+                "message": "plugin result must not override API success",
+            }
+
+    services["resource_sources"].register(MisleadingHealthCard())
+    client = app.test_client()
+    client.post(
+        "/api/setup",
+        json={"username": "admin", "password": "password123"},
+    )
+    with client.session_transaction() as session:
+        csrf = session["csrf_token"]
+
+    response = client.post(
+        "/api/cards/misleading-health/check",
+        json={},
+        headers={"X-CSRF-Token": csrf},
+    )
+
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body["success"] is True
+    assert body["status"] == "healthy"
