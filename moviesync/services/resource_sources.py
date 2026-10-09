@@ -305,8 +305,9 @@ class ResourceSourceManager:
                         continue
                     results.append({
                         **item,
-                        "source_id": str(item.get("source_id") or source.card_id),
-                        "source_name": str(item.get("source_name") or self._source_name(source)),
+                        # Resource identity is owned by the manager, not plugin output.
+                        "source_id": source.card_id,
+                        "source_name": self._source_name(source),
                     })
             except Exception as exc:
                 self.logger.exception(
