@@ -12,6 +12,7 @@ from typing import Any
 
 from ..cards import CardManifest, CardRegistry, ResourceSourceCard
 from ..clients.telegram import TelegramClient
+from .filename_rules import parse_tv_episode
 
 
 class ResourceSource(ResourceSourceCard):
@@ -210,6 +211,13 @@ class ResourceSourceManager:
                     exc,
                 )
         return results
+
+    def parse_tv_episode(self, source_id: str, file_name: str) -> tuple[int | None, int | None]:
+        """通过对应资源卡片的配置解析集数，核心订阅逻辑不绑定具体正则。"""
+        config = self.config_store.load()
+        source = self.sources.get(str(source_id))
+        card_config = self._card_config(config, source.card_id) if source else {}
+        return parse_tv_episode(file_name, card_config.get("magic_regex"))
 
     def search_channel(self, source_id: str, channel: object, title: str) -> list[dict[str, Any]]:
         config = self.config_store.load()

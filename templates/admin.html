@@ -1251,6 +1251,9 @@
                 const healthResult = await healthResp.json();
                 if (!result.success) throw new Error(result.message || "读取 Telegram 配置失败");
                 tgChannels = Array.isArray(result.config?.channels) ? result.config.channels : [];
+                const magicRegex = result.config?.magic_regex || {};
+                document.getElementById("telegram-magic-regex-pattern").value = magicRegex.pattern || "";
+                document.getElementById("telegram-magic-regex-replace").value = magicRegex.replace || "";
                 renderTelegramChannels();
                 const source = (healthResult.resource_sources || []).find(x => x.id === "telegram");
                 if (source) renderTelegramHealth({resource_sources:[source]});
@@ -1284,7 +1287,7 @@
         }
         async function saveTelegramCard() {
             try {
-                const result = await (await apiFetch("/api/cards/telegram/config", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({channels:tgChannels})})).json();
+                const result = await (await apiFetch("/api/cards/telegram/config", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({channels:tgChannels, magic_regex:{pattern:document.getElementById("telegram-magic-regex-pattern").value, replace:document.getElementById("telegram-magic-regex-replace").value}})})).json();
                 if (!result.success) throw new Error(result.message || "保存失败");
                 tgChannels = result.channels || tgChannels;
                 renderTelegramChannels();
@@ -1881,9 +1884,14 @@
                      <input type="text" id="telegram-new-channel-id" placeholder="频道 ID，例如：quark_movies" class="glass-input flex-1 min-w-[150px] border border-slate-800 rounded px-3 py-2 text-xs text-slate-200">
                      <button type="button" onclick="addTelegramChannel()" class="bg-blue-600 hover:bg-blue-500 text-white text-xs px-4 py-2 rounded">添加</button>
                  </div></div>
+                 <div class="space-y-3 rounded-xl border border-slate-800 bg-slate-900/40 p-3">
+                     <div><div class="text-xs font-semibold text-slate-300">电视剧集数识别规则</div><div class="mt-1 text-[10px] text-slate-500">规则独立保存在 Telegram 卡片配置中，不会写入订阅主流程。</div></div>
+                     <label class="block text-[11px] text-slate-400">magic_regex · pattern<textarea id="telegram-magic-regex-pattern" rows="2" class="glass-input mt-1 w-full rounded border border-slate-800 px-3 py-2 text-xs text-slate-200 font-mono"></textarea></label>
+                     <label class="block text-[11px] text-slate-400">magic_regex · replace<textarea id="telegram-magic-regex-replace" rows="1" class="glass-input mt-1 w-full rounded border border-slate-800 px-3 py-2 text-xs text-slate-200 font-mono"></textarea></label>
+                 </div>
                  <div class="flex justify-end gap-2 pt-2">
                      <button type="button" onclick="closeTelegramCard()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-4 py-2 rounded">关闭</button>
-                     <button type="button" onclick="saveTelegramCard()" class="bg-blue-600 hover:bg-blue-500 text-white text-xs px-5 py-2 rounded font-semibold">保存频道配置</button>
+                     <button type="button" onclick="saveTelegramCard()" class="bg-blue-600 hover:bg-blue-500 text-white text-xs px-5 py-2 rounded font-semibold">保存卡片配置</button>
                  </div>
              </div>
          </div>

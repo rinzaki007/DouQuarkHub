@@ -7,13 +7,13 @@
 """
 from __future__ import annotations
 
-import re
 import time
 import uuid
 from datetime import datetime
 from threading import Event, RLock, Thread
 
 from ..storage import JsonStore
+from .filename_rules import parse_tv_episode
 
 SUBSCRIPTION_SCHEMA_VERSION = 4
 VIDEO_EXTENSIONS = (".mp4", ".mkv", ".avi", ".mov", ".flv", ".wmv", ".m4v", ".ts", ".m2ts", ".iso")
@@ -26,31 +26,8 @@ def _normalize_resource_id(value: object) -> str:
     return value
 
 def _parse_tv_episode(file_name: str) -> tuple[int | None, int | None]:
-    """Return (season, episode); season is None for legacy episode-only names."""
-    if not file_name:
-        return None, None
-
-    season_match = re.search(r"\bS(\d{1,2})E(\d{1,4})\b", file_name, re.IGNORECASE)
-    if season_match:
-        season, episode = int(season_match.group(1)), int(season_match.group(2))
-        if 1900 <= episode <= 2030 or episode in {720, 1080, 2160}:
-            return None, None
-        return season, episode
-
-    patterns = [
-        r"\bEP?\s*(\d{1,4})\b",
-        r"第\s*(\d{1,4})\s*[集话期]",
-        r"[\[(【](\d{1,4})[\])】]",
-    ]
-    for pattern in patterns:
-        match = re.search(pattern, file_name, re.IGNORECASE)
-        if not match:
-            continue
-        episode = int(match.group(1))
-        if 1900 <= episode <= 2030 or episode in {720, 1080, 2160}:
-            continue
-        return None, episode
-    return None, None
+    """兼容旧调用；新订阅优先使用对应资源卡片的解析规则。"""
+    return parse_tv_episode(file_name)
 
 
 def _clean_tv_filename(file_name: str, title: str = "") -> tuple[int | None, str]:
@@ -275,10 +252,16 @@ class SubscriptionManager:
             ):
                 seen.add(fid)
                 target_fids.append(fid)
-                season_num, ep_num = _parse_tv_episode(
+                file_name = (
                     str(item.get("file_name") or "")
                     if isinstance(item, dict)
                     else ""
+                )
+                parser = getattr(self.resource_sources, "parse_tv_episode", None)
+                season_num, ep_num = (
+                    parser(source_id, file_name)
+                    if source_id and callable(parser)
+                    else _parse_tv_episode(file_name)
                 )
                 if ep_num is not None:
                     selected_episode_numbers.append(ep_num)
@@ -648,7 +631,12 @@ class SubscriptionManager:
                 file_name = str(item.get("file_name") or "")
                 if not file_name.lower().endswith(VIDEO_EXTENSIONS):
                     continue
-                season, episode = _parse_tv_episode(file_name)
+                parser = getattr(self.resource_sources, "parse_tv_episode", None)
+                season, episode = (
+                    parser(source_id, file_name)
+                    if callable(parser)
+                    else _parse_tv_episode(file_name)
+                )
                 if episode is None:
                     continue
                 if season is not None and baseline_season > 0:
