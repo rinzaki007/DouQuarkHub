@@ -959,3 +959,58 @@ def test_scheduler_start_requested_during_stop_timeout_restarts_after_old_worker
     finally:
         release_first.set()
         manager.stop_scheduler()
+
+
+def test_channel_subscription_creates_separate_folders_for_each_storage_target(tmp_path):
+    class MultiTargetStorage(ChannelStorageTargets):
+        def __init__(self):
+            super().__init__()
+            self.folder_targets = []
+            self.transfer_targets = []
+
+        def resolve_resource(self, resource, target_id=None):
+            resolved = super().resolve_resource(resource, target_id)
+            resolved["target_id"] = target_id or "target-a"
+            return resolved
+
+        def create_folder(self, name, parent_id="0", target_id=None):
+            self.folder_targets.append(target_id)
+            return f"folder-{target_id}"
+
+        def transfer(self, resource, files, target_id="0", storage_target_id=None, token=None):
+            self.transfer_targets.append((storage_target_id, target_id))
+            return True, "ok"
+
+    storage = MultiTargetStorage()
+    sources = FakeResourceSources()
+    sources.shares = [
+        {"channel": "demo", "pwd_id": "share1", "storage_target_id": "target-a"},
+        {"channel": "demo", "pwd_id": "share2", "storage_target_id": "target-b"},
+    ]
+    manager = SubscriptionManager(
+        tmp_path / "multi-target-folders.json",
+        storage,
+        sources,
+        FakeLogger(),
+    )
+    sub = manager.add_subscription(
+        title="Show",
+        pwd_id="share1",
+        target_fid="0",
+        source_id="telegram",
+        channel="demo",
+        files=[{"fid": "ep1", "file_name": "Show.S01E01.mkv"}],
+    )
+
+    try:
+        ok, message = manager.check_subscription_now(sub["id"])
+
+        assert ok is True
+        assert "成功追更 2 项" in message
+        assert storage.folder_targets == ["target-a", "target-b"]
+        assert storage.transfer_targets == [
+            ("target-a", "folder-target-a"),
+            ("target-b", "folder-target-b"),
+        ]
+    finally:
+        manager.stop_scheduler()
