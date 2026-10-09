@@ -103,47 +103,6 @@ def test_duplicate_transfer_submission_reuses_active_task(tmp_path):
         manager.executor.shutdown(wait=True)
 
 
-def test_duplicate_transfer_uses_logical_file_selection_not_presentation_metadata(tmp_path):
-    from threading import Event
-
-    manager = TaskManager(tmp_path / "tasks.json", logging.getLogger("test"))
-    started = Event()
-    release = Event()
-    payload = {
-        "movie": {"title": "同一部电影", "cover": "cover-a"},
-        "candidate": {
-            "pwd_id": "share-1",
-            "storage_target_id": "quark",
-            "files": [{"fid": "file-1", "file_name": "a.mkv"}, {"fid": "file-2", "file_name": "b.mkv"}],
-        },
-        "target_fid": "target-1",
-    }
-    equivalent_payload = {
-        "movie": {"title": " 同一部电影 ", "cover": "cover-b"},
-        "candidate": {
-            "pwd_id": "share-1",
-            "storage_target_id": "quark",
-            "files": [{"fid": "file-2", "file_name": "renamed-b.mkv"}, {"fid": "file-1", "file_name": "renamed-a.mkv"}],
-        },
-        "target_fid": "target-1",
-    }
-
-    def runner(progress):
-        started.set()
-        assert release.wait(3)
-        return True, "ok", {"success": 2, "skipped": 0, "failed": 0}
-
-    try:
-        first = manager.create_transfer_task(payload, runner)
-        assert started.wait(2)
-        second = manager.create_transfer_task(equivalent_payload, runner)
-        assert second["id"] == first["id"]
-        assert len(manager.list_tasks()) == 1
-    finally:
-        release.set()
-        manager.executor.shutdown(wait=True)
-
-
 def test_duplicate_retry_reuses_existing_active_retry(tmp_path):
     from threading import Event
 

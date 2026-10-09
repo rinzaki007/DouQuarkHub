@@ -105,7 +105,9 @@ class TaskManager:
             if pwd_id and file_ids:
                 fingerprint = {
                     "type": "transfer",
-                    "title": " ".join(str(movie.get("title") or movie.get("name") or payload.get("title") or "").split()).casefold(),
+                    "title": " ".join(
+                        str(movie.get("title") or movie.get("name") or payload.get("title") or "").split()
+                    ).casefold(),
                     "pwd_id": pwd_id,
                     "storage_target_id": str(
                         candidate.get("storage_target_id")
