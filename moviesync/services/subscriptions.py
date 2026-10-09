@@ -415,42 +415,35 @@ class SubscriptionManager:
         self,
         sub_id: str,
     ) -> tuple[bool, str]:
+        sub_id = str(sub_id)
+
+        # Claim the subscription atomically with reading its persisted state.
+        # Otherwise delete_subscription() can remove it between lookup and
+        # running_ids registration while this worker continues with stale data.
         with self.lock:
             subscriptions = self._load_subscriptions()
-
             subscription = next(
                 (
                     item
                     for item in subscriptions
-                    if item.get("id")
-                    == str(sub_id)
+                    if item.get("id") == sub_id
                 ),
                 None,
             )
 
-        if not subscription:
-            return (
-                False,
-                "未找到订阅任务",
-            )
-        if subscription.get("pending_save_uncertain") and subscription.get("pending_save_keys"):
-            return (
-                False,
-                "转存结果待核实：请先在任务中心确认已转存，或确认未转存后再允许重试。",
-            )
+            if not subscription:
+                return False, "未找到订阅任务"
 
-        sub_id = str(sub_id)
-
-        with self.lock:
-            if sub_id in self.running_ids:
+            if subscription.get("pending_save_uncertain") and subscription.get("pending_save_keys"):
                 return (
                     False,
-                    "该订阅正在执行，请稍后再试",
+                    "转存结果待核实：请先在任务中心确认已转存，或确认未转存后再允许重试。",
                 )
 
-            self.running_ids.add(
-                sub_id
-            )
+            if sub_id in self.running_ids:
+                return False, "该订阅正在执行，请稍后再试"
+
+            self.running_ids.add(sub_id)
 
         try:
             # Keep the initial status write inside the guarded lifecycle so
