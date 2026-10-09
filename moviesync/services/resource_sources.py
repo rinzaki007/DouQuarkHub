@@ -372,7 +372,7 @@ class ResourceSourceManager:
                         "enabled": True,
                         **check,
                     }
-                except Exception as exc:
+                except Exception:
                     self.logger.exception(
                         "资源源 %s 健康检查异常",
                         source_id,
@@ -383,7 +383,7 @@ class ResourceSourceManager:
                         "type": self._source_type(source),
                         "enabled": True,
                         "status": "unavailable",
-                        "message": str(exc)[:200],
+                        "message": "资源来源连接检查失败，请查看服务日志",
                         "total": 0,
                         "valid_count": 0,
                     }
