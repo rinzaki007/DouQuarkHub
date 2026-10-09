@@ -1311,7 +1311,7 @@ def test_subscription_saved_history_normalizes_malformed_entries_before_finish(t
         manager.stop_scheduler()
 
 
-def test_malformed_pending_save_keys_do_not_break_subscription_reads_or_allow_blind_retry(tmp_path, monkeypatch):
+def test_malformed_pending_save_keys_fail_closed(tmp_path, monkeypatch):
     manager = SubscriptionManager(
         tmp_path / "malformed-pending-keys.json",
         FakeStorageTargets(),
