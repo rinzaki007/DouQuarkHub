@@ -17,20 +17,20 @@ class RedactingFormatter(logging.Formatter):
     """格式化后统一脱敏，覆盖普通日志消息和异常 traceback。"""
 
     _quoted_secret = re.compile(
-        r"""(?i)((?:["']?)(?:cookie|set-cookie|token|access_token|refresh_token|api[_-]?key|secret|password|authorization|credential|private[_-]?key|client_secret)(?:["']?)\s*[:=]\s*)(["'])([^"'\\r\\n]*)\\2"""
+        r"""(?i)((?:["']?)(?:cookie|set-cookie|token|access_token|refresh_token|api[_-]?key|secret|password|authorization|credential|private[_-]?key|client_secret)(?:["']?)\s*[:=]\s*)(["'])([^"'\r\n]*)\2"""
     )
     _authorization = re.compile(
-        r"(?i)(\\bauthorization\\s*[:=]\\s*)(?:bearer\\s+)?[^\\s,;\\]}]+"
+        r"(?i)(\bauthorization\s*[:=]\s*)(?:bearer\s+)?[^\s,;\]}]+"
     )
     _plain_secret = re.compile(
-        r"(?i)(\\b(?:cookie|set-cookie|token|access_token|refresh_token|api[_-]?key|secret|password|authorization|credential|private[_-]?key|client_secret)\\b\\s*[:=]\\s*)[^\\s,;\\]}]+"
+        r"(?i)(\b(?:cookie|set-cookie|token|access_token|refresh_token|api[_-]?key|secret|password|authorization|credential|private[_-]?key|client_secret)\b\s*[:=]\s*)[^\s,;\]}]+"
     )
 
     @classmethod
     def redact(cls, message: str) -> str:
-        message = cls._quoted_secret.sub(r"\\1[REDACTED]", message)
-        message = cls._authorization.sub(r"\\1[REDACTED]", message)
-        return cls._plain_secret.sub(r"\\1[REDACTED]", message)
+        message = cls._quoted_secret.sub(r"\1[REDACTED]", message)
+        message = cls._authorization.sub(r"\1[REDACTED]", message)
+        return cls._plain_secret.sub(r"\1[REDACTED]", message)
 
     def format(self, record: logging.LogRecord) -> str:
         return self.redact(super().format(record))
