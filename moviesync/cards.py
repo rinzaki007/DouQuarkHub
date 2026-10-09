@@ -53,9 +53,37 @@ class CardManifest:
         if any(not key for key in keys) or len(keys) != len(set(keys)):
             raise ValueError("卡片配置字段必须具有唯一且非空的 key")
         allowed_field_types = {"string", "password", "textarea", "boolean", "number", "json"}
+        text_field_types = {"string", "password", "textarea"}
         for field in self.config_fields:
-            if field.get("type", "string") not in allowed_field_types:
-                raise ValueError(f"不支持的配置字段类型: {field.get('type')}")
+            field_type = field.get("type", "string")
+            if field_type not in allowed_field_types:
+                raise ValueError(f"不支持的配置字段类型: {field_type}")
+
+            for bound in ("min_length", "max_length"):
+                value = field.get(bound)
+                if value is not None and (
+                    isinstance(value, bool) or not isinstance(value, int) or value < 0
+                ):
+                    raise ValueError(f"配置字段「{field.get('label') or field.get('key')}」的 {bound} 必须是非负整数")
+
+            min_length = field.get("min_length")
+            max_length = field.get("max_length")
+            if min_length is not None and max_length is not None and min_length > max_length:
+                raise ValueError(f"配置字段「{field.get('label') or field.get('key')}」的最小长度不能大于最大长度")
+
+            pattern = field.get("pattern")
+            if pattern is not None:
+                if field_type not in text_field_types or not isinstance(pattern, str):
+                    raise ValueError("pattern 只能用于文本字段，且必须是字符串")
+                try:
+                    re.compile(pattern)
+                except re.error as exc:
+                    raise ValueError(f"配置字段「{field.get('label') or field.get('key')}」的正则规则无效") from exc
+
+            value_format = field.get("format")
+            if value_format is not None:
+                if field_type not in text_field_types or value_format not in {"url", "email"}:
+                    raise ValueError(f"配置字段「{field.get('label') or field.get('key')}」的格式规则无效")
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -143,7 +171,7 @@ class Card:
                             f"配置字段「{label}」必须是有效的 HTTP 或 HTTPS 地址"
                         )
                 elif value_format == "email":
-                    if not re.fullmatch(r"[^@\\s]+@[^@\\s]+\\.[^@\\s]+", value):
+                    if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", value):
                         raise ConfigValidationError(
                             f"配置字段「{label}」必须是有效的邮箱地址"
                         )
