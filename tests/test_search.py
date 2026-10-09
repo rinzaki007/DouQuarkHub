@@ -85,3 +85,60 @@ def test_folder_creation_exception_is_not_returned_to_user():
     assert ok is False
     assert message == "创建专属文件夹失败: 请检查存储目标配置或查看服务日志"
     assert "SECRET_COOKIE_VALUE" not in message
+
+
+def test_resource_resolution_error_is_not_returned_to_transfer_task():
+    import logging
+
+    class ExplodingResolveTargets(FakeStorageTargets):
+        def resolve_resource(self, resource, target_id=None):
+            return {
+                "target_id": "quark",
+                "files": [],
+                "token": None,
+                "error": "upstream cookie=SECRET_COOKIE_VALUE",
+            }
+
+    service = SearchService(
+        FakeResourceSources(),
+        ExplodingResolveTargets(),
+        logging.getLogger("test"),
+    )
+
+    ok, message, _counts = service.transfer_selected_resource_with_progress(
+        {"title": "Show"},
+        {"pwd_id": "same123", "files": [{"fid": "f1"}]},
+        "0",
+    )
+
+    assert ok is False
+    assert message == "分享资源解析失败，请检查分享链接或查看服务日志"
+    assert "SECRET_COOKIE_VALUE" not in message
+
+
+def test_transfer_plugin_failure_message_is_sanitized():
+    import logging
+
+    class ExplodingTransferTargets(FakeStorageTargets):
+        def create_folder(self, *_args, **_kwargs):
+            return "folder-1"
+
+        def transfer(self, *_args, **_kwargs):
+            return False, "upstream cookie=SECRET_COOKIE_VALUE"
+
+    service = SearchService(
+        FakeResourceSources(),
+        ExplodingTransferTargets(),
+        logging.getLogger("test"),
+    )
+
+    ok, message, counts = service.transfer_selected_resource_with_progress(
+        {"title": "Show"},
+        {"pwd_id": "same123", "files": [{"fid": "f1"}]},
+        "0",
+    )
+
+    assert ok is False
+    assert message == "转存失败，请检查存储目标配置或查看服务日志"
+    assert counts["uncertain"] is False
+    assert "SECRET_COOKIE_VALUE" not in message
