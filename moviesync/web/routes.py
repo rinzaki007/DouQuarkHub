@@ -619,7 +619,16 @@ def _card_config_view(card, raw_config):
     """仅向管理界面返回 Manifest 声明的字段，并对敏感值做脱敏。"""
     raw_config = raw_config if isinstance(raw_config, dict) else {}
     public_config, has_value, fields = {}, {}, []
-    sensitive_markers = ("cookie", "token", "secret", "password", "api_key", "authorization", "credential", "private_key")
+    sensitive_markers = (
+        "cookie",
+        "token",
+        "secret",
+        "password",
+        "api_key",
+        "authorization",
+        "credential",
+        "private_key",
+    )
     for declared in card.manifest.config_fields:
         field = dict(declared)
         key = str(field.get("key") or "")
