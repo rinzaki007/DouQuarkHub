@@ -9,11 +9,11 @@
 from __future__ import annotations
 
 import re
-from urllib.parse import urlparse
 from copy import deepcopy
 from dataclasses import dataclass
 from threading import RLock
 from typing import Any
+from urllib.parse import urlparse
 
 from .clients.quark import QuarkClient, sanitize_pwd_id
 from .config_store import ConfigStore, ConfigValidationError
