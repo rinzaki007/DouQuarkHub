@@ -639,3 +639,29 @@ def test_stop_scheduler_keeps_live_worker_reference(tmp_path):
         manager.stop_scheduler()
 
     assert manager.worker is None
+
+
+def test_subscription_worker_does_not_expose_exception_details(tmp_path, monkeypatch):
+    import logging
+
+    manager = SubscriptionManager(
+        tmp_path / "subscriptions.json",
+        lambda: "cookie",
+        logging.getLogger("test"),
+    )
+    try:
+        sub = manager.add_subscription(title="异常脱敏测试", pwd_id="share-1")
+
+        def fail_with_sensitive_details(_subscription):
+            raise RuntimeError("upstream cookie=SECRET_COOKIE_VALUE")
+
+        monkeypatch.setattr(manager, "_check", fail_with_sensitive_details)
+        ok, message = manager.check_subscription_now(sub["id"])
+
+        assert ok is False
+        assert message == "任务执行异常，请查看服务日志"
+        current = next(item for item in manager.get_subscriptions() if item["id"] == sub["id"])
+        assert "SECRET_COOKIE_VALUE" not in current["last_error"]
+        assert all("SECRET_COOKIE_VALUE" not in event["message"] for event in current["run_history"])
+    finally:
+        manager.stop_scheduler()
