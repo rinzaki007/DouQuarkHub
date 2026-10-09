@@ -64,6 +64,9 @@ def test_card_manifest_text_constraints_reject_invalid_config_without_writing(tm
 
     invalid_values = [
         ({"endpoint": "ftp://example.com", "slug": "movie-source", "email": "admin@example.com"}, "HTTP 或 HTTPS"),
+        ({"endpoint": "http://a.co:bad", "slug": "movie-source", "email": "admin@example.com"}, "HTTP 或 HTTPS"),
+        ({"endpoint": "http://a.co:99999", "slug": "movie-source", "email": "admin@example.com"}, "HTTP 或 HTTPS"),
+        ({"endpoint": "http://exa mple.com", "slug": "movie-source", "email": "admin@example.com"}, "HTTP 或 HTTPS"),
         (
             {"endpoint": "https://example.com/a-very-long-path", "slug": "movie-source", "email": "admin@example.com"},
             "不能超过 24",
