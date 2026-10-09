@@ -1,6 +1,8 @@
 """统一任务中心服务：持久化一次性转存任务与执行历史。"""
 from __future__ import annotations
 
+import hashlib
+import json
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
@@ -57,6 +59,12 @@ class TaskManager:
 
     def _save(self, items):
         self.store.write(items[-MAX_TASKS:])
+
+    @staticmethod
+    def _payload_key(payload):
+        """生成稳定的任务指纹，用于抑制同一请求的并发重复提交。"""
+        serialized = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str)
+        return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
 
     @staticmethod
     def _phase_for_progress(progress):
@@ -118,9 +126,13 @@ class TaskManager:
             "events": [],
             "retry_payload": payload,
         }
+        task["dedupe_key"] = self._payload_key(payload)
         self._append_event(task, "info", "任务已创建")
         with self.lock:
             items = self.list_tasks()
+            active = next((item for item in items if item.get("type") == "transfer" and item.get("status") in {"queued", "running"} and item.get("dedupe_key") == task["dedupe_key"]), None)
+            if active:
+                return active
             items.append(task)
             self._save(items)
         self.executor.submit(self._run_transfer, task["id"], runner)
@@ -202,14 +214,18 @@ class TaskManager:
         return self._get(str(task_id))
 
     def retry_transfer(self, task_id, runner):
-        old = self._get(str(task_id))
-        if not old or old.get("type") != "transfer":
-            return None
-        if old.get("status") != "failed":
-            return None
         with self.lock:
             items = self.list_tasks()
+            old = next((item for item in items if str(item.get("id")) == str(task_id)), None)
+            if not old or old.get("type") != "transfer" or old.get("status") != "failed":
+                return None
+            payload = old.get("retry_payload") or {}
+            dedupe_key = old.get("dedupe_key") or self._payload_key(payload)
+            active = next((item for item in items if item.get("type") == "transfer" and item.get("status") in {"queued", "running"} and item.get("dedupe_key") == dedupe_key), None)
+            if active:
+                return active
             new = dict(old)
+            new["dedupe_key"] = dedupe_key
             new["id"] = uuid.uuid4().hex
             new["status"] = "queued"
             new["phase"] = "waiting"

@@ -1047,7 +1047,7 @@ def transfer_selected():
     task = _services()["tasks"].create_transfer_task(payload, runner)
     return jsonify({
         "success": True,
-        "task": {key: value for key, value in task.items() if key != "retry_payload"},
+        "task": {key: value for key, value in task.items() if key not in {"retry_payload", "dedupe_key"}},
         "message": "转存任务已创建",
     })
 

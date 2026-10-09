@@ -69,3 +69,58 @@ def test_running_subscription_cannot_be_deleted(tmp_path):
 
     assert manager.delete_subscription(sub["id"]) is False
     assert manager.get_subscriptions()
+
+
+
+def test_duplicate_transfer_submission_reuses_active_task(tmp_path):
+    from threading import Event
+
+    manager = TaskManager(tmp_path / "tasks.json", logging.getLogger("test"))
+    started = Event()
+    release = Event()
+    calls = []
+    payload = {"movie": {"title": "同一部电影"}, "candidate": {"pwd_id": "share-1", "files": [{"fid": "file-1"}]}, "target_fid": "target-1"}
+
+    def runner(progress):
+        calls.append(1)
+        started.set()
+        assert release.wait(3)
+        return True, "ok", {"success": 1, "skipped": 0, "failed": 0}
+
+    try:
+        first = manager.create_transfer_task(payload, runner)
+        assert started.wait(2)
+        second = manager.create_transfer_task(payload, runner)
+        assert second["id"] == first["id"]
+        assert len(manager.list_tasks()) == 1
+        assert len(calls) == 1
+    finally:
+        release.set()
+        manager.executor.shutdown(wait=True)
+
+
+def test_duplicate_retry_reuses_existing_active_retry(tmp_path):
+    from threading import Event
+
+    manager = TaskManager(tmp_path / "tasks.json", logging.getLogger("test"))
+    started = Event()
+    release = Event()
+    payload = {"movie": {"title": "重试电影"}, "candidate": {"pwd_id": "share-2", "files": []}}
+    manager.store.write([{"id": "failed-task", "type": "transfer", "status": "failed", "title": "重试电影", "events": [], "retry_payload": payload}])
+
+    def runner(progress):
+        started.set()
+        assert release.wait(3)
+        return True, "ok", {"success": 0}
+
+    try:
+        first = manager.retry_transfer("failed-task", runner)
+        assert first is not None
+        assert started.wait(2)
+        second = manager.retry_transfer("failed-task", runner)
+        assert second is not None
+        assert second["id"] == first["id"]
+        assert len(manager.list_tasks()) == 2
+    finally:
+        release.set()
+        manager.executor.shutdown(wait=True)
