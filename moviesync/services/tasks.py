@@ -78,7 +78,16 @@ class TaskManager:
             return [dict(item) for item in items if isinstance(item, dict)]
 
     def _save(self, items):
-        self.store.write(items[-MAX_TASKS:])
+        # Never evict queued/running tasks: their workers still need a durable
+        # record to claim and report the final outcome. Bound only terminal history.
+        active = [item for item in items if item.get("status") in {"queued", "running"}]
+        terminal = [item for item in items if item.get("status") not in {"queued", "running"}]
+        remaining = max(0, MAX_TASKS - len(active))
+        keep_ids = {id(item) for item in active}
+        if remaining:
+            keep_ids.update(id(item) for item in terminal[-remaining:])
+        kept = [item for item in items if id(item) in keep_ids]
+        self.store.write(kept)
 
     @staticmethod
     def _payload_key(payload):
@@ -169,6 +178,11 @@ class TaskManager:
             current = next((x for x in items if x.get("id") == task_id), None)
             if not current:
                 return
+            if current.get("status") in {"success", "failed", "cancelled"} and (
+                "status" not in changes or changes["status"] != current.get("status")
+            ):
+                # Ignore late progress/status updates after a terminal outcome.
+                return
             old_message = current.get("message")
             current.update(changes)
             current["updated_at"] = time.time()
@@ -192,15 +206,21 @@ class TaskManager:
         )
 
     def _run_transfer(self, task_id, runner):
-        self._update(
-            task_id,
-            status="running",
-            progress=10,
-            phase="validate",
-            phase_label="校验资源",
-            message="正在重新验证分享资源…",
-            started_at=time.time(),
-        )
+        # Claim the queued task atomically with deletion/clear-history operations.
+        # A task deleted before its worker starts must never execute a remote transfer.
+        with self.lock:
+            current = self._get(task_id)
+            if not current or current.get("status") != "queued":
+                return
+            self._update(
+                task_id,
+                status="running",
+                progress=10,
+                phase="validate",
+                phase_label="校验资源",
+                message="正在重新验证分享资源…",
+                started_at=time.time(),
+            )
         try:
             result = runner(lambda progress, message: self._progress_update(task_id, progress, message))
             ok, message, counts = result
@@ -290,7 +310,7 @@ class TaskManager:
             target = next((x for x in items if str(x.get("id")) == task_id), None)
             if not target:
                 return False, "任务不存在"
-            if target.get("status") in {"queued", "running"}:
+            if target.get("status") == "running":
                 return False, "执行中的任务不能删除，请等待任务结束"
             items = [x for x in items if str(x.get("id")) != task_id]
             self._save(items)

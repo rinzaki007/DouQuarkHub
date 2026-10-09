@@ -214,3 +214,75 @@ def test_uncertain_transfer_failure_disables_direct_retry(tmp_path):
         assert manager.retry_transfer(task["id"], lambda progress: (True, "不应重试", {"success": 1})) is None
     finally:
         manager.shutdown()
+
+
+def test_deleted_queued_task_never_starts_remote_runner(tmp_path):
+    manager = TaskManager(tmp_path / "tasks.json", logging.getLogger("test"))
+    calls = []
+    try:
+        manager.executor.shutdown(wait=True)
+        manager.store.write([{
+            "id": "queued-task",
+            "type": "transfer",
+            "status": "queued",
+            "title": "待执行任务",
+            "events": [],
+        }])
+
+        ok, message = manager.delete_task("queued-task")
+        assert ok is True
+        manager._run_transfer("queued-task", lambda progress: calls.append("ran"))
+
+        assert calls == []
+        assert manager.get_task("queued-task") == {}
+    finally:
+        manager.shutdown()
+
+
+def test_late_progress_cannot_overwrite_terminal_task_state(tmp_path):
+    manager = TaskManager(tmp_path / "tasks.json", logging.getLogger("test"))
+    try:
+        manager.store.write([{
+            "id": "done-task",
+            "type": "transfer",
+            "status": "success",
+            "phase": "completed",
+            "phase_label": "转存完成",
+            "progress": 100,
+            "message": "ok",
+            "events": [],
+        }])
+
+        manager._progress_update("done-task", 45, "迟到的进度事件")
+
+        current = manager.get_task("done-task")
+        assert current["status"] == "success"
+        assert current["phase"] == "completed"
+        assert current["phase_label"] == "转存完成"
+        assert current["progress"] == 100
+        assert current["message"] == "ok"
+    finally:
+        manager.shutdown()
+
+
+def test_task_history_limit_never_discards_active_tasks(tmp_path):
+    manager = TaskManager(tmp_path / "tasks.json", logging.getLogger("test"))
+    try:
+        items = [
+            {"id": f"terminal-{index}", "status": "success"}
+            for index in range(305)
+        ]
+        items.extend([
+            {"id": f"active-{index}", "status": "running"}
+            for index in range(3)
+        ])
+        manager._save(items)
+
+        saved = manager.list_tasks()
+        saved_ids = {item["id"] for item in saved}
+        assert {"active-0", "active-1", "active-2"} <= saved_ids
+        assert len(saved) == 300
+        assert "terminal-0" not in saved_ids
+        assert "terminal-304" in saved_ids
+    finally:
+        manager.shutdown()
