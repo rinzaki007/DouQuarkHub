@@ -1471,3 +1471,50 @@ def test_recovery_keeps_invalid_pending_transfer_fail_closed(tmp_path, monkeypat
         assert "格式异常" in message
     finally:
         manager.stop_scheduler()
+
+
+def test_uncertain_subscription_without_pending_keys_fails_closed_until_user_confirms_not_saved(tmp_path, monkeypatch):
+    manager = SubscriptionManager(
+        tmp_path / "uncertain-without-pending-keys.json",
+        FakeStorageTargets(),
+        FakeResourceSources(),
+        FakeLogger(),
+    )
+    sub = manager.add_subscription(title="缺少待确认文件记录", pwd_id="share-empty-pending")
+    calls = []
+
+    try:
+        # Model an ambiguous result whose pending file list was lost or cleared.
+        items = manager.get_subscriptions()
+        current = next(item for item in items if item["id"] == sub["id"])
+        current["pending_save_keys"] = []
+        current["pending_save_uncertain"] = True
+        current["pending_save_keys_invalid"] = False
+        current["status"] = "failed"
+        manager.store.write(items)
+
+        def successful_check(subscription):
+            calls.append(subscription["id"])
+            return manager._finish(subscription, True, "检查完成")
+
+        monkeypatch.setattr(manager, "_check", successful_check)
+
+        ok, message = manager.check_subscription_now(sub["id"])
+        assert ok is False
+        assert "缺少文件记录" in message
+        assert calls == []
+
+        ok, message = manager.resolve_pending_save(sub["id"], "saved")
+        assert ok is False
+        assert "缺少待确认文件记录" in message
+        assert calls == []
+
+        ok, message = manager.resolve_pending_save(sub["id"], "not_saved")
+        assert ok is True
+        assert message == "检查完成"
+        assert calls == [sub["id"]]
+        saved = manager.get_subscriptions()[0]
+        assert saved["pending_save_uncertain"] is False
+        assert saved["pending_save_keys"] == []
+    finally:
+        manager.stop_scheduler()

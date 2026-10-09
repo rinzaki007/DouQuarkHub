@@ -513,6 +513,10 @@ class SubscriptionManager:
                         False,
                         "转存结果待核实：请先在任务中心确认已转存，或确认未转存后再允许重试。",
                     )
+                return (
+                    False,
+                    "转存结果待核实但缺少文件记录；请检查目标网盘，确认未转存后再选择“确认未转存”以解除保护。",
+                )
 
             # The scheduler iterates a snapshot that can become stale while
             # another manual check or confirmation updates next_run_at.
@@ -987,12 +991,17 @@ class SubscriptionManager:
             if str(sub_id) in self.running_ids:
                 return False, "该订阅正在执行，请稍后再确认"
             keys = list(current.get("pending_save_keys", []) or [])
-            if current.get("pending_save_keys_invalid"):
-                return False, "待确认转存记录格式异常，请先检查网盘并修复订阅记录"
-            if not current.get("pending_save_uncertain") or not keys:
-                return False, "该任务没有待确认的转存结果"
             if action not in {"saved", "not_saved"}:
                 return False, "不支持的确认操作"
+            if current.get("pending_save_keys_invalid"):
+                return False, "待确认转存记录格式异常，请先检查网盘并修复订阅记录"
+            if not current.get("pending_save_uncertain"):
+                return False, "该任务没有待确认的转存结果"
+            if not keys and action == "saved":
+                return False, "缺少待确认文件记录，无法安全登记转存成功；请修复订阅记录"
+            # If the uncertainty flag survived but its file list is empty,
+            # an explicit user confirmation that nothing was transferred can
+            # safely release the guard. Never infer this from the empty list.
             current["pending_save_keys"] = []
             current["pending_save_uncertain"] = False
             current["last_error"] = ""
