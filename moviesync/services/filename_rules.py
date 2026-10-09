@@ -50,23 +50,35 @@ def parse_tv_episode(
     magic_regex: object = None,
 ) -> tuple[int | None, int | None]:
     """解析文件名并返回 (season, episode)，兼容只有集数的旧命名。"""
+
+    def parse_normalized(value: str) -> tuple[int | None, int | None]:
+        match = _SEASON_EPISODE.search(value)
+        if match:
+            season, episode = int(match.group(1)), int(match.group(2))
+            return (season, episode) if _valid_episode(episode) else (None, None)
+
+        for pattern in _EPISODE_PATTERNS:
+            match = pattern.search(value)
+            if not match:
+                continue
+            episode = int(match.group(1))
+            if _valid_episode(episode):
+                return None, episode
+        return None, None
+
     if not file_name:
         return None, None
 
-    normalized = _apply_magic_regex(str(file_name), magic_regex)
-    match = _SEASON_EPISODE.search(normalized)
-    if match:
-        season, episode = int(match.group(1)), int(match.group(2))
-        return (season, episode) if _valid_episode(episode) else (None, None)
+    original = str(file_name)
+    # 先解析原始文件名，避免正则重写丢失“第 N 集”等本来就能识别的信息。
+    result = parse_normalized(original)
+    if result[1] is not None:
+        return result
 
-    for pattern in _EPISODE_PATTERNS:
-        match = pattern.search(normalized)
-        if not match:
-            continue
-        episode = int(match.group(1))
-        if _valid_episode(episode):
-            return None, episode
-    return None, None
+    normalized = _apply_magic_regex(original, magic_regex)
+    if normalized == original:
+        return None, None
+    return parse_normalized(normalized)
 
 
 def extract_filename_tokens(file_name: str, task_name: str = "") -> dict[str, str]:
