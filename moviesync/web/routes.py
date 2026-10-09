@@ -673,8 +673,16 @@ def resource_card_config(card_id):
     if enabled is not None and not isinstance(enabled, bool):
         return _json_error("enabled 必须是布尔值")
     try:
+        validated = card.validate_config(merged)
+        if not isinstance(validated, dict):
+            return _json_error("卡片配置校验必须返回 JSON 对象")
+        # 只写入本次声明并提交的字段，使用卡片规范化后的值；其余内部配置保持不变。
+        persisted_incoming = {
+            key: validated.get(key, value)
+            for key, value in persisted_incoming.items()
+        }
         saved = config_store.save_card_config(card_id, persisted_incoming, enabled=enabled)
-    except ValueError as exc:
+    except (ValueError, TypeError) as exc:
         return _json_error(str(exc))
     fields, public_config, has_value = _card_config_view(card, saved.get("config", {}))
     return jsonify({"success": True, "card_id": card_id, "enabled": bool(saved.get("enabled", True)),

@@ -88,3 +88,105 @@ def test_generic_resource_card_config_api_sanitizes_secrets_and_saves(tmp_path):
 
     response = client.get("/api/cards/not-loaded/config")
     assert response.status_code == 404
+
+
+
+def test_generic_builtin_card_config_rejects_invalid_values_without_writing(tmp_path):
+    from moviesync.app import create_app
+
+    app = create_app({"MOVIESYNC_DATA_DIR": str(tmp_path)}, start_scheduler=False)
+    services = app.extensions["moviesync"]
+    client = app.test_client()
+    client.post("/api/setup", json={"username": "admin", "password": "password123"})
+    with client.session_transaction() as session:
+        csrf = session["csrf_token"]
+    headers = {"X-CSRF-Token": csrf}
+
+    config_store = services["config"]
+    original_quark = config_store.get_quark_config()
+    original_telegram = config_store.get_telegram_config()
+
+    response = client.post(
+        "/api/cards/quark/config",
+        json={"config": {"default_fid": "../invalid"}},
+        headers=headers,
+    )
+    assert response.status_code == 400
+    assert config_store.get_quark_config() == original_quark
+
+    response = client.post(
+        "/api/cards/quark/config",
+        json={"config": {"category_fids": []}},
+        headers=headers,
+    )
+    assert response.status_code == 400
+    assert config_store.get_quark_config() == original_quark
+
+    response = client.post(
+        "/api/cards/telegram/config",
+        json={"config": {"channels": [{"id": "bad id"}]}},
+        headers=headers,
+    )
+    assert response.status_code == 400
+    assert config_store.get_telegram_config() == original_telegram
+
+    response = client.post(
+        "/api/cards/telegram/config",
+        json={"config": {"magic_regex": {"pattern": "(", "replace": "\\1"}}},
+        headers=headers,
+    )
+    assert response.status_code == 400
+    assert config_store.get_telegram_config() == original_telegram
+
+
+def test_generic_card_config_runs_card_validator_and_persists_normalized_values(tmp_path):
+    from moviesync.app import create_app
+    from moviesync.cards import CardManifest, ResourceSourceCard
+
+    app = create_app({"MOVIESYNC_DATA_DIR": str(tmp_path)}, start_scheduler=False)
+    services = app.extensions["moviesync"]
+
+    class ValidatingCard(ResourceSourceCard):
+        manifest = CardManifest(
+            id="validating-source",
+            name="Validating Source",
+            type="resource_source",
+            capabilities=("resource.search", "resource.health_check"),
+            config_fields=({"key": "value", "type": "string"},),
+        )
+
+        def search(self, movie, config):
+            return []
+
+        def check(self, config):
+            return {"status": "healthy"}
+
+        def validate_config(self, config):
+            normalized = super().validate_config(config)
+            normalized["value"] = normalized["value"].strip()
+            if not normalized["value"]:
+                raise ValueError("value 不能为空")
+            return normalized
+
+    services["resource_sources"].register(ValidatingCard())
+    client = app.test_client()
+    client.post("/api/setup", json={"username": "admin", "password": "password123"})
+    with client.session_transaction() as session:
+        csrf = session["csrf_token"]
+    headers = {"X-CSRF-Token": csrf}
+
+    response = client.post(
+        "/api/cards/validating-source/config",
+        json={"config": {"value": "  accepted  "}},
+        headers=headers,
+    )
+    assert response.status_code == 200
+    assert response.get_json()["config"]["value"] == "accepted"
+
+    response = client.post(
+        "/api/cards/validating-source/config",
+        json={"config": {"value": "   "}},
+        headers=headers,
+    )
+    assert response.status_code == 400
+    assert services["config"].load()["cards"]["validating-source"]["config"]["value"] == "accepted"

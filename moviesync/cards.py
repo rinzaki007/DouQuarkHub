@@ -15,6 +15,8 @@ from threading import RLock
 from typing import Any
 
 from .clients.quark import QuarkClient, sanitize_pwd_id
+from .config_store import ConfigStore, ConfigValidationError
+from .settings import DEFAULT_CATEGORY_FIDS
 
 CARD_ID_RE = re.compile(r"^[a-z0-9][a-z0-9._-]{0,63}$")
 
@@ -85,6 +87,12 @@ class Card:
             "status": "healthy",
             "message": "卡片可用",
         }
+
+    def validate_config(self, config: dict[str, Any]) -> dict[str, Any]:
+        """校验并返回规范化后的完整配置；具体卡片可覆盖业务规则。"""
+        if not isinstance(config, dict):
+            raise ConfigValidationError("卡片配置必须是 JSON 对象")
+        return deepcopy(config)
 
     def close(self) -> None:
         """应用退出时释放卡片资源。默认无需处理。"""
@@ -231,6 +239,30 @@ class QuarkStorageCard(StorageTargetCard):
 
     def __init__(self, config_store):
         self.config_store = config_store
+
+    def validate_config(self, config: dict[str, Any]) -> dict[str, Any]:
+        """验证夸克目录配置，避免通用表单绕过专用接口的 FID 校验。"""
+        normalized = super().validate_config(config)
+        normalized["default_fid"] = ConfigStore._normalize_fid(
+            normalized.get("default_fid", "0"), "cards.quark.config.default_fid"
+        )
+        category_fids = normalized.get("category_fids", {})
+        if category_fids is None:
+            category_fids = {}
+        if not isinstance(category_fids, dict):
+            raise ConfigValidationError("Quark 分类目录 FID 必须是对象")
+        unknown = set(category_fids) - set(DEFAULT_CATEGORY_FIDS)
+        if unknown:
+            raise ConfigValidationError("未知分类目录: " + ", ".join(sorted(map(str, unknown))))
+        normalized["category_fids"] = {
+            key: ConfigStore._normalize_fid(
+                category_fids.get(key, ""),
+                f"cards.quark.config.category_fids.{key}",
+                allow_empty=True,
+            )
+            for key in DEFAULT_CATEGORY_FIDS
+        }
+        return normalized
 
     def destination_options(self) -> list[dict[str, Any]]:
         config = self.config_store.get_quark_config()
