@@ -1194,3 +1194,75 @@ def test_channel_subscription_uses_saved_history_after_tracked_keys_are_bounded(
         assert "share-selected:ep2" in saved["saved_episodes"]
     finally:
         manager.stop_scheduler()
+
+
+def test_channel_subscription_tracks_same_file_separately_per_storage_target(tmp_path):
+    class SameFileAcrossTargetsStorage(ChannelStorageTargets):
+        def __init__(self):
+            super().__init__()
+            self.transfers = []
+            self.fail_target_b_once = True
+
+        def resolve_resource(self, resource, target_id=None):
+            return {
+                "target_id": target_id,
+                "files": [{"fid": "ep1", "file_name": "Show.S01E01.mkv"}],
+                "token": f"token-{target_id}",
+                "error": None,
+            }
+
+        def create_folder(self, name, parent_id="0", target_id=None):
+            return f"folder-{target_id}"
+
+        def transfer(self, resource, files, target_id="0", storage_target_id=None, token=None):
+            self.transfers.append(storage_target_id)
+            if storage_target_id == "target-b" and self.fail_target_b_once:
+                self.fail_target_b_once = False
+                return False, "permission denied"
+            return True, "ok"
+
+    storage = SameFileAcrossTargetsStorage()
+    sources = FakeResourceSources()
+    sources.shares = [
+        {"channel": "demo", "pwd_id": "same-share", "storage_target_id": "target-a"},
+        {"channel": "demo", "pwd_id": "same-share", "storage_target_id": "target-b"},
+    ]
+    manager = SubscriptionManager(
+        tmp_path / "same-file-per-target.json",
+        storage,
+        sources,
+        FakeLogger(),
+    )
+    sub = manager.add_subscription(
+        title="Show",
+        pwd_id="same-share",
+        target_fid="0",
+        storage_target_id="target-a",
+        source_id="telegram",
+        channel="demo",
+        files=[{"fid": "ep1", "file_name": "Show.S01E01.mkv"}],
+    )
+
+    try:
+        ok, _ = manager.check_subscription_now(sub["id"])
+        assert ok is False
+        assert storage.transfers == ["target-a", "target-b"]
+
+        after_first = manager.get_subscriptions()[0]
+        assert "same-share:ep1" in after_first["tracked_file_keys"]
+        assert "target-b:same-share:ep1" not in after_first["tracked_file_keys"]
+
+        # The next check must retry only target-b; target-a was already saved.
+        ok, _ = manager.check_subscription_now(sub["id"])
+        assert ok is True
+        assert storage.transfers == ["target-a", "target-b", "target-b"]
+
+        saved = manager.get_subscriptions()[0]
+        assert "same-share:ep1" in saved["tracked_file_keys"]
+        assert "target-b:same-share:ep1" in saved["tracked_file_keys"]
+
+        ok, _ = manager.check_subscription_now(sub["id"])
+        assert ok is True
+        assert storage.transfers == ["target-a", "target-b", "target-b"]
+    finally:
+        manager.stop_scheduler()

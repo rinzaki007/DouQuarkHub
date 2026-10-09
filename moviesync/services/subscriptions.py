@@ -729,7 +729,10 @@ class SubscriptionManager:
         baseline_episode = int(sub.get("start_ep", 0) or 0)
         baseline_season = int(sub.get("start_season", 0) or 0)
         grouped: dict[tuple[str, str], dict] = {}
-        queued_keys: set[str] = set()
+        # A file can legitimately be copied to multiple storage targets. Queue
+        # identity therefore includes the destination, while persisted legacy
+        # keys remain compatible for the subscription's originally selected target.
+        queued_keys: set[tuple[str, str, str]] = set()
         resolution_errors: list[str] = []
 
         for source in sources:
@@ -767,8 +770,14 @@ class SubscriptionManager:
                 fid = str(item.get("fid") or "").strip()
                 if not fid:
                     continue
-                key = f"{pwd_id}:{fid}"
-                if key in tracked or key in queued_keys:
+                legacy_key = f"{pwd_id}:{fid}"
+                key = (
+                    legacy_key
+                    if target_id == selected_target_id
+                    else f"{target_id}:{legacy_key}" if target_id else legacy_key
+                )
+                queue_key = (pwd_id, target_id, fid)
+                if key in tracked or queue_key in queued_keys:
                     continue
                 file_name = str(item.get("file_name") or "")
                 if not file_name.lower().endswith(VIDEO_EXTENSIONS):
@@ -799,7 +808,7 @@ class SubscriptionManager:
                     "keys": [],
                 })["files"].append({"fid": fid})
                 grouped[(pwd_id, target_id)]["keys"].append(key)
-                queued_keys.add(key)
+                queued_keys.add(queue_key)
 
         if not grouped:
             if resolution_errors:
