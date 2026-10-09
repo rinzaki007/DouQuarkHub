@@ -208,6 +208,7 @@ class ConfigStore:
 
     def load(self) -> dict:
         data = self.store.read()
+        original_data = deepcopy(data)
         defaults = self._defaults()
         if isinstance(data, dict):
             defaults.update(data)
@@ -278,6 +279,11 @@ class ConfigStore:
             )
             for key in DEFAULT_CATEGORY_FIDS
         }
+        # Persist normalized legacy data and the current schema version once.
+        # Compare against a deep copy because the normalization above mutates nested dicts.
+        if defaults != original_data:
+            self.store.write(defaults)
+
         return defaults
 
     def save_card_config(

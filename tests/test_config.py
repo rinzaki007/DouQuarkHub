@@ -92,6 +92,10 @@ def test_legacy_quark_config_is_migrated_on_load(tmp_path):
     assert quark["cookie"] == "legacy-cookie"
     assert quark["default_fid"] == "789"
     assert quark["category_fids"]["电影"] == "101112"
+    persisted = __import__("json").loads(config_file.read_text(encoding="utf-8"))
+    assert persisted["schema_version"] >= 5
+    assert "quark_cookie" not in persisted
+    assert persisted["cards"]["quark"]["config"]["cookie"] == "legacy-cookie"
 
 
 def test_telegram_settings_are_stored_inside_card_config(tmp_path):
