@@ -469,7 +469,7 @@ class ConfigStore:
                     self.save_telegram_config({
                         key: value
                         for key, value in telegram_config.items()
-                        if key in {"channels"}
+                        if key in {"channels", "magic_regex"}
                     })
                 current = self.load()
                 if "enabled" in telegram:

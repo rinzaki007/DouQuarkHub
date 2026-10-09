@@ -286,3 +286,36 @@ def test_task_history_limit_never_discards_active_tasks(tmp_path):
         assert "terminal-304" in saved_ids
     finally:
         manager.shutdown()
+
+
+def test_executor_submit_failure_is_recorded_and_retry_remains_safe(tmp_path):
+    manager = TaskManager(tmp_path / "tasks.json", logging.getLogger("test"))
+    calls = []
+    payload = {
+        "movie": {"title": "执行器关闭测试"},
+        "candidate": {"pwd_id": "share-submit-failure", "files": [{"fid": "file-1"}]},
+        "target_fid": "target-1",
+    }
+
+    def runner(progress):
+        calls.append("ran")
+        return True, "ok", {"success": 1}
+
+    try:
+        manager.shutdown()
+
+        task = manager.create_transfer_task(payload, runner)
+        assert task["status"] == "failed"
+        assert task["recovery_uncertain"] is False
+        assert "尚未开始转存" in task["message"]
+        assert calls == []
+
+        retry = manager.retry_transfer(task["id"], runner)
+        assert retry is not None
+        assert retry["status"] == "failed"
+        assert retry["recovery_uncertain"] is False
+        assert "尚未开始转存" in retry["message"]
+        assert calls == []
+        assert len(manager.list_tasks()) == 2
+    finally:
+        manager.shutdown()
