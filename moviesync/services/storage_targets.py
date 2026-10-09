@@ -258,4 +258,4 @@ class StorageTargetManager:
             return result
         except Exception:
             self._log_plugin_failure(card, "transfer")
-            return False, "存储目标转存失败，请检查插件实现或查看服务日志"
+            return False, "存储目标转存失败，转存结果不确定，请检查目标网盘后再决定是否重试"
