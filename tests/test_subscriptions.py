@@ -1546,3 +1546,55 @@ def test_subscription_finish_deduplicates_success_history_keys(tmp_path):
         assert saved["run_history"][-1]["success_count"] == 4
     finally:
         manager.stop_scheduler()
+
+
+def test_concurrent_manual_and_scheduled_checks_do_not_run_same_subscription_twice(tmp_path, monkeypatch):
+    from threading import Event, Thread
+
+    manager = SubscriptionManager(
+        tmp_path / "subscription-concurrent-check.json",
+        FakeStorageTargets(),
+        FakeResourceSources(),
+        FakeLogger(),
+    )
+    sub = manager.add_subscription(title="并发检查保护", pwd_id="share-concurrent")
+    check_entered = Event()
+    release_check = Event()
+    calls = []
+    first_result = []
+
+    def controlled_check(subscription):
+        calls.append(subscription["id"])
+        check_entered.set()
+        assert release_check.wait(timeout=3)
+        return True, "检查完成"
+
+    monkeypatch.setattr(manager, "_check", controlled_check)
+    worker = Thread(
+        target=lambda: first_result.append(manager.check_subscription_now(sub["id"]))
+    )
+
+    try:
+        worker.start()
+        assert check_entered.wait(timeout=1)
+
+        # A scheduler tick can use a stale due snapshot while a manual check
+        # is already in flight. The same subscription must still be single-run.
+        second_ok, second_message = manager.check_subscription_now(
+            sub["id"],
+            only_if_due=True,
+        )
+        assert second_ok is False
+        assert "正在执行" in second_message
+        assert calls == [sub["id"]]
+
+        release_check.set()
+        worker.join(timeout=2)
+        assert not worker.is_alive()
+        assert first_result == [(True, "检查完成")]
+        assert calls == [sub["id"]]
+        assert sub["id"] not in manager.running_ids
+    finally:
+        release_check.set()
+        worker.join(timeout=2)
+        manager.stop_scheduler()
