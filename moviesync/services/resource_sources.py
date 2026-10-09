@@ -6,10 +6,10 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Iterable
 from concurrent.futures import ThreadPoolExecutor
 from importlib.metadata import entry_points
-import re
 from threading import RLock
 from typing import Any
 
