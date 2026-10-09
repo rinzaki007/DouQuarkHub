@@ -235,9 +235,10 @@ class SearchService:
                 storage_target_id or None,
             )
             create_err = None
-        except Exception as exc:
+        except Exception:
+            self.logger.exception("创建专属文件夹失败: %s", title)
             folder_fid = None
-            create_err = str(exc)
+            create_err = "请检查存储目标配置或查看服务日志"
         if not folder_fid:
             return False, f"创建专属文件夹失败: {create_err}", {"success": 0, "skipped": 0, "failed": total}
 
