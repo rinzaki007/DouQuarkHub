@@ -268,7 +268,7 @@ def test_redacted_config_import_does_not_clear_existing_third_party_secrets(tmp_
     store = ConfigStore(tmp_path / "config.json", tmp_path / "legacy")
     store.save_card_config(
         "third-party.storage",
-        {"endpoint": "https://old.example", "cookie": "keep-this-cookie"},
+        {"endpoint": "https://old.example", "cookie": "keep-this-cookie", "auth": {"refresh_token": "keep-this-token", "region": "us-east"}},
     )
 
     store.save({
@@ -278,7 +278,7 @@ def test_redacted_config_import_does_not_clear_existing_third_party_secrets(tmp_
                 "config": {
                     "endpoint": "https://new.example",
                     "cookie": "",
-                    "auth": {"refresh_token": ""},
+                    "auth": {"refresh_token": "", "region": "eu-west"},
                 },
             },
         },
@@ -287,5 +287,5 @@ def test_redacted_config_import_does_not_clear_existing_third_party_secrets(tmp_
     card = store.load()["cards"]["third-party.storage"]
     assert card["config"]["endpoint"] == "https://new.example"
     assert card["config"]["cookie"] == "keep-this-cookie"
-    assert card["config"]["auth"]["refresh_token"] is None or "refresh_token" not in card["config"]["auth"]
+    assert card["config"]["auth"] == {"refresh_token": "keep-this-token", "region": "eu-west"}
 
