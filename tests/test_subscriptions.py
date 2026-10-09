@@ -790,3 +790,38 @@ def test_record_success_keys_atomically_clears_pending_transfer(tmp_path):
         assert saved["pending_save_uncertain"] is False
     finally:
         manager.stop_scheduler()
+
+
+def test_subscription_running_guard_is_released_when_initial_status_write_fails(tmp_path, monkeypatch):
+    manager = SubscriptionManager(
+        tmp_path / "status-write-failure.json",
+        FakeStorageTargets(),
+        FakeResourceSources(),
+        FakeLogger(),
+    )
+    sub = manager.add_subscription(title="状态写入异常", pwd_id="share-status")
+    original_set_status = manager._set_status
+    calls = 0
+
+    def fail_once(subscription, status, phase, phase_label):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise OSError("simulated subscription store failure")
+        return original_set_status(subscription, status, phase, phase_label)
+
+    monkeypatch.setattr(manager, "_set_status", fail_once)
+    monkeypatch.setattr(manager, "_check", lambda subscription: (True, "检查成功"))
+
+    try:
+        ok, message = manager.check_subscription_now(sub["id"])
+        assert ok is False
+        assert "任务执行异常" in message
+        assert sub["id"] not in manager.running_ids
+
+        ok, message = manager.check_subscription_now(sub["id"])
+        assert ok is True
+        assert message == "检查成功"
+        assert sub["id"] not in manager.running_ids
+    finally:
+        manager.stop_scheduler()
