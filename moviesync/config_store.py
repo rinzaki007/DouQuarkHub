@@ -229,6 +229,10 @@ class ConfigStore:
 
         telegram = cards.get("telegram") if isinstance(cards.get("telegram"), dict) else {}
         telegram_config = telegram.get("config") if isinstance(telegram.get("config"), dict) else {}
+        if not isinstance(telegram_config.get("magic_regex"), dict):
+            telegram_config["magic_regex"] = deepcopy(
+                self._defaults()["cards"]["telegram"]["config"]["magic_regex"]
+            )
         if "channels" in defaults and not telegram_config.get("channels"):
             telegram_config["channels"] = defaults.get("channels") or []
         old_sources = defaults.get("resource_sources")
