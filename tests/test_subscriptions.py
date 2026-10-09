@@ -825,3 +825,54 @@ def test_subscription_running_guard_is_released_when_initial_status_write_fails(
         assert sub["id"] not in manager.running_ids
     finally:
         manager.stop_scheduler()
+
+
+def test_concurrent_scheduler_start_waits_for_stop_to_finish(tmp_path, monkeypatch):
+    from threading import Event, Thread
+
+    manager = SubscriptionManager(
+        tmp_path / "scheduler-lifecycle-race.json",
+        FakeStorageTargets(),
+        FakeResourceSources(),
+        FakeLogger(),
+    )
+    first_entered = Event()
+    release_first = Event()
+    second_entered = Event()
+    calls = 0
+
+    def controlled_loop():
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            first_entered.set()
+            release_first.wait(timeout=5)
+        else:
+            second_entered.set()
+            manager.stop_event.wait(timeout=5)
+
+    monkeypatch.setattr(manager, "_scheduler_loop", controlled_loop)
+    manager.start_scheduler()
+    assert first_entered.wait(timeout=1)
+    old_worker = manager.worker
+
+    stopper = Thread(target=manager.stop_scheduler)
+    starter = Thread(target=manager.start_scheduler)
+    try:
+        stopper.start()
+        # Ensure stop has signalled the worker before racing a new start.
+        assert manager.stop_event.wait(timeout=1)
+        starter.start()
+        release_first.set()
+
+        stopper.join(timeout=2)
+        starter.join(timeout=2)
+
+        assert not stopper.is_alive()
+        assert not starter.is_alive()
+        assert calls == 2
+        assert manager.worker is not old_worker
+        assert second_entered.wait(timeout=1)
+    finally:
+        release_first.set()
+        manager.stop_scheduler()
