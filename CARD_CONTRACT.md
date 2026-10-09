@@ -40,12 +40,6 @@
 5. 通过 pytest、Ruff 和 Docker 构建后再合并到 `main`。
 
 
-## 声明式配置字段
-
-卡片可通过 CardManifest 的 config_fields 声明后台表单字段。每个字段至少包含 key，可选 label、type、required、default、placeholder、description 与 secret。支持 string、password、textarea、boolean、number、json 类型；复杂配置可声明为 json 对象或数组。字段是卡片配置对象的顶层键。
-
-敏感字段应设置 secret: true。服务端还会根据 cookie、token、password、secret、api_key、authorization、credential 等字段名做兜底识别。读取接口不会返回凭据原文；前端留空提交时保留已有值。配置接口只接受 Manifest 声明的字段，未知键会被拒绝。连接测试使用 POST /api/cards/<card_id>/check，卡片必须声明 *.health_check 或 *.check 能力。
-
 ## 已安装资源卡片插件入口
 
 MovieSync 支持通过 Python 包的 entry point 加载可信资源来源插件，组名为 `moviesync.resource_sources`。每个入口必须指向一个工厂函数，接收单个 `context` 字典并返回 `ResourceSourceCard` 实例。当前上下文包含 `telegram`、`config_store` 和 `logger`，插件可以按需使用这些共享服务。

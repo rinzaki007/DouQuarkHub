@@ -307,7 +307,7 @@
                             卡片管理
                         </h2>
                         <p class="text-xs text-slate-500 mt-1">
-                            显示当前 MovieSync Core 已加载的卡片。当前版本暂不开放网页上传或动态执行第三方代码。
+                            配置表单由卡片声明的字段自动生成；可统一保存、启停并检查连接。第三方代码仍需可信安装。
                         </p>
                     </div>
 
@@ -326,9 +326,9 @@
                         <div class="text-xs text-slate-400">
                             <span id="cards-summary">正在读取卡片…</span>
                         </div>
-                        <span class="rounded-full border border-amber-400/20 bg-amber-400/5 px-2.5 py-1 text-[10px] text-amber-300">
-                            <i class="fa-solid fa-lock mr-1"></i>
-                            暂不支持自行上传
+                        <span class="rounded-full border border-blue-400/20 bg-blue-400/5 px-2.5 py-1 text-[10px] text-blue-300">
+                            <i class="fa-solid fa-shield-halved mr-1"></i>
+                            敏感字段自动脱敏
                         </span>
                     </div>
 
@@ -346,9 +346,9 @@
                     <div class="flex items-start gap-3">
                         <i class="fa-solid fa-circle-info text-blue-400 mt-0.5"></i>
                         <div class="text-xs leading-5 text-slate-500">
-                            <div class="font-semibold text-slate-300 mb-1">以后这里就是“插卡槽”</div>
-                            当前先只展示编译进 MovieSync 的内置卡片。未来增加 115、WebDAV、S3、TMDB、Bark 等卡片时，
-                            只要符合 Card 接口并被 Core 加载，就会自动出现在这里。
+                            <div class="font-semibold text-slate-300 mb-1">统一卡片配置约定</div>
+                            新卡片只需在 CardManifest 声明配置字段，就会自动生成对应表单。敏感字段不会回传原值；
+                            保存时留空表示保留旧凭据。插件仍需通过可信 Python 包安装，不支持网页上传或动态执行。
                         </div>
                     </div>
                 </div>
@@ -740,6 +740,29 @@
         </div>
     </div>
 
+    <div id="generic-card-modal" class="hidden fixed inset-0 z-50 bg-black/70 backdrop-blur-sm p-4">
+        <div class="max-w-3xl mx-auto mt-6 max-h-[92vh] overflow-y-auto glass-panel rounded-2xl border border-slate-700 shadow-2xl">
+            <div class="flex items-center justify-between p-5 border-b border-slate-800">
+                <div class="min-w-0"><h3 id="generic-card-title" class="text-base font-bold text-white">卡片配置</h3><p id="generic-card-subtitle" class="text-[10px] text-slate-500 mt-1"></p></div>
+                <button type="button" onclick="closeGenericCard()" class="text-slate-400 hover:text-white text-xl">×</button>
+            </div>
+            <div class="p-5 space-y-5">
+                <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-800 bg-slate-900/50 p-3">
+                    <div><div class="text-xs font-semibold text-slate-200">卡片启用状态</div><div class="mt-1 text-[10px] text-slate-500">停用后，核心业务不再选择该卡片。</div></div>
+                    <label class="flex items-center gap-2 text-xs text-slate-300"><input id="generic-card-enabled" type="checkbox" class="h-4 w-4 accent-blue-500">启用</label>
+                </div>
+                <div id="generic-card-health" class="hidden rounded-xl border border-slate-800 bg-slate-900/50 p-3 text-xs"></div>
+                <div id="generic-card-fields" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+                <div id="generic-card-no-fields" class="hidden rounded-xl border border-slate-800 bg-slate-900/40 p-4 text-xs text-slate-500">该卡片未声明可编辑的配置字段。</div>
+                <div class="flex flex-wrap justify-end gap-2 border-t border-slate-800 pt-4">
+                    <button type="button" id="generic-card-check" onclick="checkGenericCard()" class="hidden bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-4 py-2 rounded"><i class="fa-solid fa-heart-pulse mr-1"></i>保存并检查连接</button>
+                    <button type="button" onclick="closeGenericCard()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-4 py-2 rounded">关闭</button>
+                    <button type="button" id="generic-card-save" onclick="saveGenericCard()" class="bg-blue-600 hover:bg-blue-500 text-white text-xs px-5 py-2 rounded font-semibold"><i class="fa-solid fa-floppy-disk mr-1"></i>保存配置</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div id="quark-card-modal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm p-4">
         <div class="max-w-2xl mx-auto mt-8 max-h-[90vh] overflow-y-auto glass-panel rounded-2xl border border-slate-700 shadow-2xl">
             <div class="flex items-center justify-between p-5 border-b border-slate-800">
@@ -1124,19 +1147,7 @@
         }
 
         function openCardFromRegistry(cardId) {
-            if (cardId === "quark") return openQuarkCard();
-            if (cardId === "telegram") return openTelegramCard();
-            const card = window.moviesyncCards && window.moviesyncCards.find(item => item.id === cardId);
-            if (!card) return;
-            document.getElementById("card-info-title").textContent = card.name || card.id;
-            document.getElementById("card-info-subtitle").textContent = (card.id || "") + " · v" + (card.version || "1.0.0") + " · " + (CARD_TYPE_LABELS[card.type] || card.type || "未知类型");
-            const health = card.health || {};
-            const healthMap = {healthy:["正常","text-emerald-300"],configured:["已配置","text-blue-300"],unconfigured:["未配置","text-amber-300"],idle:["未配置","text-slate-400"],unavailable:["不可用","text-rose-300"],degraded:["部分可用","text-amber-300"]};
-            const meta = healthMap[health.status] || ["未知","text-slate-400"];
-            document.getElementById("card-info-health").innerHTML = '<div class="glass-panel rounded-xl p-3 border border-slate-800"><div class="flex justify-between text-xs"><span class="text-slate-400">状态</span><span class="' + meta[1] + '">' + meta[0] + '</span></div><div class="mt-2 text-[10px] text-slate-500">' + escapeHtml(health.message || "暂无状态") + '</div></div>';
-            document.getElementById("card-info-capabilities").innerHTML = (card.capabilities || []).map(cap => '<span class="resource-chip">' + escapeHtml(cap) + '</span>').join("");
-            document.getElementById("card-info-description").textContent = card.description || "";
-            document.getElementById("card-info-modal").classList.remove("hidden");
+            openGenericCard(cardId);
         }
 
         function closeCardInfo() {
@@ -1154,6 +1165,141 @@
                 document.getElementById("cards-summary").textContent = "读取卡片失败";
                 document.getElementById("cards-list").innerHTML = '<div class="glass-panel rounded-xl p-4 text-xs text-rose-300 lg:col-span-2">' + escapeHtml(error.message || "读取卡片失败") + "</div>";
             }
+        }
+
+        let currentGenericCard = null;
+
+        function renderGenericCardFields(fields, config, hasValue) {
+            const container = document.getElementById("generic-card-fields");
+            const noFields = document.getElementById("generic-card-no-fields");
+            container.innerHTML = "";
+            noFields.classList.toggle("hidden", fields.length > 0);
+            fields.forEach(field => {
+                const key = String(field.key || "");
+                const type = field.type || "string";
+                const value = config[key] ?? field.default ?? (type === "json" ? {} : "");
+                const secret = Boolean(field.secret);
+                const common = 'data-card-field="' + escapeHtml(key) + '" data-card-type="' + escapeHtml(type) + '"';
+                let control = "";
+                if (type === "boolean") {
+                    control = '<label class="flex items-center gap-2 mt-2 text-xs text-slate-300"><input type="checkbox" ' + common + (value ? ' checked' : '') + ' class="h-4 w-4 accent-blue-500">启用</label>';
+                } else if (type === "json") {
+                    let jsonValue = "";
+                    try { jsonValue = JSON.stringify(value ?? {}, null, 2); } catch (_) { jsonValue = "{}"; }
+                    control = '<textarea ' + common + ' rows="6" spellcheck="false" class="glass-input mt-1 w-full rounded-lg border border-slate-800 px-3 py-2 text-xs text-slate-200 font-mono focus:outline-none focus:border-blue-500">' + escapeHtml(jsonValue) + '</textarea>';
+                } else if (type === "textarea") {
+                    control = '<textarea ' + common + ' rows="4" class="glass-input mt-1 w-full rounded-lg border border-slate-800 px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-blue-500" placeholder="' + escapeHtml(field.placeholder || "") + '">' + escapeHtml(value) + '</textarea>';
+                } else {
+                    const inputType = secret || type === "password" ? "password" : (type === "number" ? "number" : "text");
+                    const placeholder = secret && hasValue[key] ? "已保存；留空则保留原值" : (field.placeholder || "");
+                    control = '<input ' + common + ' type="' + inputType + '" value="' + (secret ? "" : escapeHtml(value)) + '" placeholder="' + escapeHtml(placeholder) + '" ' + (field.required && !secret ? 'required ' : '') + 'class="glass-input mt-1 w-full rounded-lg border border-slate-800 px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-blue-500">';
+                }
+                const sensitiveMark = secret ? '<span class="ml-2 inline-flex items-center gap-1 rounded border border-amber-400/20 bg-amber-400/5 px-2 py-0.5 text-[9px] text-amber-300"><i class="fa-solid fa-lock"></i>敏感字段</span>' : '';
+                const requiredMark = field.required ? '<span class="ml-1 text-rose-300">*</span>' : '';
+                const savedMark = secret && hasValue[key] ? '<span class="ml-2 text-[10px] text-emerald-300">已保存</span>' : '';
+                const wrapper = document.createElement("div");
+                wrapper.className = "min-w-0 rounded-xl border border-slate-800 bg-slate-900/30 p-3";
+                wrapper.innerHTML = '<label class="block text-[11px] font-semibold text-slate-300">' + escapeHtml(field.label || key) + requiredMark + sensitiveMark + savedMark + '</label>' +
+                    (field.description ? '<p class="mt-1 text-[10px] leading-4 text-slate-500">' + escapeHtml(field.description) + '</p>' : '') + control;
+                container.appendChild(wrapper);
+            });
+        }
+
+        async function openGenericCard(cardId) {
+            try {
+                const result = await (await apiFetch("/api/cards/" + encodeURIComponent(cardId) + "/config")).json();
+                if (!result.success) throw new Error(result.message || "读取卡片配置失败");
+                const card = (window.moviesyncCards || []).find(item => item.id === cardId) || {id: cardId};
+                currentGenericCard = {id: cardId, fields: result.fields || []};
+                document.getElementById("generic-card-title").textContent = card.name || cardId;
+                document.getElementById("generic-card-subtitle").textContent = cardId + " · v" + (card.version || "1.0.0") + " · " + (CARD_TYPE_LABELS[card.type] || card.type || "卡片");
+                document.getElementById("generic-card-enabled").checked = result.enabled !== false;
+                renderGenericCardFields(currentGenericCard.fields, result.config || {}, result.has_value || {});
+                const canCheck = (card.capabilities || []).some(cap => cap.endsWith(".health_check") || cap.endsWith(".check"));
+                document.getElementById("generic-card-check").classList.toggle("hidden", !canCheck);
+                document.getElementById("generic-card-health").classList.add("hidden");
+                document.getElementById("generic-card-modal").classList.remove("hidden");
+            } catch (error) {
+                alert(error.message || "读取卡片配置失败");
+            }
+        }
+
+        function closeGenericCard() {
+            document.getElementById("generic-card-modal").classList.add("hidden");
+            currentGenericCard = null;
+        }
+
+        function collectGenericCardConfig() {
+            if (!currentGenericCard) throw new Error("当前没有打开的卡片");
+            const config = {};
+            for (const field of currentGenericCard.fields) {
+                const key = String(field.key);
+                const input = document.querySelector('[data-card-field="' + CSS.escape(key) + '"]');
+                if (!input) continue;
+                const type = input.dataset.cardType || field.type || "string";
+                let value;
+                if (type === "boolean") value = input.checked;
+                else if (type === "json") {
+                    try { value = JSON.parse(input.value || (field.default === undefined ? "{}" : JSON.stringify(field.default))); }
+                    catch (_) { throw new Error("配置字段「" + (field.label || key) + "」不是有效 JSON"); }
+                    if (!value || typeof value !== "object") throw new Error("配置字段「" + (field.label || key) + "」必须是 JSON 对象或数组");
+                } else value = input.value;
+                if (field.secret && !String(value || "").trim()) continue;
+                if (field.required && !field.secret && (value === "" || value === null || value === undefined)) {
+                    throw new Error("请填写必填项：" + (field.label || key));
+                }
+                config[key] = value;
+            }
+            return config;
+        }
+
+        async function saveGenericCard(silent = false) {
+            if (!currentGenericCard) return false;
+            const saveButton = document.getElementById("generic-card-save");
+            saveButton.disabled = true;
+            try {
+                const config = collectGenericCardConfig();
+                const payload = {enabled: document.getElementById("generic-card-enabled").checked, config};
+                const result = await (await apiFetch("/api/cards/" + encodeURIComponent(currentGenericCard.id) + "/config", {
+                    method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(payload)
+                })).json();
+                if (!result.success) throw new Error(result.message || "保存配置失败");
+                currentGenericCard.fields = result.fields || currentGenericCard.fields;
+                renderGenericCardFields(currentGenericCard.fields, result.config || {}, result.has_value || {});
+                await loadCards();
+                if (!silent) alert(result.message || "卡片配置已保存");
+                return true;
+            } catch (error) {
+                if (!silent) alert(error.message || "保存配置失败");
+                else throw error;
+                return false;
+            } finally {
+                saveButton.disabled = false;
+            }
+        }
+
+        async function checkGenericCard() {
+            if (!currentGenericCard) return;
+            const button = document.getElementById("generic-card-check");
+            const resultBox = document.getElementById("generic-card-health");
+            button.disabled = true;
+            resultBox.classList.remove("hidden");
+            resultBox.textContent = "正在保存配置并检查连接…";
+            try {
+                const saved = await saveGenericCard(true);
+                if (!saved) throw new Error("保存配置失败");
+                const result = await (await apiFetch("/api/cards/" + encodeURIComponent(currentGenericCard.id) + "/check", {
+                    method: "POST", headers: {"Content-Type": "application/json"}, body: "{}"
+                })).json();
+                if (!result.success) throw new Error(result.message || "连接检查失败");
+                const healthy = result.status === "healthy";
+                resultBox.className = "rounded-xl border p-3 text-xs " + (healthy ? "border-emerald-400/20 bg-emerald-400/5 text-emerald-200" : "border-amber-400/20 bg-amber-400/5 text-amber-200");
+                resultBox.textContent = (result.status || "unknown") + " · " + (result.message || "检查完成");
+                await loadCards();
+            } catch (error) {
+                resultBox.className = "rounded-xl border border-rose-400/20 bg-rose-400/5 p-3 text-xs text-rose-200";
+                resultBox.textContent = error.message || "连接检查失败";
+            } finally { button.disabled = false; }
         }
 
         async function openQuarkCard() {

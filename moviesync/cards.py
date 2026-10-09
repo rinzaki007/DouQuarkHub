@@ -9,7 +9,6 @@
 from __future__ import annotations
 
 import re
-from copy import deepcopy
 from dataclasses import dataclass
 from threading import RLock
 from typing import Any
@@ -39,20 +38,12 @@ class CardManifest:
     description: str = ""
     capabilities: tuple[str, ...] = ()
     config_version: int = 1
-    config_fields: tuple[dict[str, Any], ...] = ()
 
     def __post_init__(self) -> None:
         if not CARD_ID_RE.fullmatch(self.id):
             raise ValueError(f"卡片 ID 无效: {self.id}")
         if self.type not in CARD_TYPES:
             raise ValueError(f"卡片类型无效: {self.type}")
-        keys = [str(field.get("key") or "") for field in self.config_fields]
-        if any(not key for key in keys) or len(keys) != len(set(keys)):
-            raise ValueError("卡片配置字段必须具有唯一且非空的 key")
-        allowed_field_types = {"string", "password", "textarea", "boolean", "number", "json"}
-        for field in self.config_fields:
-            if field.get("type", "string") not in allowed_field_types:
-                raise ValueError(f"不支持的配置字段类型: {field.get('type')}")
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -63,7 +54,6 @@ class CardManifest:
             "description": self.description,
             "capabilities": list(self.capabilities),
             "config_version": self.config_version,
-            "config_fields": deepcopy(list(self.config_fields)),
         }
 
 
@@ -200,11 +190,6 @@ class QuarkStorageCard(StorageTargetCard):
             "storage.list_files",
             "storage.create_folder",
             "storage.transfer",
-        ),
-        config_fields=(
-            {"key": "cookie", "label": "夸克 Cookie", "type": "password", "secret": True, "required": False, "placeholder": "粘贴 Cookie；留空则保留已保存的值", "description": "敏感凭据不会回显到页面。"},
-            {"key": "default_fid", "label": "默认目录 FID", "type": "string", "required": True, "default": "0", "placeholder": "0"},
-            {"key": "category_fids", "label": "分类目录 FID", "type": "json", "default": {}, "description": "JSON 对象，例如电影和电视剧对应的目录 FID。"},
         ),
     )
 
