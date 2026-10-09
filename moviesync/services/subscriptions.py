@@ -708,6 +708,16 @@ class SubscriptionManager:
             for key in (sub.get("tracked_file_keys", []) or [])
             if str(key).strip()
         }
+        # tracked_file_keys is intentionally bounded. Keep the durable success
+        # history as a fallback so older confirmed files do not become eligible
+        # for transfer again after they fall out of that bounded index.
+        saved_episodes = sub.get("saved_episodes", [])
+        if isinstance(saved_episodes, list):
+            tracked.update(
+                str(key).strip()
+                for key in saved_episodes
+                if str(key).strip()
+            )
         # The user-selected files are the initial transfer request, not just a
         # tracking watermark. Transfer them once even when they equal the baseline.
         initial_file_keys = {

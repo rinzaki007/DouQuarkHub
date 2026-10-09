@@ -1147,3 +1147,50 @@ def test_channel_subscription_keeps_same_share_from_distinct_storage_targets(tmp
         ]
     finally:
         manager.stop_scheduler()
+
+
+def test_channel_subscription_uses_saved_history_after_tracked_keys_are_bounded(tmp_path):
+    storage = ChannelStorageTargets()
+    storage.shares = {
+        "share-selected": [
+            {"fid": "ep1", "file_name": "Show.S01E01.mkv"},
+            {"fid": "ep2", "file_name": "Show.S01E02.mkv"},
+        ],
+    }
+    sources = FakeResourceSources()
+    sources.shares = [{"channel": "demo", "pwd_id": "share-selected"}]
+    manager = SubscriptionManager(
+        tmp_path / "bounded-tracking-history.json",
+        storage,
+        sources,
+        FakeLogger(),
+    )
+    sub = manager.add_subscription(
+        title="Show",
+        pwd_id="share-selected",
+        target_fid="0",
+        storage_target_id="demo-storage",
+        source_id="telegram",
+        channel="demo",
+        files=[],
+    )
+
+    try:
+        subscriptions = manager.get_subscriptions()
+        current = next(item for item in subscriptions if item["id"] == sub["id"])
+        # Simulate a long-running subscription where the bounded index no
+        # longer contains ep1, but the durable success history still does.
+        current["tracked_file_keys"] = [f"old-share:old-{index}" for index in range(1000)]
+        current["saved_episodes"] = ["share-selected:ep1"]
+        manager.store.write(subscriptions)
+
+        ok, message = manager.check_subscription_now(sub["id"])
+
+        assert ok is True
+        assert "成功追更 1 项" in message
+        assert storage.transfers == [("share-selected", ["ep2"])]
+        saved = manager.get_subscriptions()[0]
+        assert "share-selected:ep1" in saved["saved_episodes"]
+        assert "share-selected:ep2" in saved["saved_episodes"]
+    finally:
+        manager.stop_scheduler()
