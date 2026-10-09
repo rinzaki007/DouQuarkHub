@@ -692,6 +692,7 @@ class SubscriptionManager:
         baseline_episode = int(sub.get("start_ep", 0) or 0)
         baseline_season = int(sub.get("start_season", 0) or 0)
         grouped: dict[tuple[str, str], dict] = {}
+        queued_keys: set[str] = set()
         resolution_errors: list[str] = []
 
         for source in sources:
@@ -730,7 +731,7 @@ class SubscriptionManager:
                 if not fid:
                     continue
                 key = f"{pwd_id}:{fid}"
-                if key in tracked:
+                if key in tracked or key in queued_keys:
                     continue
                 file_name = str(item.get("file_name") or "")
                 if not file_name.lower().endswith(VIDEO_EXTENSIONS):
@@ -761,6 +762,7 @@ class SubscriptionManager:
                     "keys": [],
                 })["files"].append({"fid": fid})
                 grouped[(pwd_id, target_id)]["keys"].append(key)
+                queued_keys.add(key)
 
         if not grouped:
             if resolution_errors:
