@@ -86,6 +86,9 @@ class SubscriptionManager:
         )
 
         self.lock = RLock()
+        # Serialize start/stop callers without holding the data lock while
+        # joining the worker, since the worker may need that lock to finish.
+        self._scheduler_lifecycle_lock = RLock()
         self.running_ids: set[str] = set()
         self.stop_event = Event()
         self.worker: Thread | None = None
@@ -1111,45 +1114,45 @@ class SubscriptionManager:
     def start_scheduler(
         self,
     ) -> None:
-        with self.lock:
-            if (
-                self.worker
-                and self.worker.is_alive()
-            ):
-                return
+        # Serialize lifecycle transitions. Otherwise a concurrent start can
+        # observe the old worker as alive and return just before stop clears
+        # its reference, accidentally leaving the scheduler stopped.
+        with self._scheduler_lifecycle_lock:
+            with self.lock:
+                if self.worker and self.worker.is_alive():
+                    return
 
-            self.stop_event.clear()
+                self.stop_event.clear()
+                self.worker = Thread(
+                    target=self._scheduler_loop,
+                    name="moviesync-scheduler",
+                    daemon=True,
+                )
+                worker = self.worker
+                worker.start()
 
-            self.worker = Thread(
-                target=self._scheduler_loop,
-                name="moviesync-scheduler",
-                daemon=True,
-            )
-
-            self.worker.start()
-
-        self.logger.info(
-            "自动追剧调度器已启动"
-        )
+            self.logger.info("自动追剧调度器已启动")
 
     def stop_scheduler(
         self,
     ) -> None:
-        self.stop_event.set()
+        with self._scheduler_lifecycle_lock:
+            self.stop_event.set()
+            with self.lock:
+                worker = self.worker
 
-        worker = self.worker
+            if worker and worker.is_alive():
+                worker.join(timeout=2)
 
-        if worker and worker.is_alive():
-            worker.join(timeout=2)
-
-        # Keep the reference while a check is still running. Clearing it here
-        # would let start_scheduler() create a second worker over the same data.
-        if worker is None or not worker.is_alive():
-            self.worker = None
-        else:
-            self.logger.warning(
-                "自动追剧调度器尚未退出；保留线程引用以阻止重复启动"
-            )
+            # Keep the reference while a check is still running. Clearing it
+            # would allow a second scheduler to overlap the existing worker.
+            with self.lock:
+                if self.worker is worker and (worker is None or not worker.is_alive()):
+                    self.worker = None
+                elif worker is not None and worker.is_alive():
+                    self.logger.warning(
+                        "自动追剧调度器尚未退出；保留线程引用以阻止重复启动"
+                    )
 
     def _scheduler_loop(
         self,
