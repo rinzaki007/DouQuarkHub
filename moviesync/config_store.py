@@ -543,16 +543,24 @@ class ConfigStore:
                 saved_card = dict(saved_card) if isinstance(saved_card, dict) else {}
                 saved_config = saved_card.get("config")
                 saved_config = dict(saved_config) if isinstance(saved_config, dict) else {}
-                for key, value in imported_config.items():
-                    lowered_key = str(key).lower()
-                    is_secret = any(marker in lowered_key for marker in sensitive_markers)
-                    # Public/redacted exports can contain empty secret fields;
-                    # don't erase a credential that is already stored locally.
-                    if is_secret and (
-                        value is None or (isinstance(value, str) and not value.strip())
-                    ):
-                        continue
-                    saved_config[key] = deepcopy(value)
+                def merge_imported_values(existing, imported):
+                    merged = dict(existing) if isinstance(existing, dict) else {}
+                    for key, value in imported.items():
+                        lowered_key = str(key).lower()
+                        is_secret = any(marker in lowered_key for marker in sensitive_markers)
+                        # Public/redacted exports can contain empty secret fields;
+                        # don't erase a credential that is already stored locally.
+                        if is_secret and (
+                            value is None or (isinstance(value, str) and not value.strip())
+                        ):
+                            continue
+                        if isinstance(value, dict):
+                            merged[key] = merge_imported_values(merged.get(key), value)
+                        else:
+                            merged[key] = deepcopy(value)
+                    return merged
+
+                saved_config = merge_imported_values(saved_config, imported_config)
                 saved_card["config"] = saved_config
                 if isinstance(imported_card.get("enabled"), bool):
                     saved_card["enabled"] = imported_card["enabled"]
