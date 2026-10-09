@@ -1437,7 +1437,7 @@
         }
         function normalizeTelegramChannelId(value) {
             const raw = String(value || "").trim();
-            const urlMatch = raw.match(/^(?:https?:\\/\\/)?(?:www\\.)?t\\.me\\/(?:s\\/)?([A-Za-z0-9_]+)(?:[/?#].*)?$/i);
+            const urlMatch = raw.match(/^(?:https?:\/\/)?(?:www\.)?t\.me\/(?:s\/)?([A-Za-z0-9_]+)(?:[/?#].*)?$/i);
             return (urlMatch ? urlMatch[1] : raw.replace(/^@+/, "")).trim();
         }
         function addTelegramChannel() {
