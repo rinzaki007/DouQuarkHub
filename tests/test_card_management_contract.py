@@ -479,3 +479,51 @@ def test_generic_card_health_check_cannot_override_api_success(tmp_path):
     body = response.get_json()
     assert body["success"] is True
     assert body["status"] == "healthy"
+
+
+def test_private_key_fields_are_redacted_from_card_config_api(tmp_path):
+    from moviesync.app import create_app
+    from moviesync.cards import CardManifest, ResourceSourceCard
+
+    app = create_app({"MOVIESYNC_DATA_DIR": str(tmp_path)}, start_scheduler=False)
+    services = app.extensions["moviesync"]
+
+    class PrivateKeyCard(ResourceSourceCard):
+        manifest = CardManifest(
+            id="private-key-source",
+            name="Private Key Source",
+            type="resource_source",
+            capabilities=("resource.search", "resource.health_check"),
+            config_fields=(
+                {"key": "private_key", "label": "Private Key", "type": "textarea"},
+            ),
+        )
+
+        def search(self, movie, config):
+            return []
+
+        def check(self, config):
+            return {"status": "healthy"}
+
+    services["resource_sources"].register(PrivateKeyCard())
+    client = app.test_client()
+    client.post("/api/setup", json={"username": "admin", "password": "password123"})
+    with client.session_transaction() as session:
+        csrf = session["csrf_token"]
+
+    response = client.post(
+        "/api/cards/private-key-source/config",
+        json={"config": {"private_key": "test-value"}},
+        headers={"X-CSRF-Token": csrf},
+    )
+
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body["config"]["private_key"] == ""
+    assert body["has_value"]["private_key"] is True
+    assert "test-value" not in str(body)
+
+    card = services["card_registry"].get("private-key-source")
+    assert card.public_config({"nested": {"private_key": "test-value"}}) == {
+        "nested": {"has_private_key": True}
+    }

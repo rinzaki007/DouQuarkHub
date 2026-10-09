@@ -229,7 +229,7 @@ class ResourceSourceCard(Card):
 
     def public_config(self, config: dict[str, Any]) -> dict[str, Any]:
         """返回可给管理界面展示的配置；默认递归隐藏疑似凭据字段。"""
-        sensitive = ("cookie", "token", "secret", "password", "api_key", "authorization", "credential")
+        sensitive = ("cookie", "token", "secret", "password", "api_key", "authorization", "credential", "private_key")
 
         def sanitize(value):
             if isinstance(value, dict):
