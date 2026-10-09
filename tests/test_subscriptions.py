@@ -1426,3 +1426,48 @@ def test_invalid_only_pending_keys_without_marker_fail_closed(tmp_path, monkeypa
         assert "格式异常" in message
     finally:
         manager.stop_scheduler()
+
+
+def test_recovery_keeps_invalid_pending_transfer_fail_closed(tmp_path, monkeypatch):
+    manager = SubscriptionManager(
+        tmp_path / "recovery-invalid-pending.json",
+        FakeStorageTargets(),
+        FakeResourceSources(),
+        FakeLogger(),
+    )
+    sub = manager.add_subscription(title="重启恢复待确认记录异常", pwd_id="share-recovery-invalid")
+    calls = []
+
+    try:
+        items = manager.get_subscriptions()
+        current = next(item for item in items if item["id"] == sub["id"])
+        current["status"] = "running"
+        current["pending_save_keys"] = [None, True, {}, "   "]
+        current["pending_save_uncertain"] = True
+        current.pop("pending_save_keys_invalid", None)
+        manager.store.write(items)
+
+        # Simulate startup recovery after the pending list has become corrupt.
+        manager._recover_interrupted_subscriptions()
+        recovered = next(item for item in manager.get_subscriptions() if item["id"] == sub["id"])
+        assert recovered["status"] == "failed"
+        assert recovered["pending_save_keys"] == []
+        assert recovered["pending_save_keys_invalid"] is True
+        assert recovered["pending_save_uncertain"] is True
+        assert "格式异常" in recovered["last_error"]
+
+        def unexpected_check(subscription):
+            calls.append(subscription["id"])
+            return True, "不应执行"
+
+        monkeypatch.setattr(manager, "_check", unexpected_check)
+        ok, message = manager.check_subscription_now(sub["id"])
+        assert ok is False
+        assert "格式异常" in message
+        assert calls == []
+
+        ok, message = manager.resolve_pending_save(sub["id"], "not_saved")
+        assert ok is False
+        assert "格式异常" in message
+    finally:
+        manager.stop_scheduler()
