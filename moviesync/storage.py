@@ -33,8 +33,12 @@ class JsonStore:
             try:
                 with self.path.open("r", encoding="utf-8") as handle:
                     return json.load(handle)
-            except json.JSONDecodeError:
+            except json.JSONDecodeError as exc:
                 self._quarantine_corrupt_file()
+                if self.path.exists():
+                    raise JsonStoreReadError(
+                        f"无法隔离损坏的 JSON 数据文件 {self.path}"
+                    ) from exc
                 return self.default_factory()
             except OSError as exc:
                 raise JsonStoreReadError(
@@ -45,7 +49,7 @@ class JsonStore:
         """保留损坏数据副本，避免后续写入把现场直接覆盖。"""
         if not self.path.exists():
             return
-        stamp = time.strftime("%Y%m%d-%H%M%S")
+        stamp = f"{time.strftime('%Y%m%d-%H%M%S')}-{time.time_ns()}"
         backup = self.path.with_name(
             f"{self.path.name}.corrupt-{stamp}"
         )
