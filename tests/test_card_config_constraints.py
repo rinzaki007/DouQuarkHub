@@ -30,6 +30,12 @@ def test_card_manifest_text_constraints_reject_invalid_config_without_writing(tm
                     "max_length": 12,
                     "pattern": "^[a-z0-9-]+$",
                 },
+                {
+                    "key": "email",
+                    "label": "Contact Email",
+                    "type": "string",
+                    "format": "email",
+                },
             ),
         )
 
@@ -47,16 +53,21 @@ def test_card_manifest_text_constraints_reject_invalid_config_without_writing(tm
     headers = {"X-CSRF-Token": csrf}
     endpoint = "/api/cards/constrained-source/config"
 
-    valid = {"endpoint": "https://example.com", "slug": "movie-source"}
+    valid = {
+        "endpoint": "https://example.com",
+        "slug": "movie-source",
+        "email": "admin@example.com",
+    }
     response = client.post(endpoint, json={"config": valid}, headers=headers)
     assert response.status_code == 200
     assert services["config"].load()["cards"]["constrained-source"]["config"] == valid
 
     invalid_values = [
-        ({"endpoint": "ftp://example.com", "slug": "movie-source"}, "HTTP 或 HTTPS"),
-        ({"endpoint": "https://example.com/a-very-long-path", "slug": "movie-source"}, "不能超过 24"),
-        ({"endpoint": "https://example.com", "slug": "Movie_Source"}, "格式不正确"),
-        ({"endpoint": "https://example.com", "slug": "ab"}, "不能少于 3"),
+        ({"endpoint": "ftp://example.com", "slug": "movie-source", "email": "admin@example.com"}, "HTTP 或 HTTPS"),
+        ({"endpoint": "https://example.com/a-very-long-path", "slug": "movie-source", "email": "admin@example.com"}, "不能超过 24"),
+        ({"endpoint": "https://example.com", "slug": "Movie_Source", "email": "admin@example.com"}, "格式不正确"),
+        ({"endpoint": "https://example.com", "slug": "ab", "email": "admin@example.com"}, "不能少于 3"),
+        ({"endpoint": "https://example.com", "slug": "movie-source", "email": "not-an-email"}, "有效的邮箱地址"),
     ]
     for invalid_config, expected_message in invalid_values:
         response = client.post(endpoint, json={"config": invalid_config}, headers=headers)
