@@ -33,23 +33,15 @@ def sanitize_pwd_id(pwd_id: object) -> str:
 
 
 def clean_tv_filename(raw_name: str, title: str = "") -> tuple[int | None, str]:
+    """兼容旧调用方；集数判断统一委托给共享文件名规则。"""
     if not raw_name:
         return None, raw_name
-    patterns = [
-        r"\bS\d{1,2}E(\d{1,4})\b",
-        r"\bEP?\s*(\d{1,4})\b",
-        r"第\s*(\d{1,4})\s*[集话期]",
-        r"[\[(【](\d{1,4})[\])】]",
-    ]
-    for pattern in patterns:
-        match = re.search(pattern, raw_name, re.IGNORECASE)
-        if not match:
-            continue
-        episode = int(match.group(1))
-        if 1900 <= episode <= 2030 or episode in {720, 1080, 2160}:
-            continue
-        return episode, raw_name
-    return None, raw_name
+
+    # 延迟导入以避免 clients.quark 与卡片注册初始化期间形成循环导入。
+    from ..services.filename_rules import parse_tv_episode
+
+    _season, episode = parse_tv_episode(raw_name)
+    return episode, raw_name
 
 
 class QuarkClient:
