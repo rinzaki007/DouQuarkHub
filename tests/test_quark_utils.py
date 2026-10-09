@@ -32,3 +32,20 @@ def test_quark_share_listing_errors_are_not_reported_as_success(monkeypatch):
     assert files is None
     assert stoken is None
     assert "temporary upstream failure" in error
+
+
+def test_quark_save_timeout_is_reported_as_uncertain(monkeypatch):
+    from moviesync.clients.http import ApiError
+    from moviesync.clients.quark import QuarkClient
+
+    client = QuarkClient("cookie")
+
+    def fail(*args, **kwargs):
+        raise ApiError("Read timed out")
+
+    monkeypatch.setattr(client.http, "request_json", fail)
+    ok, message = client.save_files("AbC123", [{"fid": "file1"}], "token", "0")
+
+    assert ok is False
+    assert "转存结果不确定" in message
+    assert "检查目标目录" in message

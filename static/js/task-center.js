@@ -85,6 +85,7 @@ async function loadTasks() {
 }
 
 function taskState(task) {
+    if (task.pending_save_keys && task.pending_save_keys.length && task.pending_save_uncertain) return {key:'pending', label:'结果待核实', cls:'text-amber-200 bg-amber-950/60 border-amber-700'};
     if (task.pending_save_keys && task.pending_save_keys.length) return {key:'pending', label:'待确认转存', cls:'text-amber-300 bg-amber-950/50 border-amber-800'};
     if (task.recovery_uncertain) return {key:'uncertain', label:'结果待核实', cls:'text-amber-200 bg-amber-950/60 border-amber-700'};
     if (task.status === 'running') return {key:'running', label:'执行中', cls:'text-purple-300 bg-purple-950/50 border-purple-800'};
@@ -188,7 +189,8 @@ function renderTasks() {
                 '</div>' +
                 '<div class="flex shrink-0 flex-wrap content-start justify-end gap-2">' +
                 '<button data-action="detail" data-id="' + escapeTask(task.id) + '" class="rounded-xl border border-slate-700/70 bg-slate-950/55 px-3 py-2 text-[11px] text-slate-300 hover:bg-slate-800/80"><i class="fa-solid fa-circle-info mr-1"></i>详情</button>' +
-                (task.type === 'subscription' ? '<button data-action="run-sub" data-id="' + escapeTask(task.subscription_id) + '" class="rounded-xl bg-purple-600/90 px-3 py-2 text-[11px] font-medium text-white shadow-lg shadow-purple-600/15 hover:bg-purple-500"><i class="fa-solid fa-play mr-1"></i>立即检查</button>' : '') +
+                (task.type === 'subscription' && task.pending_save_uncertain ? '<button data-action="confirm-saved" data-id="' + escapeTask(task.subscription_id) + '" class="rounded-xl border border-emerald-800/70 bg-emerald-950/35 px-3 py-2 text-[11px] text-emerald-300 hover:bg-emerald-900/60">确认已转存</button><button data-action="retry-pending" data-id="' + escapeTask(task.subscription_id) + '" class="rounded-xl border border-amber-800/70 bg-amber-950/35 px-3 py-2 text-[11px] text-amber-300 hover:bg-amber-900/60">确认未转存，重试</button>' : '') +
+                (task.type === 'subscription' && !task.pending_save_uncertain ? '<button data-action="run-sub" data-id="' + escapeTask(task.subscription_id) + '" class="rounded-xl bg-purple-600/90 px-3 py-2 text-[11px] font-medium text-white shadow-lg shadow-purple-600/15 hover:bg-purple-500"><i class="fa-solid fa-play mr-1"></i>立即检查</button>' : '') +
                 ((task.type === 'subscription' || task.status === 'success' || task.status === 'failed' || task.status === 'error') ? '<button data-action="delete" data-id="' + escapeTask(task.id) + '" class="rounded-xl border border-slate-700/70 bg-slate-950/55 px-3 py-2 text-[11px] text-slate-400 hover:bg-slate-800 hover:text-rose-300"><i class="fa-solid fa-trash mr-1"></i>删除</button>' : '') +
                 (retryable ? '<button data-action="retry" data-id="' + escapeTask(task.id) + '" class="rounded-xl border border-amber-800/70 bg-amber-950/35 px-3 py-2 text-[11px] text-amber-300 hover:bg-amber-900/60"><i class="fa-solid fa-rotate-right mr-1"></i>失败重试</button>' : '') +
                 '</div></div>';
@@ -198,6 +200,8 @@ function renderTasks() {
 
     document.querySelectorAll('[data-action="detail"]').forEach(btn => btn.onclick = () => openTaskDetail(btn.dataset.id));
     document.querySelectorAll('[data-action="run-sub"]').forEach(btn => btn.onclick = () => runSubscription(btn.dataset.id));
+    document.querySelectorAll('[data-action="confirm-saved"]').forEach(btn => btn.onclick = () => resolvePendingSubscription(btn.dataset.id, 'saved'));
+    document.querySelectorAll('[data-action="retry-pending"]').forEach(btn => btn.onclick = () => resolvePendingSubscription(btn.dataset.id, 'not_saved'));
     document.querySelectorAll('[data-action="retry"]').forEach(btn => btn.onclick = () => retryTask(btn.dataset.id));
     document.querySelectorAll('[data-action="delete"]').forEach(btn => btn.onclick = () => deleteTask(btn.dataset.id));
 }
@@ -297,7 +301,7 @@ function renderTaskDetail(task) {
         '<details class="rounded-xl border border-slate-800 bg-slate-950 p-4"><summary class="cursor-pointer text-xs font-semibold text-slate-300">执行日志</summary><div class="mt-3 space-y-2">' +
         (task.events || []).map(e => '<div class="flex gap-3 text-[11px]"><span class="shrink-0 font-mono text-slate-600">' + new Date(Number(e.at || 0)*1000).toLocaleTimeString() + '</span><span class="' + (e.level === 'error' ? 'text-rose-400' : e.level === 'success' ? 'text-emerald-400' : 'text-slate-400') + '">' + escapeTask(e.message) + '</span></div>').join('') +
         '</div></details>' +
-        (task.status === 'failed' && task.type === 'transfer' ? '<button onclick="retryTask(\'' + escapeTask(task.id) + '\'); closeTaskDetail()" class="w-full rounded-xl bg-amber-600 px-4 py-3 text-xs font-medium text-white hover:bg-amber-500"><i class="fa-solid fa-rotate-right mr-1"></i>失败重试</button>' : '');
+        (task.status === 'failed' && task.type === 'transfer' && !task.recovery_uncertain ? '<button onclick="retryTask(\'' + escapeTask(task.id) + '\'); closeTaskDetail()" class="w-full rounded-xl bg-amber-600 px-4 py-3 text-xs font-medium text-white hover:bg-amber-500"><i class="fa-solid fa-rotate-right mr-1"></i>失败重试</button>' : '');
 }
 
 function renderHistory() {
@@ -496,6 +500,27 @@ async function createTask() {
     }catch(err){
         taskToast(err.message || '保存失败');
         btn.disabled=false;
+    }
+}
+
+async function resolvePendingSubscription(id, action) {
+    const message = action === 'saved'
+        ? '请先确认目标网盘中已存在这些文件。确认后系统会将其记为已转存，不再重复提交。继续吗？'
+        : '请先确认目标网盘中确实没有这些文件。系统将重新检查并可能再次提交转存。继续吗？';
+    if (!confirm(message)) return;
+    try {
+        const resp = await apiFetchTask('/api/subscriptions/resolve-pending', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({id, action})
+        });
+        const res = await resp.json();
+        if (!res.success) throw new Error(res.message || '处理待确认转存失败');
+        taskToast(res.message || '待确认转存已处理');
+    } catch (err) {
+        taskToast(err.message || '处理待确认转存失败');
+    } finally {
+        await loadTasks();
     }
 }
 

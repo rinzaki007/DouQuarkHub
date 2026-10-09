@@ -9,6 +9,7 @@ from concurrent.futures import ThreadPoolExecutor
 from threading import RLock
 
 from ..storage import JsonStore
+from .transfer_outcome import is_uncertain_transfer_message
 
 MAX_TASKS = 300
 TASK_SCHEMA_VERSION = 2
@@ -204,6 +205,7 @@ class TaskManager:
             result = runner(lambda progress, message: self._progress_update(task_id, progress, message))
             ok, message, counts = result
             counts = counts if isinstance(counts, dict) else {}
+            uncertain = bool(counts.get("uncertain")) or (not ok and is_uncertain_transfer_message(message))
             now = time.time()
             current = self._get(task_id)
             final_progress = 100 if ok else max(10, int(current.get("progress", 10)))
@@ -212,7 +214,8 @@ class TaskManager:
                 status="success" if ok else "failed",
                 progress=final_progress,
                 phase="completed" if ok else "failed",
-                phase_label="转存完成" if ok else "执行失败",
+                phase_label="转存完成" if ok else ("结果待核实" if uncertain else "执行失败"),
+                recovery_uncertain=uncertain,
                 message=str(message)[:500],
                 success_count=int(counts.get("success", 0)),
                 skipped_count=int(counts.get("skipped", 0)),
@@ -221,12 +224,14 @@ class TaskManager:
             )
         except Exception as exc:
             self.logger.exception("一次性转存任务 %s 执行异常", task_id)
+            uncertain = is_uncertain_transfer_message(exc)
             self._update(
                 task_id,
                 status="failed",
                 phase="failed",
-                phase_label="执行失败",
-                message=f"任务执行异常: {exc}",
+                phase_label="结果待核实" if uncertain else "执行失败",
+                recovery_uncertain=uncertain,
+                message=f"转存结果待核实: {exc}" if uncertain else f"任务执行异常: {exc}",
                 failed_count=1,
                 finished_at=time.time(),
             )

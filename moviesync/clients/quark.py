@@ -280,4 +280,7 @@ class QuarkClient:
                 return True, "转存成功"
             return False, str(data.get("message") or f"转存失败（HTTP {response.status_code}）")
         except ApiError as exc:
-            return False, str(exc)
+            return False, (
+                "转存结果不确定：请求可能已到达网盘，请检查目标目录后再决定是否重试。"
+                f"详情：{exc}"
+            )
