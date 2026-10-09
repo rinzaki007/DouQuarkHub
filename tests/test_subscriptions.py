@@ -1518,3 +1518,31 @@ def test_uncertain_subscription_without_pending_keys_fails_closed_until_user_con
         assert saved["pending_save_keys"] == []
     finally:
         manager.stop_scheduler()
+
+
+def test_subscription_finish_deduplicates_success_history_keys(tmp_path):
+    manager = SubscriptionManager(
+        tmp_path / "duplicate-success-history.json",
+        FakeStorageTargets(),
+        FakeResourceSources(),
+        FakeLogger(),
+    )
+    sub = manager.add_subscription(title="重复成功记录", pwd_id="share-duplicate-history")
+
+    try:
+        ok, message = manager._finish(
+            sub,
+            True,
+            "检查完成",
+            success_keys=[3, 3, 4, 4],
+        )
+
+        assert ok is True
+        assert message == "检查完成"
+        saved = manager.get_subscriptions()[0]
+        assert saved["saved_episodes"] == [3, 4]
+        assert saved["tracked_file_keys"] == ["3", "4"]
+        # The run counter still reflects the executioner's reported successes.
+        assert saved["run_history"][-1]["success_count"] == 4
+    finally:
+        manager.stop_scheduler()
