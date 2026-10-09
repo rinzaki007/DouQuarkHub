@@ -876,3 +876,57 @@ def test_concurrent_scheduler_start_waits_for_stop_to_finish(tmp_path, monkeypat
     finally:
         release_first.set()
         manager.stop_scheduler()
+
+
+def test_subscription_check_claim_is_atomic_with_delete(tmp_path, monkeypatch):
+    from threading import Event, Thread
+
+    manager = SubscriptionManager(
+        tmp_path / "atomic-check-claim.json",
+        FakeStorageTargets(),
+        FakeResourceSources(),
+        FakeLogger(),
+    )
+    sub = manager.add_subscription(title="并发删除测试", pwd_id="share-race")
+    original_load = manager._load_subscriptions
+    delete_done = Event()
+    delete_result = []
+    first_load = True
+
+    class PausingSubscription(dict):
+        def get(self, key, default=None):
+            if key == "pending_save_uncertain":
+                def delete_during_claim():
+                    delete_result.append(manager.delete_subscription(sub["id"]))
+                    delete_done.set()
+
+                deleter = Thread(target=delete_during_claim)
+                deleter.start()
+                # With an atomic claim, deletion blocks on manager.lock until
+                # running_ids is registered; without it, deletion wins this gap.
+                delete_done.wait(timeout=0.5)
+                deleter.join(timeout=1)
+            return super().get(key, default)
+
+    def controlled_load():
+        nonlocal first_load
+        rows = original_load()
+        if first_load:
+            first_load = False
+            return [PausingSubscription(row) if row.get("id") == sub["id"] else row for row in rows]
+        return rows
+
+    monkeypatch.setattr(manager, "_load_subscriptions", controlled_load)
+    checked = []
+    monkeypatch.setattr(manager, "_check", lambda subscription: (checked.append(subscription["id"]) or True, "checked"))
+
+    try:
+        ok, message = manager.check_subscription_now(sub["id"])
+        assert ok is True
+        assert message == "checked"
+        assert delete_done.wait(timeout=1)
+        assert delete_result == [False]
+        assert checked == [sub["id"]]
+        assert any(item["id"] == sub["id"] for item in manager.get_subscriptions())
+    finally:
+        manager.stop_scheduler()
