@@ -673,8 +673,16 @@ def resource_card_config(card_id):
     if enabled is not None and not isinstance(enabled, bool):
         return _json_error("enabled 必须是布尔值")
     try:
+        validated = card.validate_config(merged)
+        if not isinstance(validated, dict):
+            return _json_error("卡片配置校验必须返回 JSON 对象")
+        # 只写入本次声明并提交的字段，使用卡片规范化后的值；其余内部配置保持不变。
+        persisted_incoming = {
+            key: validated.get(key, value)
+            for key, value in persisted_incoming.items()
+        }
         saved = config_store.save_card_config(card_id, persisted_incoming, enabled=enabled)
-    except ValueError as exc:
+    except (ValueError, TypeError) as exc:
         return _json_error(str(exc))
     fields, public_config, has_value = _card_config_view(card, saved.get("config", {}))
     return jsonify({"success": True, "card_id": card_id, "enabled": bool(saved.get("enabled", True)),
@@ -730,9 +738,21 @@ def get_quark_card_config():
 @require_csrf
 def save_quark_card_config():
     data = request.get_json(silent=True) or {}
+    if not isinstance(data, dict):
+        return _json_error("Quark 卡片配置必须是 JSON 对象")
+    services = _services()
+    card = services["card_registry"].get("quark")
+    if card is None:
+        return _json_error("Quark 卡片未加载", 404)
+    config_store = services["config"]
+    declared_keys = {str(field.get("key")) for field in card.manifest.config_fields}
+    incoming_config = {key: value for key, value in data.items() if key in declared_keys}
+    merged_config = {**config_store.get_quark_config(), **incoming_config}
     try:
-        saved = _services()["config"].save_quark_config(data)
-    except ValueError as exc:
+        validated = card.validate_config(merged_config)
+        incoming_config = {key: validated.get(key, value) for key, value in incoming_config.items()}
+        saved = config_store.save_quark_config({**data, **incoming_config})
+    except (ValueError, TypeError) as exc:
         return _json_error(str(exc))
     return jsonify({
         "success": True,
@@ -768,9 +788,21 @@ def get_telegram_card_config():
 @require_csrf
 def save_telegram_card_config():
     data = request.get_json(silent=True) or {}
+    if not isinstance(data, dict):
+        return _json_error("Telegram 卡片配置必须是 JSON 对象")
+    services = _services()
+    card = services["card_registry"].get("telegram")
+    if card is None:
+        return _json_error("Telegram 卡片未加载", 404)
+    config_store = services["config"]
+    declared_keys = {str(field.get("key")) for field in card.manifest.config_fields}
+    incoming_config = {key: value for key, value in data.items() if key in declared_keys}
+    merged_config = {**config_store.get_telegram_config(), **incoming_config}
     try:
-        saved = _services()["config"].save_telegram_config(data)
-    except ValueError as exc:
+        validated = card.validate_config(merged_config)
+        incoming_config = {key: validated.get(key, value) for key, value in incoming_config.items()}
+        saved = config_store.save_telegram_config({**data, **incoming_config})
+    except (ValueError, TypeError) as exc:
         return _json_error(str(exc))
     return jsonify({
         "success": True,
