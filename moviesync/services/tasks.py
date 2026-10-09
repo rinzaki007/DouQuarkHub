@@ -297,12 +297,11 @@ class TaskManager:
             )
         except Exception as exc:
             self.logger.exception("一次性转存任务 %s 执行异常", task_id)
-            uncertain = is_uncertain_transfer_message(exc)
-            safe_message = (
-                "转存结果待核实，请检查目标网盘后再决定是否重试"
-                if uncertain
-                else "任务执行异常，转存未能完成，请查看服务日志"
-            )
+            # Once the runner has started, an exception alone cannot prove that
+            # no remote side effect occurred. Treat the outcome as ambiguous to
+            # prevent a blind retry from duplicating a transfer.
+            uncertain = True
+            safe_message = "转存结果待核实，请检查目标网盘后再决定是否重试"
             self._update(
                 task_id,
                 status="failed",
