@@ -200,10 +200,11 @@ class TaskManager:
                 return active
             items.append(task)
             self._save(items)
-        return self._submit_transfer(task["id"], runner)
+        return self._submit_transfer(task, runner)
 
-    def _submit_transfer(self, task_id, runner):
+    def _submit_transfer(self, task, runner):
         """Submit a persisted task and record a safe failure if the executor rejects it."""
+        task_id = task["id"]
         try:
             self.executor.submit(self._run_transfer, task_id, runner)
         except Exception:
@@ -219,7 +220,10 @@ class TaskManager:
                 failed_count=1,
                 finished_at=time.time(),
             )
-        return self.get_task(task_id) or {}
+            return self.get_task(task_id) or task
+        # Preserve the queue snapshot returned by the previous implementation;
+        # the worker may already have moved the persisted task to running.
+        return task
 
     def _update(self, task_id, **changes):
         with self.lock:
@@ -349,7 +353,7 @@ class TaskManager:
             self._append_event(new, "info", "已创建重试任务")
             items.append(new)
             self._save(items)
-        return self._submit_transfer(new["id"], runner)
+        return self._submit_transfer(new, runner)
 
     def delete_task(self, task_id):
         task_id = str(task_id)
