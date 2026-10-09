@@ -34,3 +34,4 @@ def test_filename_template_tokens():
     assert tokens["CHINESE"] == "黑镜"
     assert tokens["VER"] == "高清版"
     assert render_filename_template(file_name, "{TASKNAME}.{SXX}E{II}.{EXT}", "黑镜") == "黑镜.S02E03.mkv"
+    assert render_filename_template(file_name, "{TASKNAME}.{SXX}E{III}.{EXT}", "黑镜") == "黑镜.S02E003.mkv"
