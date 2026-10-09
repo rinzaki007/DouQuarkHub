@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "moviesync-example-storage-card"
+version = "0.1.0"
+description = "A safe demonstration storage-target plugin for MovieSync"
+requires-python = ">=3.12"
+
+[project.entry-points."moviesync.storage_targets"]
+example-storage = "moviesync_example_storage:create_card"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
