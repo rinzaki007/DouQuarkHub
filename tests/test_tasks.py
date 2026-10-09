@@ -437,3 +437,49 @@ def test_transfer_start_status_write_failure_is_safe_and_does_not_run_remote_run
         assert "尚未开始转存" in current["message"]
     finally:
         manager.shutdown()
+
+
+def test_task_recovery_survives_malformed_counts_and_event_history(tmp_path):
+    import json
+
+    path = tmp_path / "malformed-task-history.json"
+    path.write_text(
+        json.dumps([
+            {
+                "id": "queued-corrupt-history",
+                "type": "transfer",
+                "status": "queued",
+                "failed_count": "not-a-number",
+                "events": "legacy-invalid-value",
+            },
+            {
+                "id": "running-corrupt-history",
+                "type": "transfer",
+                "status": "running",
+                "failed_count": None,
+                "events": [None, "invalid event", {"message": "older event"}],
+            },
+        ]),
+        encoding="utf-8",
+    )
+
+    manager = TaskManager(path, logging.getLogger("test"))
+    try:
+        recovered = {task["id"]: task for task in manager.list_tasks()}
+
+        queued = recovered["queued-corrupt-history"]
+        assert queued["status"] == "failed"
+        assert queued["failed_count"] == 1
+        assert isinstance(queued["events"], list)
+        assert all(isinstance(event, dict) for event in queued["events"])
+        assert "可安全重试" in queued["message"]
+
+        running = recovered["running-corrupt-history"]
+        assert running["status"] == "failed"
+        assert running["failed_count"] == 1
+        assert running["recovery_uncertain"] is True
+        assert isinstance(running["events"], list)
+        assert all(isinstance(event, dict) for event in running["events"])
+        assert "检查目标网盘" in running["message"]
+    finally:
+        manager.shutdown()

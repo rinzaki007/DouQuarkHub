@@ -41,7 +41,7 @@ class TaskManager:
                     item["phase_label"] = "任务中断"
                     item["message"] = "服务重启时任务仍在排队，未开始执行，可安全重试"
                     item["recovery_uncertain"] = False
-                    item["failed_count"] = max(1, int(item.get("failed_count", 0) or 0))
+                    item["failed_count"] = self._recovered_failed_count(item)
                     item["updated_at"] = time.time()
                     self._append_event(item, "error", item["message"])
                     changed = True
@@ -57,7 +57,7 @@ class TaskManager:
                         "为避免重复转存，系统已禁用此任务的直接重试。"
                     )
                     item["recovery_uncertain"] = True
-                    item["failed_count"] = max(1, int(item.get("failed_count", 0) or 0))
+                    item["failed_count"] = self._recovered_failed_count(item)
                     item["updated_at"] = time.time()
                     self._append_event(item, "error", item["message"])
                     changed = True
@@ -140,8 +140,24 @@ class TaskManager:
         return "completed", "转存完成"
 
     @staticmethod
+    def _recovered_failed_count(item):
+        try:
+            return max(1, int(item.get("failed_count", 0) or 0))
+        except (TypeError, ValueError, OverflowError):
+            # Invalid legacy metadata must not prevent the service from starting.
+            return 1
+
+    @staticmethod
     def _append_event(item, level, message):
-        events = item.setdefault("events", [])
+        raw_events = item.get("events")
+        events = (
+            [event for event in raw_events if isinstance(event, dict)]
+            if isinstance(raw_events, list)
+            else []
+        )
+        if events != raw_events:
+            item["events"] = events
+
         text = str(message or "").strip()
         if not text:
             return
@@ -152,7 +168,7 @@ class TaskManager:
             "level": str(level or "info"),
             "message": text[:300],
         })
-        del events[:-MAX_EVENTS]
+        item["events"] = events[-MAX_EVENTS:]
 
     def create_transfer_task(self, payload, runner):
         movie = payload.get("movie") if isinstance(payload.get("movie"), dict) else {}
