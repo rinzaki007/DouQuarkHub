@@ -86,6 +86,7 @@ async function loadTasks() {
 
 function taskState(task) {
     if (task.pending_save_keys && task.pending_save_keys.length) return {key:'pending', label:'待确认转存', cls:'text-amber-300 bg-amber-950/50 border-amber-800'};
+    if (task.recovery_uncertain) return {key:'uncertain', label:'结果待核实', cls:'text-amber-200 bg-amber-950/60 border-amber-700'};
     if (task.status === 'running') return {key:'running', label:'执行中', cls:'text-purple-300 bg-purple-950/50 border-purple-800'};
     if (task.status === 'failed' || task.last_error) return {key:'error', label:'异常', cls:'text-rose-300 bg-rose-950/50 border-rose-800'};
     if (task.status === 'success') return {key:'success', label:'已完成', cls:'text-emerald-300 bg-emerald-950/50 border-emerald-800'};
@@ -163,7 +164,7 @@ function renderTasks() {
 
         groupTasks.forEach(task => {
             const state = taskState(task);
-            const retryable = task.type === 'transfer' && task.status === 'failed';
+            const retryable = task.type === 'transfer' && task.status === 'failed' && !task.recovery_uncertain;
             const card = document.createElement('article');
             card.className = 'm-2 rounded-2xl border border-slate-800/80 bg-slate-950/30 p-4 transition hover:border-slate-600';
             const phase = escapeTask(task.phase_label || task.message || '等待执行');
