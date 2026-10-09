@@ -287,6 +287,13 @@ class SubscriptionManager:
                 elif source_id and channel:
                     initial_tracked_keys.append(f"{pwd_id}:{fid}")
 
+        selected_baseline = max(selected_season_episodes, default=(0, 0))
+        baseline_episode = (
+            selected_baseline[1]
+            if selected_baseline[0] > 0
+            else max([start_ep, *selected_episode_numbers], default=start_ep)
+        )
+
         subscription = {
             "id": uuid.uuid4().hex,
             "title": title,
@@ -294,8 +301,8 @@ class SubscriptionManager:
             "target_fid": target_fid,
             "storage_target_id": str(storage_target_id or "").strip(),
             "interval_hours": interval_hours,
-            "start_ep": max([start_ep, *selected_episode_numbers], default=start_ep),
-            "start_season": max(selected_season_episodes, default=(0, 0))[0],
+            "start_ep": baseline_episode,
+            "start_season": selected_baseline[0],
             "channel": str(
                 channel or ""
             ).strip()[:100],
@@ -601,7 +608,7 @@ class SubscriptionManager:
         }
         baseline_episode = int(sub.get("start_ep", 0) or 0)
         baseline_season = int(sub.get("start_season", 0) or 0)
-        grouped: dict[tuple[str, str], dict] = {};
+        grouped: dict[tuple[str, str], dict] = {}
 
         for source in sources:
             self._set_status(sub, "running", "resolve", "正在解析发现的资源…")
