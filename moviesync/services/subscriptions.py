@@ -1204,10 +1204,11 @@ class SubscriptionManager:
             if success_keys:
                 tracked = list(current.get("tracked_file_keys", []) or [])
                 seen_tracked = set(str(key) for key in tracked)
-                tracked.extend(
-                    str(key) for key in success_keys
-                    if str(key) not in seen_tracked
-                )
+                for key in success_keys:
+                    normalized_key = str(key)
+                    if normalized_key not in seen_tracked:
+                        tracked.append(normalized_key)
+                        seen_tracked.add(normalized_key)
                 current["tracked_file_keys"] = tracked[-1000:]
 
                 old = list(
@@ -1219,11 +1220,10 @@ class SubscriptionManager:
 
                 seen = set(old)
 
-                old.extend(
-                    key
-                    for key in success_keys
-                    if key not in seen
-                )
+                for key in success_keys:
+                    if key not in seen:
+                        old.append(key)
+                        seen.add(key)
 
                 current[
                     "saved_episodes"
