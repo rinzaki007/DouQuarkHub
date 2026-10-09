@@ -156,6 +156,35 @@ class SubscriptionManager:
                 item["run_history"] = []
                 changed = True
             item["run_history"] = item["run_history"][-50:]
+
+            # Older or manually edited JSON may contain non-scalar history
+            # entries. Keep only supported episode identifiers so completion
+            # bookkeeping can safely deduplicate saved history with a set.
+            raw_saved = item.get("saved_episodes", [])
+            if not isinstance(raw_saved, list):
+                raw_saved = []
+                changed = True
+            saved_episodes = []
+            seen_saved = set()
+            for value in raw_saved:
+                if isinstance(value, bool) or not isinstance(value, (str, int)):
+                    changed = True
+                    continue
+                if isinstance(value, str):
+                    value = value.strip()
+                    if not value:
+                        changed = True
+                        continue
+                key = str(value)
+                if key in seen_saved:
+                    changed = True
+                    continue
+                seen_saved.add(key)
+                saved_episodes.append(value)
+            if saved_episodes != item.get("saved_episodes", []):
+                changed = True
+            item["saved_episodes"] = saved_episodes
+
             item["pending_save_keys"] = [
                 str(key)
                 for key in (
