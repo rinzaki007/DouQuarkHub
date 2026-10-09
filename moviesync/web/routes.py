@@ -645,6 +645,7 @@ def get_telegram_card_config():
         "enabled": bool(saved.get("enabled", True)),
         "config": {
             "channels": config.get("channels", []),
+            "magic_regex": config.get("magic_regex", {}),
             "health": config.get("health", {}),
         },
     })
