@@ -229,7 +229,7 @@ def test_channel_subscription_uses_selected_episode_as_baseline(tmp_path):
     ok, message = manager.check_subscription_now(sub["id"])
 
     assert ok is True
-    assert "成功追更 1 项" in message
+    assert "成功追更 2 项" in message
     assert storage.transfers == [("share44", ["ep44"]), ("share45", ["ep45"])]
 
 
@@ -360,7 +360,7 @@ def test_channel_subscription_tracks_later_episodes_across_separate_shares(tmp_p
     ok, message = manager.check_subscription_now(sub["id"])
 
     assert ok is True
-    assert "成功追更 2 项" in message
+    assert "成功追更 3 项" in message
     assert storage.transfers == [
         ("share-selected", ["ep207"]),
         ("share-next", ["ep208"]),
@@ -398,5 +398,5 @@ def test_channel_subscription_checks_selected_share_when_channel_search_is_empty
     ok, message = manager.check_subscription_now(sub["id"])
 
     assert ok is True
-    assert "成功追更 1 项" in message
+    assert "成功追更 2 项" in message
     assert storage.transfers == [("share-selected", ["ep108", "ep109"])]
