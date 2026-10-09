@@ -467,7 +467,7 @@ class SubscriptionManager:
             )
             uncertain = is_uncertain_transfer_message(exc)
             safe_message = (
-                "任务结果待核实，请检查目标网盘后再决定是否重试"
+                "转存结果不确定，请检查目标网盘后再决定是否重试"
                 if uncertain
                 else "任务执行异常，请查看服务日志"
             )
@@ -605,7 +605,7 @@ class SubscriptionManager:
             self.logger.warning("自动追剧转存失败: %s", msg)
             uncertain = is_uncertain_transfer_message(msg)
             safe_message = (
-                "转存结果待核实，请检查目标网盘后再决定是否重试"
+                "转存结果不确定，请检查目标网盘后再决定是否重试"
                 if uncertain
                 else "转存失败，请检查存储目标配置或查看服务日志"
             )
@@ -793,7 +793,7 @@ class SubscriptionManager:
                 self.logger.warning("频道追剧转存失败: %s", msg)
                 uncertain = is_uncertain_transfer_message(msg)
                 safe_message = (
-                    "转存结果待核实，请检查目标网盘后再决定是否重试"
+                    "转存结果不确定，请检查目标网盘后再决定是否重试"
                     if uncertain
                     else "转存失败，请检查存储目标配置或查看服务日志"
                 )
