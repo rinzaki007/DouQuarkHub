@@ -165,8 +165,19 @@ class Card:
 
                 value_format = field.get("format")
                 if value_format == "url":
-                    parsed = urlparse(value)
-                    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+                    try:
+                        parsed = urlparse(value)
+                        hostname = parsed.hostname
+                        # Accessing .port validates malformed and out-of-range ports.
+                        parsed.port
+                        valid_url = (
+                            parsed.scheme in {"http", "https"}
+                            and bool(hostname)
+                            and not any(char.isspace() for char in hostname or "")
+                        )
+                    except ValueError:
+                        valid_url = False
+                    if not valid_url:
                         raise ConfigValidationError(
                             f"配置字段「{label}」必须是有效的 HTTP 或 HTTPS 地址"
                         )
