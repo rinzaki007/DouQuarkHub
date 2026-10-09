@@ -878,7 +878,7 @@ def test_concurrent_scheduler_start_waits_for_stop_to_finish(tmp_path, monkeypat
         manager.stop_scheduler()
 
 
-def test_subscription_check_claim_is_atomic_with_delete(tmp_path, monkeypatch):
+def test_running_subscription_cannot_be_deleted_during_check(tmp_path, monkeypatch):
     from threading import Event, Thread
 
     manager = SubscriptionManager(
@@ -888,45 +888,29 @@ def test_subscription_check_claim_is_atomic_with_delete(tmp_path, monkeypatch):
         FakeLogger(),
     )
     sub = manager.add_subscription(title="并发删除测试", pwd_id="share-race")
-    original_load = manager._load_subscriptions
-    delete_done = Event()
-    delete_result = []
-    first_load = True
+    status_entered = Event()
+    release_status = Event()
+    results = []
 
-    class PausingSubscription(dict):
-        def get(self, key, default=None):
-            if key == "pending_save_uncertain":
-                def delete_during_claim():
-                    delete_result.append(manager.delete_subscription(sub["id"]))
-                    delete_done.set()
+    def blocked_status(subscription, status, phase, phase_label):
+        status_entered.set()
+        assert release_status.wait(timeout=2)
 
-                deleter = Thread(target=delete_during_claim)
-                deleter.start()
-                # With an atomic claim, deletion blocks on manager.lock until
-                # running_ids is registered; without it, deletion wins this gap.
-                delete_done.wait(timeout=0.5)
-                deleter.join(timeout=1)
-            return super().get(key, default)
+    monkeypatch.setattr(manager, "_set_status", blocked_status)
+    monkeypatch.setattr(manager, "_check", lambda subscription: (True, "checked"))
 
-    def controlled_load():
-        nonlocal first_load
-        rows = original_load()
-        if first_load:
-            first_load = False
-            return [PausingSubscription(row) if row.get("id") == sub["id"] else row for row in rows]
-        return rows
-
-    monkeypatch.setattr(manager, "_load_subscriptions", controlled_load)
-    checked = []
-    monkeypatch.setattr(manager, "_check", lambda subscription: (checked.append(subscription["id"]) or True, "checked"))
-
+    worker = Thread(target=lambda: results.append(manager.check_subscription_now(sub["id"])))
     try:
-        ok, message = manager.check_subscription_now(sub["id"])
-        assert ok is True
-        assert message == "checked"
-        assert delete_done.wait(timeout=1)
-        assert delete_result == [False]
-        assert checked == [sub["id"]]
+        worker.start()
+        assert status_entered.wait(timeout=1)
+        assert sub["id"] in manager.running_ids
+        assert manager.delete_subscription(sub["id"]) is False
         assert any(item["id"] == sub["id"] for item in manager.get_subscriptions())
+        release_status.set()
+        worker.join(timeout=2)
+        assert not worker.is_alive()
+        assert results == [(True, "checked")]
     finally:
+        release_status.set()
+        worker.join(timeout=2)
         manager.stop_scheduler()
