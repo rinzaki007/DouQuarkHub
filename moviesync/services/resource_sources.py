@@ -89,7 +89,9 @@ class TelegramResourceSource(ResourceSource):
         return results
 
     def search_channel(self, channel: object, title: str, config: dict) -> list[dict[str, Any]]:
-        return self.client.search_channel(channel, title, scan_all=False)
+        # 自动追剧要扫描频道最近的消息，而不是只依赖 Telegram 的标题查询结果；
+        # 后续仍由客户端做标题匹配并受页数上限保护。
+        return self.client.search_channel(channel, title, scan_all=True)
 
 
     def check(self, config: dict) -> dict[str, Any]:
