@@ -465,11 +465,17 @@ class SubscriptionManager:
                 "订阅任务 %s 执行异常",
                 sub_id,
             )
-
+            uncertain = is_uncertain_transfer_message(exc)
+            safe_message = (
+                "转存结果不确定，请检查目标网盘后再决定是否重试"
+                if uncertain
+                else "任务执行异常，请查看服务日志"
+            )
             return self._finish(
                 subscription,
                 False,
-                f"任务执行异常: {exc}",
+                safe_message,
+                outcome_uncertain=uncertain,
             )
 
         finally:
@@ -574,8 +580,9 @@ class SubscriptionManager:
                 target_fid,
                 target_id or None,
             )
-        except Exception as exc:
-            return self._finish(sub, False, f"创建专属文件夹失败: {exc}")
+        except Exception:
+            self.logger.exception("自动追剧创建专属文件夹失败: %s", sub.get("title", ""))
+            return self._finish(sub, False, "创建专属文件夹失败，请检查存储目标配置或查看服务日志")
 
         pending_keys = list(dict.fromkeys(str(key) for key in found_keys))[:200]
         with self.lock:
@@ -595,11 +602,18 @@ class SubscriptionManager:
             fetched_stoken,
         )
         if not ok:
+            self.logger.warning("自动追剧转存失败: %s", msg)
+            uncertain = is_uncertain_transfer_message(msg)
+            safe_message = (
+                "转存结果不确定，请检查目标网盘后再决定是否重试"
+                if uncertain
+                else "转存失败，请检查存储目标配置或查看服务日志"
+            )
             return self._finish(
                 sub,
                 False,
-                f"转存失败: {msg}",
-                outcome_uncertain=is_uncertain_transfer_message(msg),
+                safe_message,
+                outcome_uncertain=uncertain,
             )
 
         return self._finish(
@@ -700,7 +714,8 @@ class SubscriptionManager:
             ).strip()
             if resolved.get("error") or not files or not token:
                 reason = str(resolved.get("error") or "未获取到文件列表或分享令牌").strip()
-                resolution_errors.append(f"{pwd_id}: {reason[:160]}")
+                self.logger.warning("自动追剧资源解析失败，分享 ID=%s，原因=%s", pwd_id, reason)
+                resolution_errors.append(f"{pwd_id}: 解析失败")
                 continue
 
             for item in files:
@@ -745,7 +760,7 @@ class SubscriptionManager:
                 return self._finish(
                     sub,
                     False,
-                    f"频道资源解析失败，未能确认是否有新集：{'; '.join(resolution_errors[:3])}",
+                    "频道资源解析失败，未能确认是否有新集；请检查资源来源状态或查看服务日志",
                     success_keys=[],
                 )
             return self._finish(sub, True, f"《{title}》暂无新更新", success_keys=[])
@@ -758,8 +773,9 @@ class SubscriptionManager:
                 target_fid,
                 default_target["target_id"] or None,
             )
-        except Exception as exc:
-            return self._finish(sub, False, f"创建专属文件夹失败: {exc}")
+        except Exception:
+            self.logger.exception("频道追剧创建专属文件夹失败: %s", title)
+            return self._finish(sub, False, "创建专属文件夹失败，请检查存储目标配置或查看服务日志")
 
         all_keys: list[str] = []
         total = 0
@@ -774,12 +790,19 @@ class SubscriptionManager:
                 group["token"],
             )
             if not ok:
+                self.logger.warning("频道追剧转存失败: %s", msg)
+                uncertain = is_uncertain_transfer_message(msg)
+                safe_message = (
+                    "转存结果不确定，请检查目标网盘后再决定是否重试"
+                    if uncertain
+                    else "转存失败，请检查存储目标配置或查看服务日志"
+                )
                 return self._finish(
                     sub,
                     False,
-                    f"转存失败: {msg}",
+                    safe_message,
                     success_keys=all_keys,
-                    outcome_uncertain=is_uncertain_transfer_message(msg),
+                    outcome_uncertain=uncertain,
                 )
             all_keys.extend(group["keys"])
             self._record_success_keys(sub, group["keys"])
@@ -790,7 +813,7 @@ class SubscriptionManager:
             return self._finish(
                 sub,
                 False,
-                f"已转存 {total} 项，但部分频道资源解析失败，后续将继续检查：{'; '.join(resolution_errors[:3])}",
+                f"已转存 {total} 项，但部分频道资源解析失败，后续将继续检查",
                 success_keys=all_keys,
             )
 

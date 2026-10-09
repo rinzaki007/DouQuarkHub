@@ -319,3 +319,27 @@ def test_executor_submit_failure_is_recorded_and_retry_remains_safe(tmp_path):
         assert len(manager.list_tasks()) == 2
     finally:
         manager.shutdown()
+
+
+def test_transfer_worker_does_not_expose_exception_details(tmp_path):
+    manager = TaskManager(tmp_path / "tasks.json", logging.getLogger("test"))
+    payload = {
+        "movie": {"title": "异常信息脱敏测试"},
+        "candidate": {"pwd_id": "share-secret-test", "files": [{"fid": "file-1"}]},
+        "target_fid": "target-1",
+    }
+
+    def runner(_progress):
+        raise RuntimeError("upstream cookie=SECRET_COOKIE_VALUE")
+
+    try:
+        task = manager.create_transfer_task(payload, runner)
+        manager.executor.shutdown(wait=True)
+        failed = manager.get_task(task["id"])
+
+        assert failed["status"] == "failed"
+        assert failed["message"] == "任务执行异常，转存未能完成，请查看服务日志"
+        assert "SECRET_COOKIE_VALUE" not in failed["message"]
+        assert all("SECRET_COOKIE_VALUE" not in event["message"] for event in failed["events"])
+    finally:
+        manager.shutdown()
