@@ -222,7 +222,13 @@ class SearchService:
         progress(20, "正在重新验证分享资源…")
         files, fresh_stoken, err, storage_target_id = self._get_resource_files(resource)
         if err or not files or not fresh_stoken:
-            return False, f"分享资源解析失败: {err or '未知错误'}", {"success": 0, "skipped": 0, "failed": total}
+            if err:
+                self.logger.warning("分享资源解析失败: %s", err)
+            return False, "分享资源解析失败，请检查分享链接或查看服务日志", {
+                "success": 0,
+                "skipped": 0,
+                "failed": total,
+            }
         available_fids = {str(item.get("fid")) for item in files if item.get("fid")}
         if not set(selected_fids).issubset(available_fids):
             return False, "所选文件已不存在或不属于该分享资源", {"success": 0, "skipped": 0, "failed": total}
@@ -256,7 +262,12 @@ class SearchService:
             return True, f"《{title}》转存成功！已精准归档至专属文件夹", {"success": total, "skipped": 0, "failed": 0}
         self.logger.warning("《%s》转存失败: %s", title, msg)
         uncertain = is_uncertain_transfer_message(msg)
-        return False, f"转存失败: {msg}", {
+        safe_message = (
+            "转存结果待核实，请检查目标网盘后再决定是否重试"
+            if uncertain
+            else "转存失败，请检查存储目标配置或查看服务日志"
+        )
+        return False, safe_message, {
             "success": 0,
             "skipped": 0,
             "failed": total,
