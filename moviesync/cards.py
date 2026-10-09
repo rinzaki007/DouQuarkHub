@@ -169,11 +169,12 @@ class Card:
                         parsed = urlparse(value)
                         hostname = parsed.hostname
                         # Accessing .port validates malformed and out-of-range ports.
-                        parsed.port
+                        port = parsed.port
                         valid_url = (
                             parsed.scheme in {"http", "https"}
                             and bool(hostname)
                             and not any(char.isspace() for char in hostname or "")
+                            and (port is None or 1 <= port <= 65535)
                         )
                     except ValueError:
                         valid_url = False
