@@ -607,3 +607,35 @@ def test_channel_subscription_reports_partial_resolution_failure_without_resavin
     ok, _ = manager.check_subscription_now(sub["id"])
     assert ok is False
     assert storage.transfers == [("share1", ["ep1"])]
+
+
+
+def test_stop_scheduler_keeps_live_worker_reference(tmp_path):
+    from threading import Event, Thread
+
+    manager = SubscriptionManager(
+        tmp_path / "subscriptions.json",
+        FakeStorageTargets(),
+        FakeResourceSources(),
+        FakeLogger(),
+    )
+    release = Event()
+    worker = Thread(target=release.wait, name="test-scheduler")
+    manager.worker = worker
+    worker.start()
+
+    try:
+        manager.stop_scheduler()
+        assert worker.is_alive()
+        assert manager.worker is worker
+
+        # A second start must not create a competing scheduler while the old
+        # worker is still finishing a blocking subscription check.
+        manager.start_scheduler()
+        assert manager.worker is worker
+    finally:
+        release.set()
+        worker.join(timeout=2)
+        manager.stop_scheduler()
+
+    assert manager.worker is None

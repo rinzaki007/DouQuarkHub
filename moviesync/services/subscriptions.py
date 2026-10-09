@@ -1100,15 +1100,17 @@ class SubscriptionManager:
 
         worker = self.worker
 
-        if (
-            worker
-            and worker.is_alive()
-        ):
-            worker.join(
-                timeout=2
-            )
+        if worker and worker.is_alive():
+            worker.join(timeout=2)
 
-        self.worker = None
+        # Keep the reference while a check is still running. Clearing it here
+        # would let start_scheduler() create a second worker over the same data.
+        if worker is None or not worker.is_alive():
+            self.worker = None
+        else:
+            self.logger.warning(
+                "自动追剧调度器尚未退出；保留线程引用以阻止重复启动"
+            )
 
     def _scheduler_loop(
         self,
@@ -1126,6 +1128,9 @@ class SubscriptionManager:
             now = time.time()
 
             for sub in subscriptions:
+                if self.stop_event.is_set():
+                    break
+
                 try:
                     next_run_at = float(
                         sub.get(
