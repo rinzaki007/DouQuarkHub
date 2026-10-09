@@ -219,3 +219,91 @@ def test_no_default_storage_target_uses_first_enabled_card():
     manager = StorageTargetManager(registry, FakeStore(), FakeLogger())
 
     assert manager.get().card_id == "demo-storage"
+
+
+
+def test_storage_manager_normalizes_malformed_plugin_results():
+    class MalformedStorage(DemoStorage):
+        manifest = CardManifest(
+            id="malformed-storage",
+            name="Malformed Storage",
+            type="storage_target",
+            capabilities=DemoStorage.manifest.capabilities,
+        )
+
+        def resolve_resource(self, resource):
+            return ["not", "a", "mapping"]
+
+        def list_files(self, resource):
+            return {"fid": "not-a-list"}
+
+        def destination_options(self):
+            return [None]
+
+        def create_folder(self, name, parent_id="0"):
+            return None
+
+        def transfer(self, resource, files, target_id="0"):
+            return {"success": True}
+
+    registry = CardRegistry()
+    registry.register(MalformedStorage())
+    manager = StorageTargetManager(registry, FakeStore(), FakeLogger())
+
+    resolved = manager.resolve_resource({"pwd_id": "abc"}, "malformed-storage")
+    assert resolved == {
+        "target_id": "malformed-storage",
+        "files": [],
+        "token": None,
+        "error": "存储目标资源解析失败，请检查插件实现或查看服务日志",
+    }
+    assert manager.list_files({"pwd_id": "abc"}, "malformed-storage") == []
+    assert manager.destination_options("malformed-storage") == []
+    import pytest
+    with pytest.raises(RuntimeError, match="创建目录失败"):
+        manager.create_folder("Show", target_id="malformed-storage")
+    ok, message = manager.transfer(
+        {"pwd_id": "abc"}, [{"fid": "1"}], storage_target_id="malformed-storage"
+    )
+    assert ok is False
+    assert "转存失败" in message
+
+
+def test_storage_manager_catches_plugin_exceptions_without_leaking_details():
+    class ExplodingStorage(DemoStorage):
+        manifest = CardManifest(
+            id="exploding-storage",
+            name="Exploding Storage",
+            type="storage_target",
+            capabilities=DemoStorage.manifest.capabilities,
+        )
+
+        def resolve_resource(self, resource):
+            raise RuntimeError("cookie=SECRET_COOKIE")
+
+        def list_files(self, resource):
+            raise RuntimeError("cookie=SECRET_COOKIE")
+
+        def destination_options(self):
+            raise RuntimeError("cookie=SECRET_COOKIE")
+
+        def create_folder(self, name, parent_id="0"):
+            raise RuntimeError("cookie=SECRET_COOKIE")
+
+        def transfer(self, resource, files, target_id="0"):
+            raise RuntimeError("cookie=SECRET_COOKIE")
+
+    registry = CardRegistry()
+    registry.register(ExplodingStorage())
+    manager = StorageTargetManager(registry, FakeStore(), FakeLogger())
+
+    assert "SECRET_COOKIE" not in str(manager.resolve_resource({}, "exploding-storage"))
+    assert manager.list_files({}, "exploding-storage") == []
+    assert manager.destination_options("exploding-storage") == []
+    import pytest
+    with pytest.raises(RuntimeError, match="创建目录失败") as error:
+        manager.create_folder("Show", target_id="exploding-storage")
+    assert "SECRET_COOKIE" not in str(error.value)
+    ok, message = manager.transfer({}, [], storage_target_id="exploding-storage")
+    assert ok is False
+    assert "SECRET_COOKIE" not in message
