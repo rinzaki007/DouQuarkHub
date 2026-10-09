@@ -126,9 +126,20 @@ def render_filename_template(
 ) -> str:
     """将 {TASKNAME}/{II}/{EXT}/{CHINESE}/{DATE}/{YEAR}/{S}/{SXX}/{E}/{PART}/{VER} 替换为令牌值。"""
     tokens = extract_filename_tokens(file_name, task_name)
+    episode_value = tokens.get("E", "")
+    # {I}/{II}/{III} 分别按 1/2/3 位补零，I 的数量决定排序位数。
+    rendered = re.sub(
+        r"\{(I{1,10})\}",
+        lambda match: (
+            f"{int(episode_value):0{len(match.group(1))}d}"
+            if episode_value.isdigit()
+            else ""
+        ),
+        str(template or ""),
+    )
     rendered = re.sub(
         r"\{([A-Z]+)\}",
         lambda match: tokens.get(match.group(1), match.group(0)),
-        str(template or ""),
+        rendered,
     )
     return re.sub(r"[<>:\"/\\|?*\x00-\x1f]", "_", rendered).strip(" .")
