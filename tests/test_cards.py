@@ -97,3 +97,23 @@ def test_registry_contains_unified_card_manifest_contract():
     assert TelegramResourceSource.manifest.type == "resource_source"
     assert "metadata.search" in DoubanMetadataCard.manifest.capabilities
     assert "resource.search" in TelegramResourceSource.manifest.capabilities
+
+
+
+@pytest.mark.parametrize(
+    "field, message",
+    [
+        ({"key": "value", "min_length": -1}, "min_length"),
+        ({"key": "value", "min_length": 5, "max_length": 2}, "最小长度"),
+        ({"key": "value", "pattern": "["}, "正则规则无效"),
+        ({"key": "value", "format": "date"}, "格式规则无效"),
+        ({"key": "value", "type": "boolean", "pattern": "yes"}, "pattern"),
+    ],
+)
+def test_card_manifest_rejects_invalid_text_constraints(field, message):
+    with pytest.raises(ValueError, match=message):
+        CardManifest(
+            id="invalid-schema",
+            name="Invalid Schema",
+            config_fields=(field,),
+        )
