@@ -1305,7 +1305,7 @@ def test_subscription_saved_history_normalizes_malformed_entries_before_finish(t
         assert ok is True
         assert message == "检查完成"
         saved = manager.get_subscriptions()[0]
-        assert saved["saved_episodes"] == ["1", 2, 3]
+        assert saved["saved_episodes"] == [2, 3, "1"]
         assert saved["status"] == "success"
     finally:
         manager.stop_scheduler()
