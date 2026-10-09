@@ -200,8 +200,26 @@ class TaskManager:
                 return active
             items.append(task)
             self._save(items)
-        self.executor.submit(self._run_transfer, task["id"], runner)
-        return task
+        return self._submit_transfer(task["id"], runner)
+
+    def _submit_transfer(self, task_id, runner):
+        """Submit a persisted task and record a safe failure if the executor rejects it."""
+        try:
+            self.executor.submit(self._run_transfer, task_id, runner)
+        except Exception:
+            self.logger.exception("提交转存任务 %s 到后台执行器失败", task_id)
+            self._update(
+                task_id,
+                status="failed",
+                phase="failed",
+                phase_label="提交失败",
+                progress=0,
+                recovery_uncertain=False,
+                message="任务未能提交到后台执行器，尚未开始转存，可以安全重试",
+                failed_count=1,
+                finished_at=time.time(),
+            )
+        return self.get_task(task_id) or {}
 
     def _update(self, task_id, **changes):
         with self.lock:
@@ -331,8 +349,7 @@ class TaskManager:
             self._append_event(new, "info", "已创建重试任务")
             items.append(new)
             self._save(items)
-        self.executor.submit(self._run_transfer, new["id"], runner)
-        return new
+        return self._submit_transfer(new["id"], runner)
 
     def delete_task(self, task_id):
         task_id = str(task_id)
