@@ -713,7 +713,7 @@ def check_card_connection(card_id):
     config = saved.get("config", {}) if isinstance(saved, dict) else {}
     try:
         result = card.check(config if isinstance(config, dict) else {})
-    except Exception as exc:
+    except Exception:
         _services()["logger"].exception("卡片 %s 连接检查失败", card_id)
         return _json_error("连接检查失败，请查看服务日志", 502)
     if not isinstance(result, dict):
