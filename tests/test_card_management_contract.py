@@ -54,8 +54,9 @@ def test_generic_resource_card_config_api_sanitizes_secrets_and_saves(tmp_path):
     body = response.get_json()
     assert body["success"] is True
     assert body["config"]["endpoint"] == "https://example.test"
-    assert body["config"]["has_api_token"] is True
-    assert "api_token" not in body["config"]
+    assert body["config"]["api_token"] == ""
+    assert body["has_value"]["api_token"] is True
+    assert "do-not-leak" not in str(body)
 
     response = client.get("/api/cards/configurable-source/config")
     assert response.status_code == 200
