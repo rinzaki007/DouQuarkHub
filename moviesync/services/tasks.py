@@ -310,7 +310,7 @@ class TaskManager:
             target = next((x for x in items if str(x.get("id")) == task_id), None)
             if not target:
                 return False, "任务不存在"
-            if target.get("status") in {"queued", "running"}:
+            if target.get("status") == "running":
                 return False, "执行中的任务不能删除，请等待任务结束"
             items = [x for x in items if str(x.get("id")) != task_id]
             self._save(items)
