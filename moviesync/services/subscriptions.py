@@ -814,8 +814,8 @@ class SubscriptionManager:
                     outcome_uncertain=uncertain,
                 )
             all_keys.extend(group["keys"])
+            # Commit confirmed success and clear pending state in one write.
             self._record_success_keys(sub, group["keys"])
-            self._set_pending_save_keys(sub, [])
             total += len(group["files"])
 
         if resolution_errors:
@@ -924,6 +924,11 @@ class SubscriptionManager:
             seen_saved = {str(key) for key in saved}
             saved.extend(key for key in keys if key not in seen_saved)
             current["saved_episodes"] = sorted(saved, key=lambda value: (isinstance(value, str), str(value)))
+            # The remote transfer is confirmed: persist its success checkpoint
+            # and clear its pending marker atomically to avoid false uncertainty
+            # if the process exits between two separate writes.
+            current["pending_save_keys"] = []
+            current["pending_save_uncertain"] = False
             self.store.write(subscriptions)
 
     def _finish(
