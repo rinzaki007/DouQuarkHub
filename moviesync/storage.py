@@ -15,6 +15,10 @@ from pathlib import Path
 from typing import Any
 
 
+class JsonStoreReadError(OSError):
+    """Raised when an existing JSON store cannot be read safely."""
+
+
 class JsonStore:
     def __init__(self, path: Path, default_factory: Callable[[], Any]):
         self.path = Path(path)
@@ -32,8 +36,10 @@ class JsonStore:
             except json.JSONDecodeError:
                 self._quarantine_corrupt_file()
                 return self.default_factory()
-            except OSError:
-                return self.default_factory()
+            except OSError as exc:
+                raise JsonStoreReadError(
+                    f"无法读取 JSON 数据文件 {self.path}: {exc}"
+                ) from exc
 
     def _quarantine_corrupt_file(self) -> None:
         """保留损坏数据副本，避免后续写入把现场直接覆盖。"""
