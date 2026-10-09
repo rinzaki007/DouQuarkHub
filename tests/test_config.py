@@ -180,3 +180,116 @@ def test_full_config_save_preserves_telegram_magic_regex(tmp_path):
     config = store.get_telegram_config()
     assert config["channels"] == channels
     assert config["magic_regex"] == magic_regex
+
+def test_generic_card_config_persists_after_store_recreation(tmp_path):
+    config_file = tmp_path / "config.json"
+    store = ConfigStore(config_file, tmp_path / "legacy")
+
+    store.save_card_config(
+        "third-party.storage",
+        {"endpoint": "https://storage.example", "cookie": "private-cookie"},
+        enabled=False,
+    )
+
+    reopened = ConfigStore(config_file, tmp_path / "legacy")
+    saved = reopened.load()["cards"]["third-party.storage"]
+
+    assert saved["enabled"] is False
+    assert saved["config"]["endpoint"] == "https://storage.example"
+    assert saved["config"]["cookie"] == "private-cookie"
+
+
+def test_public_config_redacts_secrets_from_all_cards(tmp_path):
+    store = ConfigStore(tmp_path / "config.json", tmp_path / "legacy")
+    store.save_card_config(
+        "third-party.storage",
+        {
+            "cookie": "private-cookie",
+            "endpoint": "https://storage.example",
+            "auth": {"refresh_token": "private-token", "region": "us-east"},
+        },
+    )
+
+    public = store.public()
+    public_config = public["cards"]["third-party.storage"]["config"]
+
+    assert public_config["cookie"] == ""
+    assert public_config["has_cookie"] is True
+    assert public_config["endpoint"] == "https://storage.example"
+    assert public_config["auth"]["refresh_token"] == ""
+    assert public_config["auth"]["has_refresh_token"] is True
+    assert public_config["auth"]["region"] == "us-east"
+
+    # Public responses are sanitized copies; persisted credentials remain intact.
+    stored_config = store.load()["cards"]["third-party.storage"]["config"]
+    assert stored_config["cookie"] == "private-cookie"
+    assert stored_config["auth"]["refresh_token"] == "private-token"
+
+
+def test_default_storage_target_persists_after_store_recreation(tmp_path):
+    config_file = tmp_path / "config.json"
+    store = ConfigStore(config_file, tmp_path / "legacy")
+    store.set_default_storage_target_id("quark")
+
+    reopened = ConfigStore(config_file, tmp_path / "legacy")
+
+    assert reopened.get_default_storage_target_id() == "quark"
+
+
+def test_config_backup_restores_third_party_card_settings_and_secrets(tmp_path):
+    backup_dir = tmp_path / "backup"
+    restore_dir = tmp_path / "restore"
+    backup = ConfigStore(backup_dir / "config.json", backup_dir / "legacy")
+    backup.save_card_config(
+        "third-party.storage",
+        {
+            "endpoint": "https://storage.example",
+            "cookie": "backup-cookie",
+            "auth": {"refresh_token": "backup-token", "region": "us-east"},
+        },
+        enabled=False,
+    )
+
+    exported = backup.load()
+    restored = ConfigStore(restore_dir / "config.json", restore_dir / "legacy")
+    restored.save(exported)
+
+    card = restored.load()["cards"]["third-party.storage"]
+    assert card["enabled"] is False
+    assert card["config"]["endpoint"] == "https://storage.example"
+    assert card["config"]["cookie"] == "backup-cookie"
+    assert card["config"]["auth"] == {
+        "refresh_token": "backup-token",
+        "region": "us-east",
+    }
+
+
+def test_redacted_config_import_does_not_clear_existing_third_party_secrets(tmp_path):
+    store = ConfigStore(tmp_path / "config.json", tmp_path / "legacy")
+    store.save_card_config(
+        "third-party.storage",
+        {
+            "endpoint": "https://old.example",
+            "cookie": "keep-this-cookie",
+            "auth": {"refresh_token": "keep-this-token", "region": "us-east"},
+        },
+    )
+
+    store.save({
+        "cards": {
+            "third-party.storage": {
+                "enabled": True,
+                "config": {
+                    "endpoint": "https://new.example",
+                    "cookie": "",
+                    "auth": {"refresh_token": "", "region": "eu-west"},
+                },
+            },
+        },
+    })
+
+    card = store.load()["cards"]["third-party.storage"]
+    assert card["config"]["endpoint"] == "https://new.example"
+    assert card["config"]["cookie"] == "keep-this-cookie"
+    assert card["config"]["auth"] == {"refresh_token": "keep-this-token", "region": "eu-west"}
+

@@ -577,12 +577,16 @@ def cards():
             fields = card.manifest.config_fields
             required_fields = [field for field in fields if field.get("required")]
             configured = all(
-                card_config.get(str(field.get("key")), field.get("default")) not in (None, "", {}, [])
+                _has_config_value(
+                    card_config.get(str(field.get("key")), field.get("default"))
+                )
                 for field in required_fields
             )
             if not required_fields and fields:
                 configured = any(
-                    card_config.get(str(field.get("key")), field.get("default")) not in (None, "", {}, [])
+                    _has_config_value(
+                        card_config.get(str(field.get("key")), field.get("default"))
+                    )
                     for field in fields
                 )
             item["configured"] = configured
@@ -598,6 +602,17 @@ def cards():
             "dynamic_install_enabled": False,
         }
     )
+
+
+def _has_config_value(value):
+    """判断配置是否实际填写；字符串只含空白时视为未配置。"""
+    if value is None:
+        return False
+    if isinstance(value, str):
+        return bool(value.strip())
+    if isinstance(value, (dict, list)):
+        return bool(value)
+    return True
 
 
 def _card_config_view(card, raw_config):
@@ -657,7 +672,10 @@ def resource_card_config(card_id):
         field = fields_by_key[key]
         field_type = field.get("type", "string")
         secret = bool(field.get("secret")) or any(marker in key.lower() for marker in sensitive_markers)
-        if secret and value in (None, ""):
+        # 密钥字段提交空字符串、null 或纯空白时表示“未修改”，不能覆盖已保存凭据。
+        if secret and (
+            value is None or (isinstance(value, str) and not value.strip())
+        ):
             continue
         if field_type == "json" and not isinstance(value, (dict, list)):
             return _json_error(f"配置字段「{field.get('label') or key}」必须是 JSON 对象或数组")
@@ -672,7 +690,9 @@ def resource_card_config(card_id):
 
     for key, field in fields_by_key.items():
         secret = bool(field.get("secret")) or any(marker in key.lower() for marker in sensitive_markers)
-        if field.get("required") and not merged.get(key) and not (secret and raw_config.get(key)):
+        has_value = _has_config_value(merged.get(key))
+        has_saved_secret = secret and _has_config_value(raw_config.get(key))
+        if field.get("required") and not has_value and not has_saved_secret:
             return _json_error(f"请填写必填配置：{field.get('label') or key}")
     enabled = data.get("enabled") if "enabled" in data else None
     if enabled is not None and not isinstance(enabled, bool):

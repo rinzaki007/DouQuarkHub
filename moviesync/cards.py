@@ -13,6 +13,7 @@ from copy import deepcopy
 from dataclasses import dataclass
 from threading import RLock
 from typing import Any
+from urllib.parse import urlparse
 
 from .clients.quark import QuarkClient, sanitize_pwd_id
 from .config_store import ConfigStore, ConfigValidationError
@@ -52,9 +53,37 @@ class CardManifest:
         if any(not key for key in keys) or len(keys) != len(set(keys)):
             raise ValueError("卡片配置字段必须具有唯一且非空的 key")
         allowed_field_types = {"string", "password", "textarea", "boolean", "number", "json"}
+        text_field_types = {"string", "password", "textarea"}
         for field in self.config_fields:
-            if field.get("type", "string") not in allowed_field_types:
-                raise ValueError(f"不支持的配置字段类型: {field.get('type')}")
+            field_type = field.get("type", "string")
+            if field_type not in allowed_field_types:
+                raise ValueError(f"不支持的配置字段类型: {field_type}")
+
+            for bound in ("min_length", "max_length"):
+                value = field.get(bound)
+                if value is not None and (
+                    isinstance(value, bool) or not isinstance(value, int) or value < 0
+                ):
+                    raise ValueError(f"配置字段「{field.get('label') or field.get('key')}」的 {bound} 必须是非负整数")
+
+            min_length = field.get("min_length")
+            max_length = field.get("max_length")
+            if min_length is not None and max_length is not None and min_length > max_length:
+                raise ValueError(f"配置字段「{field.get('label') or field.get('key')}」的最小长度不能大于最大长度")
+
+            pattern = field.get("pattern")
+            if pattern is not None:
+                if field_type not in text_field_types or not isinstance(pattern, str):
+                    raise ValueError("pattern 只能用于文本字段，且必须是字符串")
+                try:
+                    re.compile(pattern)
+                except re.error as exc:
+                    raise ValueError(f"配置字段「{field.get('label') or field.get('key')}」的正则规则无效") from exc
+
+            value_format = field.get("format")
+            if value_format is not None:
+                if field_type not in text_field_types or value_format not in {"url", "email"}:
+                    raise ValueError(f"配置字段「{field.get('label') or field.get('key')}」的格式规则无效")
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -89,10 +118,69 @@ class Card:
         }
 
     def validate_config(self, config: dict[str, Any]) -> dict[str, Any]:
-        """校验并返回规范化后的完整配置；具体卡片可覆盖业务规则。"""
+        """校验并返回规范化后的完整配置；具体卡片可覆盖业务规则。
+
+        Manifest 可为文本字段声明 min_length、max_length、pattern 或 format
+        （目前支持 url、email），供通用卡片配置接口执行一致的基础校验。
+        """
         if not isinstance(config, dict):
             raise ConfigValidationError("卡片配置必须是 JSON 对象")
-        return deepcopy(config)
+
+        normalized = deepcopy(config)
+        for field in self.manifest.config_fields:
+            key = str(field.get("key") or "")
+            if key not in normalized or normalized[key] is None:
+                continue
+
+            field_type = field.get("type", "string")
+            value = normalized[key]
+            label = str(field.get("label") or key)
+
+            if field_type in {"string", "password", "textarea"}:
+                if not isinstance(value, str):
+                    raise ConfigValidationError(f"配置字段「{label}」必须是文本")
+                min_length = field.get("min_length")
+                max_length = field.get("max_length")
+                if min_length is not None and len(value) < min_length:
+                    raise ConfigValidationError(
+                        f"配置字段「{label}」长度不能少于 {min_length} 个字符"
+                    )
+                if max_length is not None and len(value) > max_length:
+                    raise ConfigValidationError(
+                        f"配置字段「{label}」长度不能超过 {max_length} 个字符"
+                    )
+
+                pattern = field.get("pattern")
+                if pattern:
+                    try:
+                        matches = re.fullmatch(str(pattern), value) is not None
+                    except re.error as exc:
+                        raise ConfigValidationError(
+                            f"配置字段「{label}」的格式规则无效"
+                        ) from exc
+                    if not matches:
+                        raise ConfigValidationError(
+                            f"配置字段「{label}」格式不正确"
+                        )
+
+                value_format = field.get("format")
+                if value_format == "url":
+                    parsed = urlparse(value)
+                    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+                        raise ConfigValidationError(
+                            f"配置字段「{label}」必须是有效的 HTTP 或 HTTPS 地址"
+                        )
+                elif value_format == "email":
+                    if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", value):
+                        raise ConfigValidationError(
+                            f"配置字段「{label}」必须是有效的邮箱地址"
+                        )
+                elif value_format:
+                    raise ConfigValidationError(
+                        f"配置字段「{label}」使用了不支持的格式规则: {value_format}"
+                    )
+
+        return normalized
 
     def close(self) -> None:
         """应用退出时释放卡片资源。默认无需处理。"""

@@ -364,3 +364,71 @@ def test_card_listing_does_not_call_plugin_health_check_and_hides_exception_deta
     assert "secret-token-value" not in response.get_data(as_text=True)
     assert "请查看服务日志" in response.get_json()["message"]
     assert len(calls) == 1
+
+
+
+def test_generic_card_config_preserves_secrets_on_whitespace_and_rejects_blank_required_fields(tmp_path):
+    from moviesync.app import create_app
+    from moviesync.cards import CardManifest, ResourceSourceCard
+
+    app = create_app({"MOVIESYNC_DATA_DIR": str(tmp_path)}, start_scheduler=False)
+    services = app.extensions["moviesync"]
+
+    class CredentialCard(ResourceSourceCard):
+        manifest = CardManifest(
+            id="credential-source",
+            name="Credential Source",
+            type="resource_source",
+            capabilities=("resource.search", "resource.health_check"),
+            config_fields=(
+                {"key": "api_token", "label": "API Token", "type": "password",
+                 "secret": True, "required": True},
+                {"key": "endpoint", "label": "Endpoint", "type": "string",
+                 "required": True},
+            ),
+        )
+
+        def search(self, movie, config):
+            return []
+
+        def check(self, config):
+            return {"status": "healthy"}
+
+    services["resource_sources"].register(CredentialCard())
+    client = app.test_client()
+    client.post("/api/setup", json={"username": "admin", "password": "password123"})
+    with client.session_transaction() as session:
+        csrf = session["csrf_token"]
+    headers = {"X-CSRF-Token": csrf}
+    endpoint = "/api/cards/credential-source/config"
+
+    response = client.post(
+        endpoint,
+        json={"config": {"api_token": "keep-this-secret", "endpoint": "https://example.com"}},
+        headers=headers,
+    )
+    assert response.status_code == 200
+
+    # Blank/whitespace secret input means unchanged, not erase or overwrite.
+    response = client.post(
+        endpoint,
+        json={"config": {"api_token": "  \t  ", "endpoint": "https://example.org"}},
+        headers=headers,
+    )
+    assert response.status_code == 200
+    saved = services["config"].load()["cards"]["credential-source"]["config"]
+    assert saved == {
+        "api_token": "keep-this-secret",
+        "endpoint": "https://example.org",
+    }
+    assert "keep-this-secret" not in response.get_data(as_text=True)
+
+    # A required non-secret field containing only whitespace must be rejected.
+    response = client.post(
+        endpoint,
+        json={"config": {"endpoint": "   "}},
+        headers=headers,
+    )
+    assert response.status_code == 400
+    assert "必填配置" in response.get_json()["message"]
+    assert services["config"].load()["cards"]["credential-source"]["config"] == saved

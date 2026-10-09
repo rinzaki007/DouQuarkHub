@@ -65,6 +65,11 @@ class StorageTargetManager:
         return cards
 
     def _unavailable_message(self, target_id: str | None = None) -> str:
+        is_default_target = not target_id
+        if is_default_target:
+            getter = getattr(self.config_store, "get_default_storage_target_id", None)
+            target_id = str(getter() or "").strip() if callable(getter) else ""
+
         if target_id:
             card = self.registry.get(str(target_id))
             if isinstance(card, StorageTargetCard):
@@ -73,6 +78,16 @@ class StorageTargetManager:
                 saved = card_configs.get(card.card_id) if isinstance(card_configs, dict) else {}
                 if isinstance(saved, dict) and not saved.get("enabled", True):
                     return f"存储目标卡片「{card.manifest.name}」已停用，请重新启用后重试"
+            else:
+                if is_default_target:
+                    return (
+                        f"默认存储目标卡片「{target_id}」不存在或未加载，"
+                        "请检查插件安装状态或重新选择默认存储目标"
+                    )
+                return (
+                    f"存储目标卡片「{target_id}」不存在或未加载，"
+                    "请检查插件安装状态或重新选择存储目标"
+                )
         return "未找到可用的存储目标卡片"
 
     def get(self, target_id: str | None = None) -> StorageTargetCard | None:
@@ -87,15 +102,21 @@ class StorageTargetManager:
                 return None
             return card
         getter = getattr(self.config_store, "get_default_storage_target_id", None)
-        default_id = getter() if callable(getter) else ""
+        default_id = str(getter() or "").strip() if callable(getter) else ""
         if default_id:
             card = self.registry.get(default_id)
-            if isinstance(card, StorageTargetCard):
-                config = self.config_store.load()
-                card_configs = config.get("cards") if isinstance(config, dict) else {}
-                saved = card_configs.get(card.card_id) if isinstance(card_configs, dict) else {}
-                if not isinstance(saved, dict) or saved.get("enabled", True):
-                    return card
+            if not isinstance(card, StorageTargetCard):
+                # Do not silently send files to another destination when the
+                # configured default plugin is missing or has been removed.
+                return None
+            config = self.config_store.load()
+            card_configs = config.get("cards") if isinstance(config, dict) else {}
+            saved = card_configs.get(card.card_id) if isinstance(card_configs, dict) else {}
+            if isinstance(saved, dict) and not saved.get("enabled", True):
+                # An explicitly selected default that was disabled should fail
+                # safely rather than silently falling back to another cloud.
+                return None
+            return card
         cards = self._enabled_cards()
         return cards[0] if cards else None
 

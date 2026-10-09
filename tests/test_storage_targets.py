@@ -3,6 +3,9 @@ from moviesync.services.storage_targets import StorageTargetManager
 
 
 class FakeStore:
+    def __init__(self, default_target_id=""):
+        self.default_target_id = default_target_id
+
     def load(self):
         return {
             "cards": {
@@ -10,6 +13,9 @@ class FakeStore:
                 "disabled-storage": {"enabled": False, "config": {}},
             }
         }
+
+    def get_default_storage_target_id(self):
+        return self.default_target_id
 
 
 class FakeLogger:
@@ -166,3 +172,50 @@ def test_storage_target_manager_isolates_invalid_plugin(monkeypatch):
 
     assert manager.load_plugins() == []
     assert registry.list() == []
+
+
+
+def test_configured_default_storage_target_is_used():
+    registry = CardRegistry()
+    registry.register(DemoStorage())
+    registry.register(DisabledStorage())
+    manager = StorageTargetManager(
+        registry, FakeStore(default_target_id="demo-storage"), FakeLogger()
+    )
+
+    assert manager.get().card_id == "demo-storage"
+
+
+def test_disabled_default_storage_target_does_not_silently_fallback():
+    registry = CardRegistry()
+    registry.register(DemoStorage())
+    registry.register(DisabledStorage())
+    manager = StorageTargetManager(
+        registry, FakeStore(default_target_id="disabled-storage"), FakeLogger()
+    )
+
+    assert manager.get() is None
+    result = manager.resolve_resource({"pwd_id": "abc"})
+    assert result["error"] == "存储目标卡片「Disabled Storage」已停用，请重新启用后重试"
+
+
+def test_missing_default_storage_target_does_not_silently_fallback():
+    registry = CardRegistry()
+    registry.register(DemoStorage())
+    manager = StorageTargetManager(
+        registry, FakeStore(default_target_id="removed-plugin"), FakeLogger()
+    )
+
+    assert manager.get() is None
+    result = manager.resolve_resource({"pwd_id": "abc"})
+    assert "removed-plugin" in result["error"]
+    assert "重新选择默认存储目标" in result["error"]
+
+
+def test_no_default_storage_target_uses_first_enabled_card():
+    registry = CardRegistry()
+    registry.register(DemoStorage())
+    registry.register(DisabledStorage())
+    manager = StorageTargetManager(registry, FakeStore(), FakeLogger())
+
+    assert manager.get().card_id == "demo-storage"
