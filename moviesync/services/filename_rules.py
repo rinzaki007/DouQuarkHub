@@ -52,8 +52,8 @@ def parse_tv_episode(
 
     def parse_normalized(value: str) -> tuple[int | None, int | None]:
         # Only treat an all-numeric filename stem as an episode; this avoids mistaking years/resolutions for episode numbers.
-        numeric_stem = PurePosixPath(value.replace("\\\\", "/")).stem.strip()
-        if re.fullmatch(r"\\d{1,4}", numeric_stem):
+        numeric_stem = PurePosixPath(value.replace("\\", "/")).stem.strip()
+        if re.fullmatch(r"\d{1,4}", numeric_stem):
             episode = int(numeric_stem)
             if _valid_episode(episode):
                 return None, episode
