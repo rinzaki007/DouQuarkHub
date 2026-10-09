@@ -718,3 +718,40 @@ def test_subscription_transfer_exception_with_pending_keys_requires_confirmation
         assert storage.calls == 1
     finally:
         manager.stop_scheduler()
+
+
+def test_channel_subscription_deduplicates_repeated_file_ids_before_transfer(tmp_path):
+    storage = ChannelStorageTargets()
+    storage.shares = {
+        "share-selected": [
+            {"fid": "ep1", "file_name": "Show.S01E01.mkv"},
+            {"fid": "ep1", "file_name": "Show.S01E01.mkv"},
+            {"fid": "ep2", "file_name": "Show.S01E02.mkv"},
+        ],
+    }
+    sources = FakeResourceSources()
+    sources.shares = [{"channel": "demo", "pwd_id": "share-selected"}]
+    manager = SubscriptionManager(
+        tmp_path / "duplicate-file-ids.json",
+        storage,
+        sources,
+        FakeLogger(),
+    )
+    sub = manager.add_subscription(
+        title="Show",
+        pwd_id="share-selected",
+        target_fid="0",
+        storage_target_id="demo-storage",
+        source_id="telegram",
+        channel="demo",
+        files=[{"fid": "ep1", "file_name": "Show.S01E01.mkv"}],
+    )
+
+    ok, message = manager.check_subscription_now(sub["id"])
+
+    assert ok is True
+    assert "成功追更 2 项" in message
+    assert storage.transfers == [("share-selected", ["ep1", "ep2"])]
+    saved = manager.get_subscriptions()[0]
+    assert saved["saved_episodes"].count("share-selected:ep1") == 1
+    manager.stop_scheduler()
