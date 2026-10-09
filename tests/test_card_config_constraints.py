@@ -64,7 +64,10 @@ def test_card_manifest_text_constraints_reject_invalid_config_without_writing(tm
 
     invalid_values = [
         ({"endpoint": "ftp://example.com", "slug": "movie-source", "email": "admin@example.com"}, "HTTP 或 HTTPS"),
-        ({"endpoint": "https://example.com/a-very-long-path", "slug": "movie-source", "email": "admin@example.com"}, "不能超过 24"),
+        (
+            {"endpoint": "https://example.com/a-very-long-path", "slug": "movie-source", "email": "admin@example.com"},
+            "不能超过 24",
+        ),
         ({"endpoint": "https://example.com", "slug": "Movie_Source", "email": "admin@example.com"}, "格式不正确"),
         ({"endpoint": "https://example.com", "slug": "ab", "email": "admin@example.com"}, "不能少于 3"),
         ({"endpoint": "https://example.com", "slug": "movie-source", "email": "not-an-email"}, "有效的邮箱地址"),
