@@ -203,6 +203,17 @@ class SubscriptionManager:
                     and not isinstance(key, bool)
                     and str(key).strip()
                 ][:200]
+                # A non-empty raw list that normalizes to no usable keys is
+                # corrupt. If the remote outcome was uncertain, do not let
+                # normalization erase the only evidence that retry is unsafe.
+                if (
+                    item.get("pending_save_uncertain")
+                    and raw_pending_keys
+                    and not item["pending_save_keys"]
+                    and not item.get("pending_save_keys_invalid")
+                ):
+                    item["pending_save_keys_invalid"] = True
+                    changed = True
                 if item.get("pending_save_keys_invalid") and item["pending_save_keys"]:
                     # Keep the fail-closed marker until an operator supplies
                     # a repaired, non-empty list of pending keys.
