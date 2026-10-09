@@ -339,7 +339,7 @@ class ResourceSourceManager:
                     )
                     result = {
                         "id": source_id,
-                        "name": source.name,
+                        "name": self._source_name(source),
                         "type": self._source_type(source),
                         "enabled": True,
                         "status": "unavailable",
