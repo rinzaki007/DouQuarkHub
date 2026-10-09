@@ -180,3 +180,58 @@ def test_full_config_save_preserves_telegram_magic_regex(tmp_path):
     config = store.get_telegram_config()
     assert config["channels"] == channels
     assert config["magic_regex"] == magic_regex
+
+def test_generic_card_config_persists_after_store_recreation(tmp_path):
+    config_file = tmp_path / "config.json"
+    store = ConfigStore(config_file, tmp_path / "legacy")
+
+    store.save_card_config(
+        "third-party.storage",
+        {"endpoint": "https://storage.example", "cookie": "private-cookie"},
+        enabled=False,
+    )
+
+    reopened = ConfigStore(config_file, tmp_path / "legacy")
+    saved = reopened.load()["cards"]["third-party.storage"]
+
+    assert saved["enabled"] is False
+    assert saved["config"]["endpoint"] == "https://storage.example"
+    assert saved["config"]["cookie"] == "private-cookie"
+
+
+def test_public_config_redacts_secrets_from_all_cards(tmp_path):
+    store = ConfigStore(tmp_path / "config.json", tmp_path / "legacy")
+    store.save_card_config(
+        "third-party.storage",
+        {
+            "cookie": "private-cookie",
+            "endpoint": "https://storage.example",
+            "auth": {"refresh_token": "private-token", "region": "us-east"},
+        },
+    )
+
+    public = store.public()
+    public_config = public["cards"]["third-party.storage"]["config"]
+
+    assert public_config["cookie"] == ""
+    assert public_config["has_cookie"] is True
+    assert public_config["endpoint"] == "https://storage.example"
+    assert public_config["auth"]["refresh_token"] == ""
+    assert public_config["auth"]["has_refresh_token"] is True
+    assert public_config["auth"]["region"] == "us-east"
+
+    # Public responses are sanitized copies; persisted credentials remain intact.
+    stored_config = store.load()["cards"]["third-party.storage"]["config"]
+    assert stored_config["cookie"] == "private-cookie"
+    assert stored_config["auth"]["refresh_token"] == "private-token"
+
+
+def test_default_storage_target_persists_after_store_recreation(tmp_path):
+    config_file = tmp_path / "config.json"
+    store = ConfigStore(config_file, tmp_path / "legacy")
+    store.set_default_storage_target_id("quark")
+
+    reopened = ConfigStore(config_file, tmp_path / "legacy")
+
+    assert reopened.get_default_storage_target_id() == "quark"
+
