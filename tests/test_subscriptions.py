@@ -665,3 +665,56 @@ def test_subscription_worker_does_not_expose_exception_details(tmp_path, monkeyp
         assert all("SECRET_COOKIE_VALUE" not in event["message"] for event in current["run_history"])
     finally:
         manager.stop_scheduler()
+
+
+
+def test_subscription_transfer_exception_with_pending_keys_requires_confirmation(tmp_path):
+    class RaisesDuringTransfer(ChannelStorageTargets):
+        def __init__(self):
+            super().__init__()
+            self.calls = 0
+
+        def transfer(self, resource, files, target_id="0", storage_target_id=None, token=None):
+            self.calls += 1
+            raise RuntimeError("upstream worker failed unexpectedly")
+
+    storage = RaisesDuringTransfer()
+    storage.shares = {
+        "share-selected": [
+            {"fid": "ep1", "file_name": "Show.S01E01.mkv"},
+        ],
+    }
+    sources = FakeResourceSources()
+    sources.shares = [{"channel": "demo", "pwd_id": "share-selected"}]
+    manager = SubscriptionManager(
+        tmp_path / "transfer-exception-pending.json",
+        storage,
+        sources,
+        FakeLogger(),
+    )
+    sub = manager.add_subscription(
+        title="Show",
+        pwd_id="share-selected",
+        target_fid="0",
+        storage_target_id="demo-storage",
+        source_id="telegram",
+        channel="demo",
+        files=[{"fid": "ep1", "file_name": "Show.S01E01.mkv"}],
+    )
+
+    try:
+        ok, message = manager.check_subscription_now(sub["id"])
+        assert ok is False
+        assert "转存结果不确定" in message
+
+        saved = manager.get_subscriptions()[0]
+        assert saved["status"] == "failed"
+        assert saved["pending_save_uncertain"] is True
+        assert saved["pending_save_keys"] == ["share-selected:ep1"]
+
+        ok, message = manager.check_subscription_now(sub["id"])
+        assert ok is False
+        assert "待核实" in message
+        assert storage.calls == 1
+    finally:
+        manager.stop_scheduler()

@@ -465,7 +465,14 @@ class SubscriptionManager:
                 "订阅任务 %s 执行异常",
                 sub_id,
             )
-            uncertain = is_uncertain_transfer_message(exc)
+            # Pending keys are persisted before remote transfer calls, so an
+            # exception while keys remain pending has an ambiguous remote outcome.
+            current = next(
+                (item for item in self.get_subscriptions() if item.get("id") == sub_id),
+                {},
+            )
+            has_pending_transfer = bool(current.get("pending_save_keys"))
+            uncertain = has_pending_transfer or is_uncertain_transfer_message(exc)
             safe_message = (
                 "转存结果不确定，请检查目标网盘后再决定是否重试"
                 if uncertain
