@@ -417,11 +417,22 @@ def test_channel_subscription_checkpoints_successful_share_before_later_share_fa
             return super().transfer(resource, files, target_id, storage_target_id, token)
 
     storage = FailsOnceOnSecondShare()
-    storage.shares = {"share1": [{"fid": "ep1", "file_name": "Show.S01E01.mkv"}], "share2": [{"fid": "ep2", "file_name": "Show.S01E02.mkv"}]}
+    storage.shares = {
+        "share1": [{"fid": "ep1", "file_name": "Show.S01E01.mkv"}],
+        "share2": [{"fid": "ep2", "file_name": "Show.S01E02.mkv"}],
+    }
     sources = FakeResourceSources()
     sources.shares = [{"channel": "demo", "pwd_id": "share1"}, {"channel": "demo", "pwd_id": "share2"}]
     manager = SubscriptionManager(tmp_path / "partial-success.json", storage, sources, FakeLogger())
-    sub = manager.add_subscription(title="Show", pwd_id="share1", target_fid="0", storage_target_id="demo-storage", source_id="telegram", channel="demo", files=[{"fid": "ep1", "file_name": "Show.S01E01.mkv"}])
+    sub = manager.add_subscription(
+        title="Show",
+        pwd_id="share1",
+        target_fid="0",
+        storage_target_id="demo-storage",
+        source_id="telegram",
+        channel="demo",
+        files=[{"fid": "ep1", "file_name": "Show.S01E01.mkv"}],
+    )
 
     ok, message = manager.check_subscription_now(sub["id"])
     assert ok is False

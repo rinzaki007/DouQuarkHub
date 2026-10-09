@@ -79,7 +79,11 @@ def test_duplicate_transfer_submission_reuses_active_task(tmp_path):
     started = Event()
     release = Event()
     calls = []
-    payload = {"movie": {"title": "同一部电影"}, "candidate": {"pwd_id": "share-1", "files": [{"fid": "file-1"}]}, "target_fid": "target-1"}
+    payload = {
+        "movie": {"title": "同一部电影"},
+        "candidate": {"pwd_id": "share-1", "files": [{"fid": "file-1"}]},
+        "target_fid": "target-1",
+    }
 
     def runner(progress):
         calls.append(1)
@@ -106,7 +110,14 @@ def test_duplicate_retry_reuses_existing_active_retry(tmp_path):
     started = Event()
     release = Event()
     payload = {"movie": {"title": "重试电影"}, "candidate": {"pwd_id": "share-2", "files": []}}
-    manager.store.write([{"id": "failed-task", "type": "transfer", "status": "failed", "title": "重试电影", "events": [], "retry_payload": payload}])
+    manager.store.write([{
+        "id": "failed-task",
+        "type": "transfer",
+        "status": "failed",
+        "title": "重试电影",
+        "events": [],
+        "retry_payload": payload,
+    }])
 
     def runner(progress):
         started.set()

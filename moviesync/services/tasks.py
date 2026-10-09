@@ -130,7 +130,12 @@ class TaskManager:
         self._append_event(task, "info", "任务已创建")
         with self.lock:
             items = self.list_tasks()
-            active = next((item for item in items if item.get("type") == "transfer" and item.get("status") in {"queued", "running"} and item.get("dedupe_key") == task["dedupe_key"]), None)
+            active = next((
+                item for item in items
+                if item.get("type") == "transfer"
+                and item.get("status") in {"queued", "running"}
+                and item.get("dedupe_key") == task["dedupe_key"]
+            ), None)
             if active:
                 return active
             items.append(task)
@@ -221,7 +226,12 @@ class TaskManager:
                 return None
             payload = old.get("retry_payload") or {}
             dedupe_key = old.get("dedupe_key") or self._payload_key(payload)
-            active = next((item for item in items if item.get("type") == "transfer" and item.get("status") in {"queued", "running"} and item.get("dedupe_key") == dedupe_key), None)
+            active = next((
+                item for item in items
+                if item.get("type") == "transfer"
+                and item.get("status") in {"queued", "running"}
+                and item.get("dedupe_key") == dedupe_key
+            ), None)
             if active:
                 return active
             new = dict(old)
