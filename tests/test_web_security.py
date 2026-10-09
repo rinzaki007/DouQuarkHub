@@ -79,3 +79,31 @@ def test_setup_is_closed_after_initialization(tmp_path):
     )
     assert response.status_code == 302
     assert response.headers["Location"] == "/login"
+
+
+
+def test_get_movies_does_not_expose_upstream_exception(tmp_path, monkeypatch):
+    app = make_app(tmp_path)
+    client = app.test_client()
+    client.post(
+        "/api/setup",
+        json={"username": "admin", "password": "password123"},
+    )
+
+    def fail_with_sensitive_details(*_args, **_kwargs):
+        raise RuntimeError("upstream failed with cookie=SECRET_COOKIE_VALUE")
+
+    monkeypatch.setattr(
+        app.extensions["moviesync"]["metadata"],
+        "list_movies",
+        fail_with_sensitive_details,
+    )
+
+    response = client.get("/api/get-movies")
+    body = response.get_json()
+
+    assert response.status_code == 200
+    assert body["success"] is False
+    assert body["movies"] == []
+    assert body["message"] == "获取影片数据失败，请稍后重试"
+    assert "SECRET_COOKIE_VALUE" not in response.get_data(as_text=True)
