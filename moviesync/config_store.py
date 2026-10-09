@@ -408,7 +408,42 @@ class ConfigStore:
         self.store.write(current)
         return deepcopy(card)
 
+    @classmethod
+    def _sanitize_public_value(cls, value):
+        """递归隐藏卡片配置中的敏感值，同时保留是否已配置的信息。"""
+        sensitive_markers = (
+            "cookie",
+            "token",
+            "secret",
+            "password",
+            "api_key",
+            "authorization",
+            "credential",
+            "private_key",
+        )
+
+        if isinstance(value, dict):
+            result = {}
+            for key, item in value.items():
+                key_text = str(key)
+                lowered = key_text.lower()
+                # has_* 是给管理界面使用的布尔状态，不是凭据本身。
+                if lowered.startswith("has_"):
+                    result[key] = deepcopy(item)
+                elif any(marker in lowered for marker in sensitive_markers):
+                    result[key] = ""
+                    result[f"has_{key_text}"] = bool(item)
+                else:
+                    result[key] = cls._sanitize_public_value(item)
+            return result
+
+        if isinstance(value, list):
+            return [cls._sanitize_public_value(item) for item in value]
+
+        return deepcopy(value)
+
     def public(self) -> dict:
+        """返回可公开给后台界面的配置，所有卡片的敏感字段均脱敏。"""
         config = self.load()
 
         quark = config["cards"]["quark"]
@@ -418,7 +453,7 @@ class ConfigStore:
             "cookie": "",
             "has_cookie": bool(quark_config.get("cookie")),
         }
-        return config
+        return self._sanitize_public_value(config)
 
     def save(self, incoming: dict) -> dict:
         if not isinstance(incoming, dict):
