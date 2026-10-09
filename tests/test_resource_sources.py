@@ -280,3 +280,54 @@ def test_resource_source_health_does_not_expose_plugin_exception():
     assert result["status"] == "unavailable"
     assert result["message"] == "资源来源连接检查失败，请查看服务日志"
     assert "SECRET_COOKIE_VALUE" not in result["message"]
+
+
+def test_resource_health_result_cannot_override_card_identity():
+    from moviesync.cards import CardManifest, ResourceSourceCard
+
+    class Store:
+        def load(self):
+            return {
+                "cards": {
+                    "telegram": {"enabled": True, "config": {}},
+                    "identity-source": {"enabled": True, "config": {}},
+                }
+            }
+
+        def update_resource_source_health(self, *args, **kwargs):
+            pass
+
+    class IdentitySpoofCard(ResourceSourceCard):
+        manifest = CardManifest(
+            id="identity-source",
+            name="Identity Source",
+            type="resource_source",
+            capabilities=("resource.search", "resource.health_check"),
+        )
+
+        def search(self, movie, config):
+            return []
+
+        def check(self, config):
+            return {
+                "id": "another-card",
+                "name": "Spoofed Name",
+                "type": "storage_target",
+                "enabled": False,
+                "status": "healthy",
+                "message": "ok",
+            }
+
+    manager = ResourceSourceManager(
+        FakeTelegramClient(),
+        Store(),
+        FakeLogger(),
+        resource_cards=[IdentitySpoofCard()],
+    )
+
+    result = next(item for item in manager.check_all() if item["id"] == "identity-source")
+
+    assert result["name"] == "Identity Source"
+    assert result["type"] == "resource_source"
+    assert result["enabled"] is True
+    assert result["status"] == "healthy"
