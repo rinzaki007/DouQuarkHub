@@ -203,7 +203,7 @@ class SubscriptionManager:
                     and not isinstance(key, bool)
                     and str(key).strip()
                 ][:200]
-                if item.get("pending_save_keys_invalid") and raw_pending_keys:
+                if item.get("pending_save_keys_invalid") and item["pending_save_keys"]:
                     # Keep the fail-closed marker until an operator supplies
                     # a repaired, non-empty list of pending keys.
                     item["pending_save_keys_invalid"] = False
