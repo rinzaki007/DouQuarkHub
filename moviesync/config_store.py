@@ -347,6 +347,19 @@ class ConfigStore:
         config = card["config"]
         if "channels" in incoming:
             config["channels"] = self._normalize_channels(incoming["channels"])
+        if "magic_regex" in incoming:
+            magic_regex = incoming.get("magic_regex")
+            if not isinstance(magic_regex, dict):
+                raise ConfigValidationError("magic_regex 必须是 JSON 对象")
+            pattern = str(magic_regex.get("pattern") or "").strip()
+            replacement = str(magic_regex.get("replace") or "")
+            if len(pattern) > 1000 or len(replacement) > 200:
+                raise ConfigValidationError("文件名正则或替换规则过长")
+            try:
+                re.compile(pattern) if pattern else None
+            except re.error as exc:
+                raise ConfigValidationError(f"文件名正则无效：{exc}") from exc
+            config["magic_regex"] = {"pattern": pattern, "replace": replacement}
         if "enabled" in incoming:
             card["enabled"] = bool(incoming["enabled"])
         current["cards"]["telegram"] = card
