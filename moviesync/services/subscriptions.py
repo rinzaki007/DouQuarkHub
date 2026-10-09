@@ -449,13 +449,15 @@ class SubscriptionManager:
                 sub_id
             )
 
-        self._set_status(
-            subscription,
-            "running",
-            "searching",
-            "正在搜刮频道资源…",
-        )
         try:
+            # Keep the initial status write inside the guarded lifecycle so
+            # running_ids is always cleared, even if persistence fails here.
+            self._set_status(
+                subscription,
+                "running",
+                "searching",
+                "正在搜刮频道资源…",
+            )
             return self._check(
                 subscription
             )
