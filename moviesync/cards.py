@@ -109,6 +109,25 @@ class ResourceSourceCard(Card):
     def check(self, config: dict) -> dict[str, Any]:
         raise NotImplementedError
 
+    def public_config(self, config: dict[str, Any]) -> dict[str, Any]:
+        """返回可给管理界面展示的配置；默认递归隐藏疑似凭据字段。"""
+        sensitive = ("cookie", "token", "secret", "password", "api_key", "authorization", "credential")
+
+        def sanitize(value):
+            if isinstance(value, dict):
+                result = {}
+                for key, item in value.items():
+                    if any(marker in str(key).lower() for marker in sensitive):
+                        result[f"has_{key}"] = bool(item)
+                    else:
+                        result[key] = sanitize(item)
+                return result
+            if isinstance(value, list):
+                return [sanitize(item) for item in value]
+            return value
+
+        return sanitize(config if isinstance(config, dict) else {})
+
     def search_channel(self, channel: object, title: str, config: dict) -> list[dict[str, Any]]:
         """在指定资源源频道中搜索资源；没有频道级能力的卡片返回空列表。"""
         return []

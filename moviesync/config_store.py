@@ -280,6 +280,37 @@ class ConfigStore:
         }
         return defaults
 
+    def save_card_config(
+        self,
+        card_id: str,
+        incoming: dict,
+        *,
+        enabled: bool | None = None,
+    ) -> dict:
+        """保存已注册卡片的通用配置；调用方必须先确认卡片已加载。"""
+        card_id = str(card_id or "").strip()
+        if not re.fullmatch(r"[a-z0-9][a-z0-9._-]{0,63}", card_id):
+            raise ConfigValidationError("卡片 ID 无效")
+        if not isinstance(incoming, dict):
+            raise ConfigValidationError("卡片配置必须是 JSON 对象")
+        current = self.load()
+        cards = current.setdefault("cards", {})
+        saved = cards.get(card_id)
+        saved = saved if isinstance(saved, dict) else {}
+        config = saved.get("config")
+        config = dict(config) if isinstance(config, dict) else {}
+        config.update(deepcopy(incoming))
+        saved["config"] = config
+        if enabled is not None:
+            saved["enabled"] = bool(enabled)
+        else:
+            saved["enabled"] = bool(saved.get("enabled", True))
+        cards[card_id] = saved
+        current["cards"] = cards
+        current["schema_version"] = CONFIG_SCHEMA_VERSION
+        self.store.write(current)
+        return deepcopy(saved)
+
     def get_quark_config(self) -> dict:
         return deepcopy(self.load()["cards"]["quark"]["config"])
 

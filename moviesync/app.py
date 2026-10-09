@@ -77,6 +77,11 @@ def create_app(
         logger,
         registry=card_registry,
     )
+    resource_sources.load_plugins({
+        "telegram": telegram,
+        "config_store": config_store,
+        "logger": logger,
+    })
     card_registry.register(QuarkStorageCard(config_store))
     card_registry.register(DoubanMetadataCard(douban))
     metadata = MetadataProviderManager(card_registry, logger)

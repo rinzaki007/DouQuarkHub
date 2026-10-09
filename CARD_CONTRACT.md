@@ -38,3 +38,40 @@
 3. 若支持频道扫描，覆盖新集发现、跨季比较和空搜索回退。
 4. 若支持存储操作，测试资源解析、文件字段标准化、Token 不泄露与转存白名单。
 5. 通过 pytest、Ruff 和 Docker 构建后再合并到 `main`。
+
+
+## 已安装资源卡片插件入口
+
+MovieSync 支持通过 Python 包的 entry point 加载可信资源来源插件，组名为 `moviesync.resource_sources`。每个入口必须指向一个工厂函数，接收单个 `context` 字典并返回 `ResourceSourceCard` 实例。当前上下文包含 `telegram`、`config_store` 和 `logger`，插件可以按需使用这些共享服务。
+
+例如，插件包的 `pyproject.toml` 可声明：
+
+```toml
+[project.entry-points."moviesync.resource_sources"]
+example = "my_moviesync_plugin:create_card"
+```
+
+工厂函数形状：
+
+```python
+from moviesync.cards import CardManifest, ResourceSourceCard
+
+class ExampleSource(ResourceSourceCard):
+    manifest = CardManifest(
+        id="example",
+        name="Example",
+        type="resource_source",
+        capabilities=("resource.search", "resource.health_check"),
+    )
+
+    def search(self, movie, config):
+        return []
+
+    def check(self, config):
+        return {"status": "healthy", "message": "ok"}
+
+def create_card(context):
+    return ExampleSource()
+```
+
+插件必须作为可信 Python 包安装并随应用启动加载。**后台不会接收或执行用户上传的 Python 文件**；动态安装/卸载插件仍未开放。安装后的卡片会进入统一注册表，并出现在 `GET /api/cards`；资源搜索、集数配置和健康检查由资源来源管理器按卡片 ID 分发。

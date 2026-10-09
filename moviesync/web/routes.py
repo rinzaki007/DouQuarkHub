@@ -595,6 +595,49 @@ def cards():
     )
 
 
+@api.route("/cards/<card_id>/config", methods=["GET", "POST"])
+@require_csrf
+def resource_card_config(card_id):
+    """通用资源来源卡片配置入口；只接受进程中已注册的资源卡片。"""
+    from ..cards import ResourceSourceCard
+
+    card = _services()["card_registry"].get(card_id)
+    if not isinstance(card, ResourceSourceCard) or card.card_type != "resource_source":
+        return _json_error("资源来源卡片未加载", 404)
+
+    config_store = _services()["config"]
+    if request.method == "GET":
+        saved = config_store.load().get("cards", {}).get(card_id, {})
+        saved = saved if isinstance(saved, dict) else {}
+        raw_config = saved.get("config", {})
+        raw_config = raw_config if isinstance(raw_config, dict) else {}
+        return jsonify({
+            "success": True,
+            "card_id": card_id,
+            "enabled": bool(saved.get("enabled", True)),
+            "config": card.public_config(raw_config),
+        })
+
+    data = request.get_json(silent=True) or {}
+    if not isinstance(data, dict):
+        return _json_error("请求内容必须是 JSON 对象")
+    incoming = data.get("config", {})
+    if not isinstance(incoming, dict):
+        return _json_error("config 必须是 JSON 对象")
+    enabled = data.get("enabled") if "enabled" in data else None
+    try:
+        saved = config_store.save_card_config(card_id, incoming, enabled=enabled)
+    except ValueError as exc:
+        return _json_error(str(exc))
+    return jsonify({
+        "success": True,
+        "card_id": card_id,
+        "enabled": bool(saved.get("enabled", True)),
+        "config": card.public_config(saved.get("config", {})),
+        "message": "资源来源卡片配置已保存",
+    })
+
+
 @api.get("/cards/quark/config")
 def get_quark_card_config():
     card = _services()["card_registry"].get("quark")
