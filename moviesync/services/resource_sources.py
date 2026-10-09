@@ -372,7 +372,7 @@ class ResourceSourceManager:
                         "enabled": True,
                         **check,
                     }
-                except Exception as exc:
+                except Exception:
                     self.logger.exception(
                         "资源源 %s 健康检查异常",
                         source_id,
