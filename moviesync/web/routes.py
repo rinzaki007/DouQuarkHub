@@ -595,47 +595,117 @@ def cards():
     )
 
 
+def _card_config_view(card, raw_config):
+    """仅向管理界面返回 Manifest 声明的字段，并对敏感值做脱敏。"""
+    raw_config = raw_config if isinstance(raw_config, dict) else {}
+    public_config, has_value, fields = {}, {}, []
+    sensitive_markers = ("cookie", "token", "secret", "password", "api_key", "authorization", "credential")
+    for declared in card.manifest.config_fields:
+        field = dict(declared)
+        key = str(field.get("key") or "")
+        secret = bool(field.get("secret")) or any(marker in key.lower() for marker in sensitive_markers)
+        field["secret"] = secret
+        value = raw_config.get(key, field.get("default", {} if field.get("type") == "json" else ""))
+        if secret:
+            public_config[key] = ""
+            has_value[key] = bool(value)
+        else:
+            public_config[key] = value
+        fields.append(field)
+    return fields, public_config, has_value
+
+
 @api.route("/cards/<card_id>/config", methods=["GET", "POST"])
 @require_csrf
 def resource_card_config(card_id):
-    """通用资源来源卡片配置入口；只接受进程中已注册的资源卡片。"""
-    from ..cards import ResourceSourceCard
-
+    """所有已注册卡片共用的配置接口；字段由 CardManifest 声明。"""
     card = _services()["card_registry"].get(card_id)
-    if not isinstance(card, ResourceSourceCard) or card.card_type != "resource_source":
-        return _json_error("资源来源卡片未加载", 404)
+    if card is None:
+        return _json_error("卡片未加载", 404)
 
     config_store = _services()["config"]
-    if request.method == "GET":
-        saved = config_store.load().get("cards", {}).get(card_id, {})
-        saved = saved if isinstance(saved, dict) else {}
-        raw_config = saved.get("config", {})
-        raw_config = raw_config if isinstance(raw_config, dict) else {}
-        return jsonify({
-            "success": True,
-            "card_id": card_id,
-            "enabled": bool(saved.get("enabled", True)),
-            "config": card.public_config(raw_config),
-        })
+    cards_config = config_store.load().get("cards", {})
+    saved = cards_config.get(card_id, {}) if isinstance(cards_config, dict) else {}
+    saved = saved if isinstance(saved, dict) else {}
+    raw_config = saved.get("config", {})
+    raw_config = raw_config if isinstance(saved.get("config", {}), dict) else {}
 
-    data = request.get_json(silent=True) or {}
+    if request.method == "GET":
+        fields, public_config, has_value = _card_config_view(card, raw_config)
+        return jsonify({"success": True, "card_id": card_id, "enabled": bool(saved.get("enabled", True)),
+                        "fields": fields, "config": public_config, "has_value": has_value})
+
+    data = request.get_json(silent=True)
     if not isinstance(data, dict):
         return _json_error("请求内容必须是 JSON 对象")
     incoming = data.get("config", {})
     if not isinstance(incoming, dict):
         return _json_error("config 必须是 JSON 对象")
+    fields_by_key = {str(field.get("key")): field for field in card.manifest.config_fields}
+    unknown = set(incoming) - set(fields_by_key)
+    if unknown:
+        return _json_error("包含未声明的配置字段: " + ", ".join(sorted(unknown)))
+
+    merged, persisted_incoming = dict(raw_config), {}
+    sensitive_markers = ("cookie", "token", "secret", "password", "api_key", "authorization", "credential")
+    for key, value in incoming.items():
+        field = fields_by_key[key]
+        field_type = field.get("type", "string")
+        secret = bool(field.get("secret")) or any(marker in key.lower() for marker in sensitive_markers)
+        if secret and value in (None, ""):
+            continue
+        if field_type == "json" and not isinstance(value, (dict, list)):
+            return _json_error(f"配置字段「{field.get('label') or key}」必须是 JSON 对象或数组")
+        if field_type == "boolean" and not isinstance(value, bool):
+            return _json_error(f"配置字段「{field.get('label') or key}」必须是布尔值")
+        if field_type == "number" and (isinstance(value, bool) or not isinstance(value, (int, float))):
+            return _json_error(f"配置字段「{field.get('label') or key}」必须是数字")
+        if field_type in {"string", "password", "textarea"} and not isinstance(value, str):
+            return _json_error(f"配置字段「{field.get('label') or key}」必须是文本")
+        merged[key] = value
+        persisted_incoming[key] = value
+
+    for key, field in fields_by_key.items():
+        secret = bool(field.get("secret")) or any(marker in key.lower() for marker in sensitive_markers)
+        if field.get("required") and not merged.get(key) and not (secret and raw_config.get(key)):
+            return _json_error(f"请填写必填配置：{field.get('label') or key}")
     enabled = data.get("enabled") if "enabled" in data else None
+    if enabled is not None and not isinstance(enabled, bool):
+        return _json_error("enabled 必须是布尔值")
     try:
-        saved = config_store.save_card_config(card_id, incoming, enabled=enabled)
+        saved = config_store.save_card_config(card_id, persisted_incoming, enabled=enabled)
     except ValueError as exc:
         return _json_error(str(exc))
-    return jsonify({
-        "success": True,
-        "card_id": card_id,
-        "enabled": bool(saved.get("enabled", True)),
-        "config": card.public_config(saved.get("config", {})),
-        "message": "资源来源卡片配置已保存",
-    })
+    fields, public_config, has_value = _card_config_view(card, saved.get("config", {}))
+    return jsonify({"success": True, "card_id": card_id, "enabled": bool(saved.get("enabled", True)),
+                    "fields": fields, "config": public_config, "has_value": has_value,
+                    "message": "卡片配置已保存"})
+
+
+@api.post("/cards/<card_id>/check")
+@require_csrf
+def check_card_connection(card_id):
+    """调用卡片自身的健康检查；卡片必须声明健康检查能力。"""
+    card = _services()["card_registry"].get(card_id)
+    if card is None:
+        return _json_error("卡片未加载", 404)
+    supports_check = any(
+        capability.endswith(".health_check") or capability.endswith(".check")
+        for capability in card.capabilities
+    )
+    if not supports_check:
+        return _json_error("该卡片未声明连接检查能力", 400)
+    cards_config = _services()["config"].load().get("cards", {})
+    saved = cards_config.get(card_id, {}) if isinstance(cards_config, dict) else {}
+    config = saved.get("config", {}) if isinstance(saved, dict) else {}
+    try:
+        result = card.check(config if isinstance(config, dict) else {})
+    except Exception as exc:
+        _services()["logger"].exception("卡片 %s 连接检查失败", card_id)
+        return _json_error(f"连接检查失败：{exc}", 502)
+    if not isinstance(result, dict):
+        return _json_error("卡片检查结果格式无效", 502)
+    return jsonify({"success": True, **result})
 
 
 @api.get("/cards/quark/config")
@@ -709,15 +779,6 @@ def save_telegram_card_config():
         "message": "Telegram 卡片配置已保存",
     })
 
-
-@api.post("/cards/quark/check")
-@require_csrf
-def check_quark_card():
-    card = _services()["card_registry"].get("quark")
-    if not card:
-        return _json_error("Quark 卡片未加载", 404)
-    result = card.check({})
-    return jsonify({"success": True, **result})
 
 @api.get("/login-backdrop")
 def login_backdrop():

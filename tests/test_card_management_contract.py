@@ -26,7 +26,11 @@ def test_generic_resource_card_config_api_sanitizes_secrets_and_saves(tmp_path):
             id="configurable-source",
             name="Configurable Source",
             type="resource_source",
-            capabilities=("resource.search",),
+            capabilities=("resource.search", "resource.health_check"),
+            config_fields=(
+                {"key": "endpoint", "label": "Endpoint", "type": "string"},
+                {"key": "api_token", "label": "API Token", "type": "password", "secret": True},
+            ),
         )
 
         def search(self, movie, config):
@@ -50,12 +54,37 @@ def test_generic_resource_card_config_api_sanitizes_secrets_and_saves(tmp_path):
     body = response.get_json()
     assert body["success"] is True
     assert body["config"]["endpoint"] == "https://example.test"
-    assert body["config"]["has_api_token"] is True
-    assert "api_token" not in body["config"]
+    assert body["config"]["api_token"] == ""
+    assert body["has_value"]["api_token"] is True
+    assert "do-not-leak" not in str(body)
 
     response = client.get("/api/cards/configurable-source/config")
     assert response.status_code == 200
-    assert response.get_json()["config"]["has_api_token"] is True
+    assert response.get_json()["has_value"]["api_token"] is True
+    assert response.get_json()["config"]["api_token"] == ""
+
+    response = client.post(
+        "/api/cards/configurable-source/config",
+        json={"config": {"api_token": ""}},
+        headers={"X-CSRF-Token": csrf},
+    )
+    assert response.status_code == 200
+    assert response.get_json()["has_value"]["api_token"] is True
+
+    response = client.post(
+        "/api/cards/configurable-source/config",
+        json={"config": {"unexpected": "value"}},
+        headers={"X-CSRF-Token": csrf},
+    )
+    assert response.status_code == 400
+
+    response = client.post(
+        "/api/cards/configurable-source/check",
+        json={},
+        headers={"X-CSRF-Token": csrf},
+    )
+    assert response.status_code == 200
+    assert response.get_json()["status"] == "healthy"
 
     response = client.get("/api/cards/not-loaded/config")
     assert response.status_code == 404
