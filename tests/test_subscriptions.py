@@ -400,3 +400,49 @@ def test_channel_subscription_checks_selected_share_when_channel_search_is_empty
     assert ok is True
     assert "成功追更 2 项" in message
     assert storage.transfers == [("share-selected", ["ep108", "ep109"])]
+
+
+
+def test_channel_subscription_checkpoints_successful_share_before_later_share_fails(tmp_path):
+    class FailsOnceOnSecondShare(ChannelStorageTargets):
+        def __init__(self):
+            super().__init__()
+            self.failed = False
+
+        def transfer(self, resource, files, target_id="0", storage_target_id=None, token=None):
+            if resource["pwd_id"] == "share2" and not self.failed:
+                self.failed = True
+                self.transfers.append((resource["pwd_id"], [item["fid"] for item in files]))
+                return False, "模拟第二个分享转存失败"
+            return super().transfer(resource, files, target_id, storage_target_id, token)
+
+    storage = FailsOnceOnSecondShare()
+    storage.shares = {
+        "share1": [{"fid": "ep1", "file_name": "Show.S01E01.mkv"}],
+        "share2": [{"fid": "ep2", "file_name": "Show.S01E02.mkv"}],
+    }
+    sources = FakeResourceSources()
+    sources.shares = [{"channel": "demo", "pwd_id": "share1"}, {"channel": "demo", "pwd_id": "share2"}]
+    manager = SubscriptionManager(tmp_path / "partial-success.json", storage, sources, FakeLogger())
+    sub = manager.add_subscription(
+        title="Show",
+        pwd_id="share1",
+        target_fid="0",
+        storage_target_id="demo-storage",
+        source_id="telegram",
+        channel="demo",
+        files=[{"fid": "ep1", "file_name": "Show.S01E01.mkv"}],
+    )
+
+    ok, message = manager.check_subscription_now(sub["id"])
+    assert ok is False
+    assert "转存失败" in message
+    saved = manager.get_subscriptions()[0]
+    assert "share1:ep1" in saved["tracked_file_keys"]
+    assert "share1:ep1" in saved["saved_episodes"]
+
+    ok, message = manager.check_subscription_now(sub["id"])
+    assert ok is True
+    assert "成功追更 1 项" in message
+    assert storage.transfers.count(("share1", ["ep1"])) == 1
+    assert storage.transfers.count(("share2", ["ep2"])) == 2

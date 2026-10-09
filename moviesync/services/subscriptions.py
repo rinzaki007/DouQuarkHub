@@ -724,8 +724,9 @@ class SubscriptionManager:
                 group["token"],
             )
             if not ok:
-                return self._finish(sub, False, f"转存失败: {msg}")
+                return self._finish(sub, False, f"转存失败: {msg}", success_keys=all_keys)
             all_keys.extend(group["keys"])
+            self._record_success_keys(sub, group["keys"])
             total += len(group["files"])
 
         return self._finish(
@@ -734,6 +735,26 @@ class SubscriptionManager:
             f"🎉 成功追更 {total} 项，已存入专属文件夹【{title}】！",
             success_keys=all_keys,
         )
+
+    def _record_success_keys(self, sub: dict, success_keys) -> None:
+        """逐组持久化已确认转存的文件，避免后续组失败或进程中断后重复转存。"""
+        keys = list(dict.fromkeys(str(key).strip() for key in (success_keys or []) if str(key).strip()))
+        if not keys:
+            return
+        with self.lock:
+            subscriptions = self._load_subscriptions()
+            current = next((item for item in subscriptions if item.get("id") == sub.get("id")), None)
+            if current is None:
+                return
+            tracked = [str(key) for key in (current.get("tracked_file_keys", []) or [])]
+            seen_tracked = set(tracked)
+            tracked.extend(key for key in keys if key not in seen_tracked)
+            current["tracked_file_keys"] = tracked[-1000:]
+            saved = list(current.get("saved_episodes", []) or [])
+            seen_saved = {str(key) for key in saved}
+            saved.extend(key for key in keys if key not in seen_saved)
+            current["saved_episodes"] = sorted(saved, key=lambda value: (isinstance(value, str), str(value)))
+            self.store.write(subscriptions)
 
     def _finish(
         self,
