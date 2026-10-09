@@ -91,8 +91,39 @@ class TaskManager:
 
     @staticmethod
     def _payload_key(payload):
-        """生成稳定的任务指纹，用于抑制同一请求的并发重复提交。"""
-        serialized = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str)
+        """基于实际转存目标与文件生成指纹，忽略封面等展示字段和文件顺序。"""
+        if isinstance(payload, dict):
+            movie = payload.get("movie") if isinstance(payload.get("movie"), dict) else {}
+            candidate = payload.get("candidate") if isinstance(payload.get("candidate"), dict) else {}
+            files = candidate.get("files") if isinstance(candidate.get("files"), list) else []
+            file_ids = sorted({
+                str(item.get("fid") or "").strip()
+                for item in files
+                if isinstance(item, dict) and str(item.get("fid") or "").strip()
+            })
+            pwd_id = str(candidate.get("pwd_id") or "").strip()
+            if pwd_id and file_ids:
+                fingerprint = {
+                    "type": "transfer",
+                    "title": " ".join(
+                        str(movie.get("title") or movie.get("name") or payload.get("title") or "").split()
+                    ).casefold(),
+                    "pwd_id": pwd_id,
+                    "storage_target_id": str(
+                        candidate.get("storage_target_id")
+                        or candidate.get("target_id")
+                        or payload.get("storage_target_id")
+                        or ""
+                    ).strip(),
+                    "target_fid": str(payload.get("target_fid") or "0").strip(),
+                    "file_ids": file_ids,
+                }
+            else:
+                # 保留旧式/不完整 payload 的稳定指纹行为。
+                fingerprint = payload
+        else:
+            fingerprint = payload
+        serialized = json.dumps(fingerprint, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str)
         return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
 
     @staticmethod
