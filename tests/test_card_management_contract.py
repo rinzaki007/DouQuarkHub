@@ -190,3 +190,43 @@ def test_generic_card_config_runs_card_validator_and_persists_normalized_values(
     )
     assert response.status_code == 400
     assert services["config"].load()["cards"]["validating-source"]["config"]["value"] == "accepted"
+
+
+def test_disabled_storage_target_returns_clear_error_and_blocks_new_calls(tmp_path):
+    from moviesync.app import create_app
+
+    app = create_app({"MOVIESYNC_DATA_DIR": str(tmp_path)}, start_scheduler=False)
+    services = app.extensions["moviesync"]
+    client = app.test_client()
+    client.post("/api/setup", json={"username": "admin", "password": "password123"})
+    with client.session_transaction() as session:
+        csrf = session["csrf_token"]
+
+    response = client.post(
+        "/api/cards/quark/config",
+        json={"enabled": False, "config": {}},
+        headers={"X-CSRF-Token": csrf},
+    )
+    assert response.status_code == 200
+
+    resolved = services["storage_targets"].resolve_resource(
+        {"pwd_id": "share-1", "storage_target_id": "quark"}
+    )
+    assert "已停用" in resolved["error"]
+
+    ok, message = services["storage_targets"].transfer(
+        {"pwd_id": "share-1"}, [{"fid": "file-1"}], storage_target_id="quark"
+    )
+    assert ok is False
+    assert "已停用" in message
+
+    response = client.post(
+        "/api/cards/quark/config",
+        json={"enabled": True, "config": {}},
+        headers={"X-CSRF-Token": csrf},
+    )
+    assert response.status_code == 200
+    resolved = services["storage_targets"].resolve_resource(
+        {"pwd_id": "share-1", "storage_target_id": "quark"}
+    )
+    assert "已停用" not in (resolved.get("error") or "")

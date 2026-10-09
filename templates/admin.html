@@ -751,6 +751,10 @@
                     <div><div class="text-xs font-semibold text-slate-200">卡片启用状态</div><div class="mt-1 text-[10px] text-slate-500">停用后，核心业务不再选择该卡片。</div></div>
                     <label class="flex items-center gap-2 text-xs text-slate-300"><input id="generic-card-enabled" type="checkbox" class="h-4 w-4 accent-blue-500">启用</label>
                 </div>
+                <div id="generic-card-disable-warning" class="hidden rounded-xl border border-amber-700/50 bg-amber-950/25 p-3 text-[11px] leading-5 text-amber-200">
+                    <div class="font-semibold">停用存储目标时请注意</div>
+                    <p class="mt-1">停用不会撤回已经发出的网盘请求，但会阻止后续步骤再次调用此卡片。排队或执行中的任务不会被强制取消，可能因目标停用而失败；重新启用后可手动重试。若任务显示“结果待核实”，请先检查网盘，确认未转存后再重试。</p>
+                </div>
                 <div id="generic-card-health" class="hidden rounded-xl border border-slate-800 bg-slate-900/50 p-3 text-xs"></div>
                 <div id="generic-card-fields" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
                 <div id="generic-card-no-fields" class="hidden rounded-xl border border-slate-800 bg-slate-900/40 p-4 text-xs text-slate-500">该卡片未声明可编辑的配置字段。</div>
@@ -1210,7 +1214,8 @@
                 const result = await (await apiFetch("/api/cards/" + encodeURIComponent(cardId) + "/config")).json();
                 if (!result.success) throw new Error(result.message || "读取卡片配置失败");
                 const card = (window.moviesyncCards || []).find(item => item.id === cardId) || {id: cardId};
-                currentGenericCard = {id: cardId, fields: result.fields || []};
+                currentGenericCard = {id: cardId, fields: result.fields || [], enabled: result.enabled !== false, type: card.type};
+                document.getElementById("generic-card-disable-warning").classList.toggle("hidden", card.type !== "storage_target");
                 document.getElementById("generic-card-title").textContent = card.name || cardId;
                 document.getElementById("generic-card-subtitle").textContent = cardId + " · v" + (card.version || "1.0.0") + " · " + (CARD_TYPE_LABELS[card.type] || card.type || "卡片");
                 document.getElementById("generic-card-enabled").checked = result.enabled !== false;
@@ -1259,12 +1264,18 @@
             saveButton.disabled = true;
             try {
                 const config = collectGenericCardConfig();
-                const payload = {enabled: document.getElementById("generic-card-enabled").checked, config};
+                const nextEnabled = document.getElementById("generic-card-enabled").checked;
+                if (currentGenericCard.type === "storage_target" && currentGenericCard.enabled && !nextEnabled) {
+                    const confirmed = confirm("停用存储目标不会取消已发出的网盘请求；排队或正在执行的任务可能因后续步骤被阻止而失败。若结果待核实，请先检查网盘再决定是否重试。确定停用吗？");
+                    if (!confirmed) return false;
+                }
+                const payload = {enabled: nextEnabled, config};
                 const result = await (await apiFetch("/api/cards/" + encodeURIComponent(currentGenericCard.id) + "/config", {
                     method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(payload)
                 })).json();
                 if (!result.success) throw new Error(result.message || "保存配置失败");
                 currentGenericCard.fields = result.fields || currentGenericCard.fields;
+                currentGenericCard.enabled = result.enabled !== false;
                 renderGenericCardFields(currentGenericCard.fields, result.config || {}, result.has_value || {});
                 await loadCards();
                 if (!silent) alert(result.message || "卡片配置已保存");

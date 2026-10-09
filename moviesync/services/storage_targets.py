@@ -31,6 +31,17 @@ class StorageTargetManager:
                 cards.append(card)
         return cards
 
+    def _unavailable_message(self, target_id: str | None = None) -> str:
+        if target_id:
+            card = self.registry.get(str(target_id))
+            if isinstance(card, StorageTargetCard):
+                config = self.config_store.load()
+                card_configs = config.get("cards") if isinstance(config, dict) else {}
+                saved = card_configs.get(card.card_id) if isinstance(card_configs, dict) else {}
+                if isinstance(saved, dict) and not saved.get("enabled", True):
+                    return f"存储目标卡片「{card.manifest.name}」已停用，请重新启用后重试"
+        return "未找到可用的存储目标卡片"
+
     def get(self, target_id: str | None = None) -> StorageTargetCard | None:
         if target_id:
             card = self.registry.get(str(target_id))
@@ -91,7 +102,7 @@ class StorageTargetManager:
                 "target_id": str(selected_id or ""),
                 "files": [],
                 "token": None,
-                "error": "未找到可用的存储目标卡片",
+                "error": self._unavailable_message(str(selected_id) if selected_id else None),
             }
         result = card.resolve_resource(resource_dict)
         result["target_id"] = card.card_id
@@ -115,7 +126,7 @@ class StorageTargetManager:
     ) -> str:
         card = self.get(target_id)
         if not card:
-            raise RuntimeError("未找到可用的存储目标卡片")
+            raise RuntimeError(self._unavailable_message(target_id))
         return card.create_folder(name, parent_id)
 
     def transfer(
@@ -128,7 +139,7 @@ class StorageTargetManager:
     ) -> tuple[bool, str]:
         card = self.get(storage_target_id)
         if not card:
-            return False, "未找到可用的存储目标卡片"
+            return False, self._unavailable_message(storage_target_id)
         payload = dict(resource) if isinstance(resource, dict) else {}
         if token:
             payload["stoken"] = token
