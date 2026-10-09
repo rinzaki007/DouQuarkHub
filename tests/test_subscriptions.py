@@ -498,6 +498,7 @@ def test_uncertain_subscription_transfer_is_held_until_user_confirms(tmp_path):
     assert saved["pending_save_keys"] == []
     assert saved["pending_save_uncertain"] is False
     assert "share-selected:ep1" in saved["tracked_file_keys"]
+    assert "share-selected:ep1" in saved["saved_episodes"]
     assert storage.calls == 1
 
 

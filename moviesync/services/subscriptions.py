@@ -931,9 +931,15 @@ class SubscriptionManager:
                 saved = list(current.get("saved_episodes", []) or [])
                 saved_seen = {str(key) for key in saved}
                 for key in keys:
+                    # Channel-transfer keys include the share ID (share_id:file_id).
+                    # Keep them in the durable history too, so a confirmed transfer
+                    # remains deduplicated after tracked_file_keys is bounded.
                     if ":" in str(key):
-                        continue
-                    value = int(key) if str(key).isdigit() else key
+                        value = str(key)
+                    elif str(key).isdigit():
+                        value = int(key)
+                    else:
+                        value = key
                     if str(value) not in saved_seen:
                         saved.append(value)
                         saved_seen.add(str(value))
