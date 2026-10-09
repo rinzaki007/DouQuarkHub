@@ -914,3 +914,48 @@ def test_running_subscription_cannot_be_deleted_during_check(tmp_path, monkeypat
         release_status.set()
         worker.join(timeout=2)
         manager.stop_scheduler()
+
+
+def test_scheduler_start_requested_during_stop_timeout_restarts_after_old_worker_exits(tmp_path, monkeypatch):
+    from threading import Event
+
+    manager = SubscriptionManager(
+        tmp_path / "scheduler-deferred-restart.json",
+        FakeStorageTargets(),
+        FakeResourceSources(),
+        FakeLogger(),
+    )
+    first_entered = Event()
+    release_first = Event()
+    second_entered = Event()
+    calls = 0
+
+    def controlled_loop():
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            first_entered.set()
+            assert release_first.wait(timeout=3)
+        else:
+            second_entered.set()
+            manager.stop_event.wait(timeout=3)
+
+    monkeypatch.setattr(manager, "_scheduler_loop", controlled_loop)
+    manager.start_scheduler()
+    assert first_entered.wait(timeout=1)
+    old_worker = manager.worker
+
+    try:
+        # Model stop_scheduler timing out while the old worker is still in a
+        # remote check; a concurrent start must be remembered, not discarded.
+        manager.stop_event.set()
+        manager.start_scheduler()
+        assert manager.worker is old_worker
+        release_first.set()
+
+        assert second_entered.wait(timeout=2)
+        assert calls == 2
+        assert manager.worker is not old_worker
+    finally:
+        release_first.set()
+        manager.stop_scheduler()
