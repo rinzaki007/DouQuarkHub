@@ -738,9 +738,21 @@ def get_quark_card_config():
 @require_csrf
 def save_quark_card_config():
     data = request.get_json(silent=True) or {}
+    if not isinstance(data, dict):
+        return _json_error("Quark 卡片配置必须是 JSON 对象")
+    services = _services()
+    card = services["card_registry"].get("quark")
+    if card is None:
+        return _json_error("Quark 卡片未加载", 404)
+    config_store = services["config"]
+    declared_keys = {str(field.get("key")) for field in card.manifest.config_fields}
+    incoming_config = {key: value for key, value in data.items() if key in declared_keys}
+    merged_config = {**config_store.get_quark_config(), **incoming_config}
     try:
-        saved = _services()["config"].save_quark_config(data)
-    except ValueError as exc:
+        validated = card.validate_config(merged_config)
+        incoming_config = {key: validated.get(key, value) for key, value in incoming_config.items()}
+        saved = config_store.save_quark_config({**data, **incoming_config})
+    except (ValueError, TypeError) as exc:
         return _json_error(str(exc))
     return jsonify({
         "success": True,
@@ -776,9 +788,21 @@ def get_telegram_card_config():
 @require_csrf
 def save_telegram_card_config():
     data = request.get_json(silent=True) or {}
+    if not isinstance(data, dict):
+        return _json_error("Telegram 卡片配置必须是 JSON 对象")
+    services = _services()
+    card = services["card_registry"].get("telegram")
+    if card is None:
+        return _json_error("Telegram 卡片未加载", 404)
+    config_store = services["config"]
+    declared_keys = {str(field.get("key")) for field in card.manifest.config_fields}
+    incoming_config = {key: value for key, value in data.items() if key in declared_keys}
+    merged_config = {**config_store.get_telegram_config(), **incoming_config}
     try:
-        saved = _services()["config"].save_telegram_config(data)
-    except ValueError as exc:
+        validated = card.validate_config(merged_config)
+        incoming_config = {key: validated.get(key, value) for key, value in incoming_config.items()}
+        saved = config_store.save_telegram_config({**data, **incoming_config})
+    except (ValueError, TypeError) as exc:
         return _json_error(str(exc))
     return jsonify({
         "success": True,
