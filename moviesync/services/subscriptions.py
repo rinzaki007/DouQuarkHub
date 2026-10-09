@@ -773,27 +773,42 @@ class SubscriptionManager:
             return self._finish(sub, True, f"《{title}》暂无新更新", success_keys=[])
 
         target_fid = _normalize_fid(sub.get("target_fid"))
-        try:
-            default_target = next(iter(grouped.values()))
-            folder_fid = self.storage_targets.create_folder(
-                title,
-                target_fid,
-                default_target["target_id"] or None,
-            )
-        except Exception:
-            self.logger.exception("频道追剧创建专属文件夹失败: %s", title)
-            return self._finish(sub, False, "创建专属文件夹失败，请检查存储目标配置或查看服务日志")
+        # Folder IDs belong to a specific storage target. A channel can contain
+        # resources resolved through different target cards, so never reuse one
+        # target's folder ID with another target.
+        folder_fids: dict[str, str] = {}
 
         all_keys: list[str] = []
         total = 0
         self._set_status(sub, "running", "transfer", "正在转存新资源…")
         for group in grouped.values():
+            target_id = str(group["target_id"] or "").strip()
+            if target_id not in folder_fids:
+                try:
+                    folder_fids[target_id] = self.storage_targets.create_folder(
+                        title,
+                        target_fid,
+                        target_id or None,
+                    )
+                except Exception:
+                    self.logger.exception(
+                        "频道追剧在存储目标 %s 创建专属文件夹失败: %s",
+                        target_id or "(default)",
+                        title,
+                    )
+                    return self._finish(
+                        sub,
+                        False,
+                        "创建专属文件夹失败，请检查存储目标配置或查看服务日志",
+                        success_keys=all_keys,
+                    )
+
             self._set_pending_save_keys(sub, group["keys"])
             ok, msg = self.storage_targets.transfer(
                 group["resource"],
                 group["files"],
-                folder_fid,
-                group["target_id"] or None,
+                folder_fids[target_id],
+                target_id or None,
                 group["token"],
             )
             if not ok:
