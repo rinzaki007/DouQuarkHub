@@ -1333,7 +1333,11 @@ def test_malformed_pending_save_keys_fail_closed(tmp_path, monkeypatch):
         assert loaded["pending_save_uncertain"] is True
         assert loaded["pending_save_keys_invalid"] is True
 
-        monkeypatch.setattr(manager, "_check", lambda subscription: calls.append(subscription["id"]) or (True, "不应执行"))
+        def unexpected_check(subscription):
+            calls.append(subscription["id"])
+            return True, "不应执行"
+
+        monkeypatch.setattr(manager, "_check", unexpected_check)
         ok, message = manager.check_subscription_now(sub["id"])
         assert ok is False
         assert "格式异常" in message
