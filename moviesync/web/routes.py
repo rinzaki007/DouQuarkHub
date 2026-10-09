@@ -573,18 +573,23 @@ def cards():
                 "message": "Cookie 已配置，可检查连接状态" if has_cookie else "尚未配置夸克 Cookie",
             }
         else:
-            try:
-                item["health"] = card.check(card_config)
-                item["configured"] = (
-                    item["health"].get("status") not in {"unconfigured", "idle"}
-                    if isinstance(item["health"], dict)
-                    else True
+            # 列表接口只读状态，不在每次刷新时触发第三方网络请求。
+            fields = card.manifest.config_fields
+            required_fields = [field for field in fields if field.get("required")]
+            configured = all(
+                card_config.get(str(field.get("key")), field.get("default")) not in (None, "", {}, [])
+                for field in required_fields
+            )
+            if not required_fields and fields:
+                configured = any(
+                    card_config.get(str(field.get("key")), field.get("default")) not in (None, "", {}, [])
+                    for field in fields
                 )
-            except Exception as exc:
-                item["health"] = {
-                    "status": "unavailable",
-                    "message": f"卡片检查失败: {exc}",
-                }
+            item["configured"] = configured
+            item["health"] = {
+                "status": "idle",
+                "message": "尚未检查，请手动检查连接",
+            }
         cards.append(item)
     return jsonify(
         {
@@ -710,7 +715,7 @@ def check_card_connection(card_id):
         result = card.check(config if isinstance(config, dict) else {})
     except Exception as exc:
         _services()["logger"].exception("卡片 %s 连接检查失败", card_id)
-        return _json_error(f"连接检查失败：{exc}", 502)
+        return _json_error("连接检查失败，请查看服务日志", 502)
     if not isinstance(result, dict):
         return _json_error("卡片检查结果格式无效", 502)
     return jsonify({"success": True, **result})
