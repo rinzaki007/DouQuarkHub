@@ -1885,9 +1885,9 @@
                      <button type="button" onclick="addTelegramChannel()" class="bg-blue-600 hover:bg-blue-500 text-white text-xs px-4 py-2 rounded">添加</button>
                  </div></div>
                  <div class="space-y-3 rounded-xl border border-slate-800 bg-slate-900/40 p-3">
-                     <div><div class="text-xs font-semibold text-slate-300">电视剧集数识别规则</div><div class="mt-1 text-[10px] text-slate-500">规则独立保存在 Telegram 卡片配置中，不会写入订阅主流程。</div></div>
-                     <label class="block text-[11px] text-slate-400">magic_regex · pattern<textarea id="telegram-magic-regex-pattern" rows="2" class="glass-input mt-1 w-full rounded border border-slate-800 px-3 py-2 text-xs text-slate-200 font-mono"></textarea></label>
-                     <label class="block text-[11px] text-slate-400">magic_regex · replace<textarea id="telegram-magic-regex-replace" rows="1" class="glass-input mt-1 w-full rounded border border-slate-800 px-3 py-2 text-xs text-slate-200 font-mono"></textarea></label>
+                     <div><div class="text-xs font-semibold text-slate-300">文件名识别增强</div><div class="mt-1 text-[10px] text-slate-500">仅在常见命名无法识别时作为补充规则；标准 S01E08 等格式会自动识别。</div></div>
+                     <label class="block text-[11px] text-slate-400">匹配表达式（pattern）<textarea id="telegram-magic-regex-pattern" rows="2" class="glass-input mt-1 w-full rounded border border-slate-800 px-3 py-2 text-xs text-slate-200 font-mono"></textarea></label>
+                     <label class="block text-[11px] text-slate-400">替换模板（replace）<textarea id="telegram-magic-regex-replace" rows="1" class="glass-input mt-1 w-full rounded border border-slate-800 px-3 py-2 text-xs text-slate-200 font-mono"></textarea></label>
                  </div>
                  <div class="flex justify-end gap-2 pt-2">
                      <button type="button" onclick="closeTelegramCard()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-4 py-2 rounded">关闭</button>
