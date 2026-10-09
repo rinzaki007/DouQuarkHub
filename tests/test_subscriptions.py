@@ -1082,3 +1082,68 @@ def test_scheduled_subscription_rechecks_due_time_when_claiming_run(tmp_path, mo
         assert calls == [sub["id"]]
     finally:
         manager.stop_scheduler()
+
+
+def test_channel_subscription_keeps_same_share_from_distinct_storage_targets(tmp_path):
+    class SameShareAcrossTargetsStorage(ChannelStorageTargets):
+        def __init__(self):
+            super().__init__()
+            self.folder_targets = []
+            self.transfer_targets = []
+
+        def resolve_resource(self, resource, target_id=None):
+            files = {
+                "target-a": [{"fid": "ep1", "file_name": "Show.S01E01.mkv"}],
+                "target-b": [{"fid": "ep2", "file_name": "Show.S01E02.mkv"}],
+            }.get(target_id, [])
+            return {
+                "target_id": target_id,
+                "files": files,
+                "token": f"token-{target_id}",
+                "error": None,
+            }
+
+        def create_folder(self, name, parent_id="0", target_id=None):
+            self.folder_targets.append(target_id)
+            return f"folder-{target_id}"
+
+        def transfer(self, resource, files, target_id="0", storage_target_id=None, token=None):
+            self.transfer_targets.append(
+                (resource["pwd_id"], storage_target_id, [item["fid"] for item in files])
+            )
+            return True, "ok"
+
+    storage = SameShareAcrossTargetsStorage()
+    sources = FakeResourceSources()
+    sources.shares = [
+        {"channel": "demo", "pwd_id": "same-share", "storage_target_id": "target-a"},
+        {"channel": "demo", "pwd_id": "same-share", "storage_target_id": "target-b"},
+    ]
+    manager = SubscriptionManager(
+        tmp_path / "same-share-distinct-targets.json",
+        storage,
+        sources,
+        FakeLogger(),
+    )
+    sub = manager.add_subscription(
+        title="Show",
+        pwd_id="same-share",
+        target_fid="0",
+        storage_target_id="target-a",
+        source_id="telegram",
+        channel="demo",
+        files=[{"fid": "ep1", "file_name": "Show.S01E01.mkv"}],
+    )
+
+    try:
+        ok, message = manager.check_subscription_now(sub["id"])
+
+        assert ok is True
+        assert "成功追更 2 项" in message
+        assert storage.folder_targets == ["target-a", "target-b"]
+        assert storage.transfer_targets == [
+            ("same-share", "target-a", ["ep1"]),
+            ("same-share", "target-b", ["ep2"]),
+        ]
+    finally:
+        manager.stop_scheduler()

@@ -666,8 +666,10 @@ class SubscriptionManager:
         # 标题搜索可能因频道帖子使用英文名、旧消息超出扫描范围等原因返回空列表。
         # 用户创建订阅时选中的分享是可靠的起点，至少先检查该分享中的后续集数。
         selected_pwd_id = str(sub.get("pwd_id") or "").strip()
+        selected_target_id = str(sub.get("storage_target_id") or "").strip()
         if selected_pwd_id and not any(
             str(item.get("pwd_id") or "").strip() == selected_pwd_id
+            and str(item.get("storage_target_id") or selected_target_id).strip() == selected_target_id
             for item in sources
             if isinstance(item, dict)
         ):
@@ -677,21 +679,24 @@ class SubscriptionManager:
                     "channel": channel,
                     "channel_name": str(sub.get("channel_name") or channel),
                     "source_id": source_id,
-                    "storage_target_id": str(sub.get("storage_target_id") or ""),
+                    "storage_target_id": selected_target_id,
                 },
                 *sources,
             ]
 
-        # 避免同一分享既来自频道扫描、又来自选中的初始分享时被重复处理。
+        # A share ID can exist under multiple storage-target cards. Deduplicate
+        # repeated scan results only when both the share and target identity match.
         unique_sources = []
-        seen_pwd_ids = set()
+        seen_source_keys = set()
         for item in sources:
             if not isinstance(item, dict):
                 continue
             item_pwd_id = str(item.get("pwd_id") or "").strip()
-            if not item_pwd_id or item_pwd_id in seen_pwd_ids:
+            item_target_id = str(item.get("storage_target_id") or selected_target_id).strip()
+            source_key = (item_pwd_id, item_target_id)
+            if not item_pwd_id or source_key in seen_source_keys:
                 continue
-            seen_pwd_ids.add(item_pwd_id)
+            seen_source_keys.add(source_key)
             unique_sources.append(item)
         sources = unique_sources
 
