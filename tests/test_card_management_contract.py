@@ -430,5 +430,5 @@ def test_generic_card_config_preserves_secrets_on_whitespace_and_rejects_blank_r
         headers=headers,
     )
     assert response.status_code == 400
-    assert "必填配置" in response.get_json()["error"]
+    assert "必填配置" in response.get_json()["message"]
     assert services["config"].load()["cards"]["credential-source"]["config"] == saved
