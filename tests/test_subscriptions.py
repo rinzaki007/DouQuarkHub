@@ -1567,7 +1567,7 @@ def test_concurrent_manual_and_scheduled_checks_do_not_run_same_subscription_twi
         calls.append(subscription["id"])
         check_entered.set()
         assert release_check.wait(timeout=3)
-        return True, "检查完成"
+        return manager._finish(subscription, True, "检查完成")
 
     monkeypatch.setattr(manager, "_check", controlled_check)
     worker = Thread(
