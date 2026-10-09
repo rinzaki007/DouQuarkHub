@@ -157,3 +157,91 @@ def test_channel_search_scans_recent_messages_without_telegram_title_query():
 
     assert len(results) == 1
     assert client.last_scan_all is True
+
+
+def test_manager_registers_direct_resource_source_card():
+    from moviesync.cards import CardManifest, ResourceSourceCard
+
+    class Store:
+        def load(self):
+            return {
+                "cards": {
+                    "telegram": {"enabled": True, "config": {"channels": []}},
+                    "sample-source": {"enabled": True, "config": {"prefix": "test"}},
+                }
+            }
+
+        def update_resource_source_health(self, *args, **kwargs):
+            pass
+
+    class DirectCard(ResourceSourceCard):
+        manifest = CardManifest(
+            id="sample-source",
+            name="Sample Source",
+            type="resource_source",
+            capabilities=("resource.search", "resource.health_check"),
+        )
+
+        def search(self, movie, config):
+            return [
+                {"pwd_id": "sample123", "title": movie["title"] + config["prefix"]},
+                None,
+            ]
+
+        def check(self, config):
+            return {"status": "healthy", "message": "sample ok"}
+
+    manager = ResourceSourceManager(
+        FakeTelegramClient(), Store(), FakeLogger(),
+        resource_cards=[DirectCard()],
+    )
+    results = manager.search({"title": "Film"}, Store().load())
+
+    assert any(item["source_id"] == "sample-source" for item in results)
+    sample = next(item for item in results if item["source_id"] == "sample-source")
+    assert sample["source_name"] == "Sample Source"
+    assert sample["title"] == "Filmtest"
+    assert manager.check_all()[-1]["id"] == "sample-source"
+
+
+def test_manager_rejects_non_resource_card_registration():
+    import pytest
+    from moviesync.cards import Card
+
+    class OtherCard(Card):
+        pass
+
+    manager = ResourceSourceManager(FakeTelegramClient(), object(), FakeLogger())
+    with pytest.raises(TypeError):
+        manager.register(OtherCard())
+
+
+def test_manager_loads_installed_resource_card_entry_points(monkeypatch):
+    from moviesync.cards import CardManifest, ResourceSourceCard
+    from moviesync.services import resource_sources as module
+
+    class PluginCard(ResourceSourceCard):
+        manifest = CardManifest(
+            id="entrypoint-source",
+            name="Entry Point Source",
+            type="resource_source",
+            capabilities=("resource.search",),
+        )
+
+        def search(self, movie, config):
+            return []
+
+        def check(self, config):
+            return {"status": "healthy", "message": "ok"}
+
+    class FakeEntryPoint:
+        name = "entrypoint-source"
+
+        def load(self):
+            return lambda context: PluginCard()
+
+    monkeypatch.setattr(module, "entry_points", lambda **kwargs: [FakeEntryPoint()])
+    manager = ResourceSourceManager(FakeTelegramClient(), object(), FakeLogger())
+
+    assert manager.load_plugins({"example": True}) == ["entrypoint-source"]
+    assert manager.registry.get("entrypoint-source") is not None
