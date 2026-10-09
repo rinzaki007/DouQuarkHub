@@ -338,8 +338,14 @@ def test_transfer_worker_does_not_expose_exception_details(tmp_path):
         failed = manager.get_task(task["id"])
 
         assert failed["status"] == "failed"
-        assert failed["message"] == "任务执行异常，转存未能完成，请查看服务日志"
+        assert failed["recovery_uncertain"] is True
+        assert failed["phase_label"] == "结果待核实"
+        assert failed["message"] == "转存结果待核实，请检查目标网盘后再决定是否重试"
         assert "SECRET_COOKIE_VALUE" not in failed["message"]
         assert all("SECRET_COOKIE_VALUE" not in event["message"] for event in failed["events"])
+        assert manager.retry_transfer(
+            task["id"],
+            lambda progress: (True, "不应重试", {"success": 1}),
+        ) is None
     finally:
         manager.shutdown()
