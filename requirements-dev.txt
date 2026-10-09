@@ -3,3 +3,5 @@
 -r requirements.txt
 pytest>=8,<9
 ruff==0.15.12
+setuptools>=68
+wheel
