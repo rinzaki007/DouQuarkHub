@@ -65,6 +65,10 @@ class StorageTargetManager:
         return cards
 
     def _unavailable_message(self, target_id: str | None = None) -> str:
+        if not target_id:
+            getter = getattr(self.config_store, "get_default_storage_target_id", None)
+            target_id = str(getter() or "").strip() if callable(getter) else ""
+
         if target_id:
             card = self.registry.get(str(target_id))
             if isinstance(card, StorageTargetCard):
@@ -73,6 +77,11 @@ class StorageTargetManager:
                 saved = card_configs.get(card.card_id) if isinstance(card_configs, dict) else {}
                 if isinstance(saved, dict) and not saved.get("enabled", True):
                     return f"存储目标卡片「{card.manifest.name}」已停用，请重新启用后重试"
+            else:
+                return (
+                    f"默认存储目标卡片「{target_id}」不存在或未加载，"
+                    "请检查插件安装状态或重新选择默认存储目标"
+                )
         return "未找到可用的存储目标卡片"
 
     def get(self, target_id: str | None = None) -> StorageTargetCard | None:
