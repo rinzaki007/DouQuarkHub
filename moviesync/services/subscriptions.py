@@ -185,14 +185,28 @@ class SubscriptionManager:
                 changed = True
             item["saved_episodes"] = saved_episodes
 
-            item["pending_save_keys"] = [
-                str(key)
-                for key in (
-                    item.get("pending_save_keys", [])
-                    or []
+            raw_pending_keys = item.get("pending_save_keys", [])
+            if not isinstance(raw_pending_keys, list):
+                # Corrupt pending state must not crash every subscription
+                # read. If the previous run was uncertain, fail closed rather
+                # than silently allowing a potentially duplicate transfer.
+                item["pending_save_keys"] = []
+                item["pending_save_keys_invalid"] = bool(
+                    item.get("pending_save_uncertain")
                 )
-                if str(key).strip()
-            ][:200]
+                changed = True
+            else:
+                item["pending_save_keys"] = [
+                    str(key)
+                    for key in raw_pending_keys
+                    if isinstance(key, (str, int))
+                    and not isinstance(key, bool)
+                    and str(key).strip()
+                ][:200]
+                if item.get("pending_save_keys_invalid"):
+                    item["pending_save_keys_invalid"] = False
+                if item["pending_save_keys"] != raw_pending_keys:
+                    changed = True
 
             normalized.append(item)
 
@@ -465,11 +479,17 @@ class SubscriptionManager:
             if not subscription:
                 return False, "未找到订阅任务"
 
-            if subscription.get("pending_save_uncertain") and subscription.get("pending_save_keys"):
-                return (
-                    False,
-                    "转存结果待核实：请先在任务中心确认已转存，或确认未转存后再允许重试。",
-                )
+            if subscription.get("pending_save_uncertain"):
+                if subscription.get("pending_save_keys_invalid"):
+                    return (
+                        False,
+                        "待确认转存记录格式异常，请检查目标网盘并修复订阅记录后再重试。",
+                    )
+                if subscription.get("pending_save_keys"):
+                    return (
+                        False,
+                        "转存结果待核实：请先在任务中心确认已转存，或确认未转存后再允许重试。",
+                    )
 
             # The scheduler iterates a snapshot that can become stale while
             # another manual check or confirmation updates next_run_at.
@@ -944,6 +964,8 @@ class SubscriptionManager:
             if str(sub_id) in self.running_ids:
                 return False, "该订阅正在执行，请稍后再确认"
             keys = list(current.get("pending_save_keys", []) or [])
+            if current.get("pending_save_keys_invalid"):
+                return False, "待确认转存记录格式异常，请先检查网盘并修复订阅记录"
             if not current.get("pending_save_uncertain") or not keys:
                 return False, "该任务没有待确认的转存结果"
             if action not in {"saved", "not_saved"}:
