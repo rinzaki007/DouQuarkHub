@@ -133,11 +133,26 @@ class StorageTargetManager:
             })
         return results
 
+    def _log_plugin_failure(self, card: StorageTargetCard, operation: str) -> None:
+        if self.logger is not None:
+            self.logger.exception(
+                "存储目标卡片 %s 的 %s 接口返回异常或执行失败",
+                card.card_id,
+                operation,
+            )
+
     def destination_options(self, target_id: str | None = None) -> list[dict[str, Any]]:
         card = self.get(target_id)
         if not card:
             return []
-        return card.destination_options()
+        try:
+            result = card.destination_options()
+            if not isinstance(result, list) or any(not isinstance(item, dict) for item in result):
+                raise TypeError("destination_options 必须返回字典列表")
+            return result
+        except Exception:
+            self._log_plugin_failure(card, "destination_options")
+            return []
 
     def resolve_resource(
         self,
@@ -158,9 +173,29 @@ class StorageTargetManager:
                 "token": None,
                 "error": self._unavailable_message(str(selected_id) if selected_id else None),
             }
-        result = card.resolve_resource(resource_dict)
-        result["target_id"] = card.card_id
-        return result
+        try:
+            result = card.resolve_resource(resource_dict)
+            if not isinstance(result, dict):
+                raise TypeError("resolve_resource 必须返回字典")
+            files = result.get("files", [])
+            if not isinstance(files, list) or any(not isinstance(item, dict) for item in files):
+                raise TypeError("resolve_resource 的 files 必须是字典列表")
+            normalized = dict(result)
+            normalized["files"] = files
+            normalized["target_id"] = card.card_id
+            if normalized.get("token") is not None and not isinstance(normalized["token"], str):
+                raise TypeError("resolve_resource 的 token 必须是文本或 null")
+            if normalized.get("error") is not None and not isinstance(normalized["error"], str):
+                raise TypeError("resolve_resource 的 error 必须是文本或 null")
+            return normalized
+        except Exception:
+            self._log_plugin_failure(card, "resolve_resource")
+            return {
+                "target_id": card.card_id,
+                "files": [],
+                "token": None,
+                "error": "存储目标资源解析失败，请检查插件实现或查看服务日志",
+            }
 
     def list_files(
         self,
@@ -170,7 +205,14 @@ class StorageTargetManager:
         card = self.get(target_id)
         if not card:
             return []
-        return card.list_files(resource)
+        try:
+            result = card.list_files(resource)
+            if not isinstance(result, list) or any(not isinstance(item, dict) for item in result):
+                raise TypeError("list_files 必须返回字典列表")
+            return result
+        except Exception:
+            self._log_plugin_failure(card, "list_files")
+            return []
 
     def create_folder(
         self,
@@ -181,7 +223,14 @@ class StorageTargetManager:
         card = self.get(target_id)
         if not card:
             raise RuntimeError(self._unavailable_message(target_id))
-        return card.create_folder(name, parent_id)
+        try:
+            result = card.create_folder(name, parent_id)
+            if not isinstance(result, str) or not result.strip():
+                raise TypeError("create_folder 必须返回非空目录 ID")
+            return result
+        except Exception as exc:
+            self._log_plugin_failure(card, "create_folder")
+            raise RuntimeError("存储目标创建目录失败，请检查插件实现或查看服务日志") from exc
 
     def transfer(
         self,
@@ -197,4 +246,16 @@ class StorageTargetManager:
         payload = dict(resource) if isinstance(resource, dict) else {}
         if token:
             payload["stoken"] = token
-        return card.transfer(payload, files, target_id)
+        try:
+            result = card.transfer(payload, files, target_id)
+            if (
+                not isinstance(result, tuple)
+                or len(result) != 2
+                or not isinstance(result[0], bool)
+                or not isinstance(result[1], str)
+            ):
+                raise TypeError("transfer 必须返回 (bool, str)")
+            return result
+        except Exception:
+            self._log_plugin_failure(card, "transfer")
+            return False, "存储目标转存失败，请检查插件实现或查看服务日志"
