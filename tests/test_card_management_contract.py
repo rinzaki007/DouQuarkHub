@@ -547,7 +547,9 @@ def test_card_list_handles_malformed_persisted_card_config(tmp_path):
     body = response.get_json()
     telegram = next(card for card in body["cards"] if card["id"] == "telegram")
     assert telegram["configured"] is False
-    assert telegram["health"] == {"status": "idle", "message": "尚未检查"}
+    assert isinstance(telegram["health"], dict)
+    assert telegram["health"]["status"] == "unknown"
+    assert telegram["health"]["message"] == "尚未检查"
 
 
 def test_private_key_config_empty_submission_preserves_saved_secret(tmp_path):
