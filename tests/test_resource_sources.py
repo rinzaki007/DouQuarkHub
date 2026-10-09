@@ -243,3 +243,40 @@ def test_manager_loads_installed_resource_card_entry_points(monkeypatch):
 
     assert manager.load_plugins({"example": True}) == ["entrypoint-source"]
     assert manager.registry.get("entrypoint-source") is not None
+
+
+def test_resource_source_health_does_not_expose_plugin_exception():
+    class Store:
+        def load(self):
+            return {
+                "cards": {
+                    "broken-source": {"enabled": True, "config": {}},
+                }
+            }
+
+        def update_resource_source_health(self, *args, **kwargs):
+            pass
+
+    class BrokenCard(ResourceSourceCard):
+        manifest = CardManifest(
+            id="broken-source",
+            name="Broken Source",
+            type="resource_source",
+            capabilities=("resource.health_check",),
+        )
+
+        def check(self, config):
+            raise RuntimeError("upstream cookie=SECRET_COOKIE_VALUE")
+
+    manager = ResourceSourceManager(
+        FakeTelegramClient(),
+        Store(),
+        FakeLogger(),
+        resource_cards=[BrokenCard()],
+    )
+
+    result = next(item for item in manager.check_all() if item["id"] == "broken-source")
+
+    assert result["status"] == "unavailable"
+    assert result["message"] == "资源来源连接检查失败，请查看服务日志"
+    assert "SECRET_COOKIE_VALUE" not in result["message"]
