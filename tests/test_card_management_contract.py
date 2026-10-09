@@ -539,7 +539,9 @@ def test_card_list_handles_malformed_persisted_card_config(tmp_path):
     config["cards"]["telegram"]["config"] = []
     services["config"].store.write(config)
 
-    response = app.test_client().get("/api/cards")
+    client = app.test_client()
+    client.post("/api/setup", json={"username": "admin", "password": "password123"})
+    response = client.get("/api/cards")
 
     assert response.status_code == 200
     body = response.get_json()
