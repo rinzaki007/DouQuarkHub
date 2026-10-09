@@ -150,3 +150,12 @@ def create_card(context):
 不会阻止其他存储插件继续加载。重复卡片 ID 会由注册表拒绝。后台不接收或执行
 上传的 Python 文件；插件依赖需要在构建镜像或安装环境时预先安装。此阶段只提供
 发现与加载能力，动态安装、卸载及热重载不在范围内。
+
+
+## 可运行的独立存储插件示例
+
+仓库提供了完整的外置示例包：`examples/storage-card-plugin/`。它声明
+`moviesync.storage_targets` entry point，可用
+`python -m pip install ./examples/storage-card-plugin` 安装到 MovieSync 的同一
+Python 环境，再重启应用即可自动发现。该示例只演示插件加载、配置与检查，明确不执行真实网盘操作。
+CI 中的 `tests/test_example_storage_plugin_package.py` 会将示例包安装到临时目录，检查安装生成的 entry point 元数据，并通过真实的 `StorageTargetManager.load_plugins()` 加载它。
