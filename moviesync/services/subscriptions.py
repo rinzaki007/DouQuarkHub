@@ -25,11 +25,19 @@ def _normalize_resource_id(value: object) -> str:
         raise ValueError("分享资源 ID 无效")
     return value
 
-def _clean_tv_filename(file_name: str, title: str = "") -> tuple[int | None, str]:
+def _parse_tv_episode(file_name: str) -> tuple[int | None, int | None]:
+    """Return (season, episode); season is None for legacy episode-only names."""
     if not file_name:
-        return None, file_name
+        return None, None
+
+    season_match = re.search(r"\bS(\d{1,2})E(\d{1,4})\b", file_name, re.IGNORECASE)
+    if season_match:
+        season, episode = int(season_match.group(1)), int(season_match.group(2))
+        if 1900 <= episode <= 2030 or episode in {720, 1080, 2160}:
+            return None, None
+        return season, episode
+
     patterns = [
-        r"\bS\d{1,2}E(\d{1,4})\b",
         r"\bEP?\s*(\d{1,4})\b",
         r"第\s*(\d{1,4})\s*[集话期]",
         r"[\[(【](\d{1,4})[\])】]",
@@ -41,8 +49,13 @@ def _clean_tv_filename(file_name: str, title: str = "") -> tuple[int | None, str
         episode = int(match.group(1))
         if 1900 <= episode <= 2030 or episode in {720, 1080, 2160}:
             continue
-        return episode, file_name
-    return None, file_name
+        return None, episode
+    return None, None
+
+
+def _clean_tv_filename(file_name: str, title: str = "") -> tuple[int | None, str]:
+    _, episode = _parse_tv_episode(file_name)
+    return episode, file_name
 
 def _normalize_fid(value: object) -> str:
     fid = str(
@@ -236,6 +249,7 @@ class SubscriptionManager:
 
         target_fids = []
         selected_episode_numbers: list[int] = []
+        selected_season_episodes: list[tuple[int, int]] = []
         initial_tracked_keys: list[str] = []
         seen = set()
 
@@ -261,16 +275,24 @@ class SubscriptionManager:
             ):
                 seen.add(fid)
                 target_fids.append(fid)
-                ep_num, _ = _clean_tv_filename(
+                season_num, ep_num = _parse_tv_episode(
                     str(item.get("file_name") or "")
                     if isinstance(item, dict)
-                    else "",
-                    title,
+                    else ""
                 )
                 if ep_num is not None:
                     selected_episode_numbers.append(ep_num)
+                    if season_num is not None:
+                        selected_season_episodes.append((season_num, ep_num))
                 elif source_id and channel:
                     initial_tracked_keys.append(f"{pwd_id}:{fid}")
+
+        selected_baseline = max(selected_season_episodes, default=(0, 0))
+        baseline_episode = (
+            selected_baseline[1]
+            if selected_baseline[0] > 0
+            else max([start_ep, *selected_episode_numbers], default=start_ep)
+        )
 
         subscription = {
             "id": uuid.uuid4().hex,
@@ -279,7 +301,8 @@ class SubscriptionManager:
             "target_fid": target_fid,
             "storage_target_id": str(storage_target_id or "").strip(),
             "interval_hours": interval_hours,
-            "start_ep": max([start_ep, *selected_episode_numbers], default=start_ep),
+            "start_ep": baseline_episode,
+            "start_season": selected_baseline[0],
             "channel": str(
                 channel or ""
             ).strip()[:100],
@@ -584,6 +607,7 @@ class SubscriptionManager:
             if str(key).strip()
         }
         baseline_episode = int(sub.get("start_ep", 0) or 0)
+        baseline_season = int(sub.get("start_season", 0) or 0)
         grouped: dict[tuple[str, str], dict] = {}
 
         for source in sources:
@@ -624,10 +648,14 @@ class SubscriptionManager:
                 file_name = str(item.get("file_name") or "")
                 if not file_name.lower().endswith(VIDEO_EXTENSIONS):
                     continue
-                episode, _ = _clean_tv_filename(file_name, title)
+                season, episode = _parse_tv_episode(file_name)
                 if episode is None:
                     continue
-                if episode < baseline_episode:
+                if season is not None and baseline_season > 0:
+                    if (season, episode) < (baseline_season, baseline_episode):
+                        continue
+                elif episode < baseline_episode:
+                    # Legacy names without an explicit season retain episode-only behavior.
                     continue
                 grouped.setdefault((pwd_id, target_id), {
                     "resource": resource,
