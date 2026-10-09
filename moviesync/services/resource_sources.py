@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
 from threading import RLock
-from typing import Any
+from typing import Any, Iterable
 
 from ..cards import CardManifest, CardRegistry, ResourceSourceCard
 from ..clients.telegram import TelegramClient
@@ -167,18 +167,41 @@ class ResourceSourceManager:
         config_store,
         logger,
         registry: CardRegistry | None = None,
+        resource_cards: Iterable[ResourceSourceCard] | None = None,
     ):
         self.logger = logger
         self.config_store = config_store
         self.registry = registry or CardRegistry()
-        self.registry.register(TelegramResourceSource(telegram))
-        # 保留 sources 属性，兼容现有调用方；新代码优先通过 registry 发现卡片。
-        self.sources: dict[str, ResourceSource] = {
-            card.card_id: card
-            for card in self.registry.list()
-            if isinstance(card, ResourceSource)
-        }
+        self.sources: dict[str, ResourceSourceCard] = {}
         self.lock = RLock()
+
+        # 默认资源源仅在未注册时加载；允许应用装配层预先注册卡片。
+        if self.registry.get("telegram") is None:
+            self.registry.register(TelegramResourceSource(telegram))
+        for card in self.registry.find_by_type("resource_source"):
+            if isinstance(card, ResourceSourceCard):
+                self.sources[card.card_id] = card
+        for card in resource_cards or ():
+            self.register(card)
+
+    def register(self, card: ResourceSourceCard, *, replace: bool = False) -> ResourceSourceCard:
+        """注册资源来源卡片。第三方实现应由应用启动时的可信代码显式装配。"""
+        if not isinstance(card, ResourceSourceCard):
+            raise TypeError("资源来源卡片必须继承 ResourceSourceCard")
+        if card.card_type != "resource_source":
+            raise ValueError("卡片类型必须是 resource_source")
+        registered = self.registry.register(card, replace=replace)
+        self.sources[registered.card_id] = registered
+        return registered
+
+    @staticmethod
+    def _source_name(source: ResourceSourceCard) -> str:
+        return str(getattr(source, "name", "") or source.manifest.name or source.card_id)
+
+    @staticmethod
+    def _source_type(source: ResourceSourceCard) -> str:
+        return str(getattr(source, "source_type", "") or source.card_type)
+
 
     def get_cards(self) -> list[dict[str, Any]]:
         """返回已加载资源卡片的 Manifest。"""
@@ -192,7 +215,7 @@ class ResourceSourceManager:
         card_config = card.get("config")
         return dict(card_config) if isinstance(card_config, dict) else {}
 
-    def _enabled_sources(self, config: dict) -> list[ResourceSource]:
+    def _enabled_sources(self, config: dict) -> list[ResourceSourceCard]:
         enabled = []
         cards = config.get("cards") if isinstance(config, dict) else {}
         for source_id, source in self.sources.items():
@@ -205,11 +228,21 @@ class ResourceSourceManager:
         results: list[dict[str, Any]] = []
         for source in self._enabled_sources(config):
             try:
-                results.extend(source.search(movie, self._card_config(config, source.source_id)))
+                items = source.search(movie, self._card_config(config, source.card_id))
+                if not isinstance(items, list):
+                    raise TypeError("资源卡片 search 必须返回列表")
+                for item in items:
+                    if not isinstance(item, dict):
+                        continue
+                    results.append({
+                        **item,
+                        "source_id": str(item.get("source_id") or source.card_id),
+                        "source_name": str(item.get("source_name") or self._source_name(source)),
+                    })
             except Exception as exc:
                 self.logger.exception(
                     "资源源 %s 搜索异常: %s",
-                    source.source_id,
+                    source.card_id,
                     exc,
                 )
         return results
@@ -252,8 +285,8 @@ class ResourceSourceManager:
             if not enabled:
                 result = {
                     "id": source_id,
-                    "name": source.name,
-                    "type": source.source_type,
+                    "name": self._source_name(source),
+                    "type": self._source_type(source),
                     "enabled": False,
                     "status": "disabled",
                     "message": "资源源已停用",
@@ -266,7 +299,7 @@ class ResourceSourceManager:
                     result = {
                         "id": source_id,
                         "name": source.name,
-                        "type": source.source_type,
+                        "type": self._source_type(source),
                         "enabled": True,
                         **check,
                     }
@@ -287,12 +320,14 @@ class ResourceSourceManager:
                     }
 
             results.append(result)
-            self.config_store.update_resource_source_health(
-                source_id,
-                result["status"],
-                result.get("message", ""),
-                result.get("channels"),
-            )
+            update_health = getattr(self.config_store, "update_resource_source_health", None)
+            if callable(update_health):
+                update_health(
+                    source_id,
+                    result["status"],
+                    result.get("message", ""),
+                    result.get("channels"),
+                )
 
         return results
 
