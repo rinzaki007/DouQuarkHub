@@ -230,3 +230,88 @@ def test_disabled_storage_target_returns_clear_error_and_blocks_new_calls(tmp_pa
         {"pwd_id": "share-1", "storage_target_id": "quark"}
     )
     assert "已停用" not in (resolved.get("error") or "")
+
+
+
+def test_installed_storage_card_config_and_enable_lifecycle(tmp_path):
+    """Installed storage cards use the shared config API and obey enabled state."""
+    from moviesync.app import create_app
+    from moviesync.cards import CardManifest, StorageTargetCard
+
+    app = create_app({"MOVIESYNC_DATA_DIR": str(tmp_path)}, start_scheduler=False)
+    services = app.extensions["moviesync"]
+
+    class PluginStorageCard(StorageTargetCard):
+        manifest = CardManifest(
+            id="demo-storage-plugin",
+            name="Demo Storage Plugin",
+            type="storage_target",
+            capabilities=("storage.check", "storage.resolve_resource", "storage.list_files",
+                          "storage.create_folder", "storage.transfer"),
+            config_fields=(
+                {"key": "api_token", "label": "API Token", "type": "password",
+                 "secret": True, "required": True},
+                {"key": "root_id", "label": "Root ID", "type": "string",
+                 "default": "root"},
+            ),
+        )
+
+        def check(self, config):
+            return {"status": "healthy" if config.get("api_token") else "unconfigured"}
+
+        def resolve_resource(self, resource):
+            return {"files": [], "token": None, "error": None}
+
+        def list_files(self, resource):
+            return []
+
+        def create_folder(self, name, parent_id="0"):
+            return "folder-id"
+
+        def transfer(self, resource, files, target_id="0"):
+            return True, "ok"
+
+    card = PluginStorageCard()
+    services["card_registry"].register(card)
+    client = app.test_client()
+    client.post("/api/setup", json={"username": "admin", "password": "password123"})
+    with client.session_transaction() as session:
+        csrf = session["csrf_token"]
+    headers = {"X-CSRF-Token": csrf}
+    endpoint = "/api/cards/demo-storage-plugin/config"
+
+    response = client.post(
+        endpoint,
+        json={"enabled": True, "config": {"api_token": "secret-token", "root_id": "drive-root"}},
+        headers=headers,
+    )
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body["success"] is True
+    assert body["config"]["api_token"] == ""
+    assert body["has_value"]["api_token"] is True
+    assert "secret-token" not in response.get_data(as_text=True)
+    assert services["config"].load()["cards"]["demo-storage-plugin"]["config"] == {
+        "api_token": "secret-token", "root_id": "drive-root"
+    }
+    assert services["storage_targets"].get("demo-storage-plugin") is card
+
+    response = client.post(
+        endpoint,
+        json={"enabled": False, "config": {"api_token": "", "root_id": "drive-root"}},
+        headers=headers,
+    )
+    assert response.status_code == 200
+    assert services["storage_targets"].get("demo-storage-plugin") is None
+    target = next(item for item in services["storage_targets"].list_targets()
+                  if item["id"] == "demo-storage-plugin")
+    assert target["enabled"] is False
+    assert services["config"].load()["cards"]["demo-storage-plugin"]["config"]["api_token"] == "secret-token"
+
+    response = client.post(
+        endpoint,
+        json={"enabled": True, "config": {"api_token": "", "root_id": "drive-root"}},
+        headers=headers,
+    )
+    assert response.status_code == 200
+    assert services["storage_targets"].get("demo-storage-plugin") is card
