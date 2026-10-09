@@ -90,6 +90,10 @@ def create_app(
         config_store,
         logger,
     )
+    storage_targets.load_plugins({
+        "config_store": config_store,
+        "logger": logger,
+    })
     http = HttpClient()
 
     tasks = TaskManager(
