@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
+from importlib.metadata import entry_points
 from threading import RLock
 from typing import Any, Iterable
 
@@ -203,10 +204,38 @@ class ResourceSourceManager:
         return str(getattr(source, "source_type", "") or source.card_type)
 
 
+    def load_plugins(self, context: dict[str, Any] | None = None) -> list[str]:
+        """加载已安装 Python 包声明的资源卡片插件。
+
+        插件通过 moviesync.resource_sources entry point 暴露一个工厂函数，
+        工厂接收 context 字典并返回 ResourceSourceCard。仅加载环境中已安装
+        的可信 Python 包；不接受从 Web 上传或执行任意代码。
+        """
+        loaded: list[str] = []
+        plugin_context = dict(context or {})
+        try:
+            candidates = entry_points(group="moviesync.resource_sources")
+        except Exception as exc:
+            self.logger.exception("读取资源卡片插件入口失败: %s", exc)
+            return loaded
+
+        for entry_point in candidates:
+            try:
+                factory = entry_point.load()
+                if not callable(factory):
+                    raise TypeError("插件入口必须指向可调用的工厂函数")
+                card = factory(plugin_context)
+                self.register(card)
+                loaded.append(card.card_id)
+                self.logger.info("已加载资源卡片插件: %s", card.card_id)
+            except Exception as exc:
+                self.logger.exception("资源卡片插件 %s 加载失败: %s", entry_point.name, exc)
+        return loaded
+
+
     def get_cards(self) -> list[dict[str, Any]]:
         """返回已加载资源卡片的 Manifest。"""
         return self.registry.manifests()
-
     def _card_config(self, config: dict, source_id: str) -> dict[str, Any]:
         cards = config.get("cards") if isinstance(config, dict) else {}
         card = cards.get(source_id) if isinstance(cards, dict) else {}
@@ -298,7 +327,7 @@ class ResourceSourceManager:
                     check = source.check(self._card_config(config, source_id))
                     result = {
                         "id": source_id,
-                        "name": source.name,
+                        "name": self._source_name(source),
                         "type": self._source_type(source),
                         "enabled": True,
                         **check,
@@ -311,7 +340,7 @@ class ResourceSourceManager:
                     result = {
                         "id": source_id,
                         "name": source.name,
-                        "type": source.source_type,
+                        "type": self._source_type(source),
                         "enabled": True,
                         "status": "unavailable",
                         "message": str(exc)[:200],
