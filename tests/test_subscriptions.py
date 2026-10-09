@@ -1014,3 +1014,34 @@ def test_channel_subscription_creates_separate_folders_for_each_storage_target(t
         ]
     finally:
         manager.stop_scheduler()
+
+
+def test_legacy_subscription_deduplicates_repeated_file_ids_before_transfer(tmp_path):
+    storage = DynamicStorageTargets()
+    storage.files = [
+        {"fid": "ep1", "file_name": "Show.S01E01.mkv"},
+        {"fid": "ep1", "file_name": "Show.S01E01.mkv"},
+        {"fid": "ep2", "file_name": "Show.S01E02.mkv"},
+    ]
+    manager = SubscriptionManager(
+        tmp_path / "legacy-duplicate-file-ids.json",
+        storage,
+        FakeResourceSources(),
+        FakeLogger(),
+    )
+    sub = manager.add_subscription(
+        title="Show",
+        pwd_id="share-selected",
+        storage_target_id="demo-storage",
+    )
+
+    try:
+        ok, message = manager.check_subscription_now(sub["id"])
+
+        assert ok is True
+        assert "成功追更 2 项" in message
+        assert storage.transfers == [["ep1", "ep2"]]
+        saved = manager.get_subscriptions()[0]
+        assert saved["saved_episodes"] == [1, 2]
+    finally:
+        manager.stop_scheduler()

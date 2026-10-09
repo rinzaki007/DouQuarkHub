@@ -539,12 +539,14 @@ class SubscriptionManager:
         }
         selected = []
         found_keys = []
+        selected_fids = set()
         if sub.get("tracking_mode") == "all":
             for item in files:
                 fid = str(item.get("fid") or "").strip()
-                if fid and fid not in tracked_keys:
+                if fid and fid not in tracked_keys and fid not in selected_fids:
                     selected.append({"fid": fid})
                     found_keys.append(fid)
+                    selected_fids.add(fid)
         elif sub.get("files"):
             saved = {
                 item for item in (sub.get("saved_episodes", []) or [])
@@ -556,10 +558,11 @@ class SubscriptionManager:
                 if isinstance(item, dict) and item.get("fid")
             }
             for item in files:
-                fid = str(item.get("fid") or "")
-                if fid in target_fids and fid not in saved:
+                fid = str(item.get("fid") or "").strip()
+                if fid and fid in target_fids and fid not in saved and fid not in selected_fids:
                     selected.append({"fid": fid})
                     found_keys.append(fid)
+                    selected_fids.add(fid)
         else:
             saved = {
                 item for item in (sub.get("saved_episodes", []) or [])
@@ -567,13 +570,21 @@ class SubscriptionManager:
             }
             start_ep = int(sub.get("start_ep", 0) or 0)
             for item in files:
+                fid = str(item.get("fid") or "").strip()
                 ep_num, _ = _clean_tv_filename(
                     str(item.get("file_name", "")),
                     str(sub.get("title", "")),
                 )
-                if ep_num is not None and ep_num > start_ep and ep_num not in saved:
-                    selected.append({"fid": item.get("fid")})
+                if (
+                    fid
+                    and fid not in selected_fids
+                    and ep_num is not None
+                    and ep_num > start_ep
+                    and ep_num not in saved
+                ):
+                    selected.append({"fid": fid})
                     found_keys.append(ep_num)
+                    selected_fids.add(fid)
 
         if not selected:
             return self._finish(sub, True, f"《{sub.get('title', '')}》暂无新更新", success_keys=[])
