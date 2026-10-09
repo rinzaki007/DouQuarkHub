@@ -525,3 +525,85 @@ def test_interrupted_subscription_with_pending_files_recovers_as_uncertain(tmp_p
     ok, message = manager.check_subscription_now("interrupted")
     assert ok is False
     assert "待核实" in message
+
+
+
+class SelectiveResolutionStorageTargets(ChannelStorageTargets):
+    def __init__(self, broken_shares):
+        super().__init__()
+        self.broken_shares = set(broken_shares)
+
+    def resolve_resource(self, resource, target_id=None):
+        if resource["pwd_id"] in self.broken_shares:
+            return {
+                "target_id": target_id or "demo-storage",
+                "files": [],
+                "token": None,
+                "error": "临时解析失败",
+            }
+        return super().resolve_resource(resource, target_id)
+
+
+def test_channel_subscription_does_not_report_no_updates_when_all_shares_fail_resolution(tmp_path):
+    storage = SelectiveResolutionStorageTargets({"share1", "share2"})
+    sources = FakeResourceSources()
+    manager = SubscriptionManager(
+        tmp_path / "all-shares-failed.json",
+        storage,
+        sources,
+        FakeLogger(),
+    )
+    sub = manager.add_subscription(
+        title="Show",
+        pwd_id="share1",
+        target_fid="0",
+        storage_target_id="demo-storage",
+        source_id="telegram",
+        channel="demo",
+        files=[{"fid": "ep1", "file_name": "Show.S01E01.mkv"}],
+    )
+
+    ok, message = manager.check_subscription_now(sub["id"])
+
+    assert ok is False
+    assert "频道资源解析失败" in message
+    assert "暂无新更新" not in message
+    saved = manager.get_subscriptions()[0]
+    assert saved["status"] == "failed"
+    assert saved["retry_count"] == 1
+    assert storage.transfers == []
+
+
+def test_channel_subscription_reports_partial_resolution_failure_without_resaving_successes(tmp_path):
+    storage = SelectiveResolutionStorageTargets({"share2"})
+    sources = FakeResourceSources()
+    manager = SubscriptionManager(
+        tmp_path / "partial-share-failure.json",
+        storage,
+        sources,
+        FakeLogger(),
+    )
+    sub = manager.add_subscription(
+        title="Show",
+        pwd_id="share1",
+        target_fid="0",
+        storage_target_id="demo-storage",
+        source_id="telegram",
+        channel="demo",
+        files=[{"fid": "ep1", "file_name": "Show.S01E01.mkv"}],
+    )
+
+    ok, message = manager.check_subscription_now(sub["id"])
+
+    assert ok is False
+    assert "已转存 1 项" in message
+    assert "部分频道资源解析失败" in message
+    assert storage.transfers == [("share1", ["ep1"])]
+    saved = manager.get_subscriptions()[0]
+    assert "share1:ep1" in saved["tracked_file_keys"]
+    assert saved["status"] == "failed"
+
+    # A later retry still sees the already-recorded success and never submits it twice.
+    ok, _ = manager.check_subscription_now(sub["id"])
+    assert ok is False
+    assert storage.transfers == [("share1", ["ep1"])]
