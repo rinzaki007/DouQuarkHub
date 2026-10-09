@@ -367,7 +367,6 @@ def test_channel_subscription_tracks_later_episodes_across_separate_shares(tmp_p
     ]
 
 
-
 def test_channel_subscription_checks_selected_share_when_channel_search_is_empty(tmp_path):
     storage = ChannelStorageTargets()
     storage.shares = {
