@@ -56,3 +56,26 @@ def test_json_store_raises_instead_of_returning_default_on_read_error(tmp_path, 
     assert path.exists()
     with original_open(path, "r", encoding="utf-8") as handle:
         assert handle.read() == '{"keep": true}'
+
+
+
+def test_corrupt_json_is_not_replaced_when_quarantine_fails(tmp_path, monkeypatch):
+    import pytest
+
+    import moviesync.storage as storage_module
+    from moviesync.storage import JsonStoreReadError
+
+    path = tmp_path / "broken.json"
+    path.write_text("{not-json", encoding="utf-8")
+    store = JsonStore(path, lambda: {"fallback": True})
+
+    def denied_replace(*args, **kwargs):
+        raise PermissionError("permission denied")
+
+    monkeypatch.setattr(storage_module.os, "replace", denied_replace)
+
+    with pytest.raises(JsonStoreReadError, match="无法隔离损坏的 JSON 数据文件"):
+        store.read()
+
+    assert path.exists()
+    assert path.read_text(encoding="utf-8") == "{not-json"
