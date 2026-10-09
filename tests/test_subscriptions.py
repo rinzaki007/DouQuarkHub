@@ -1385,3 +1385,44 @@ def test_invalid_only_pending_keys_do_not_clear_fail_closed_marker(tmp_path, mon
         assert calls == []
     finally:
         manager.stop_scheduler()
+
+
+def test_invalid_only_pending_keys_without_marker_fail_closed(tmp_path, monkeypatch):
+    manager = SubscriptionManager(
+        tmp_path / "invalid-pending-without-marker.json",
+        FakeStorageTargets(),
+        FakeResourceSources(),
+        FakeLogger(),
+    )
+    sub = manager.add_subscription(title="无效待确认键无标记", pwd_id="share-invalid-no-marker")
+    calls = []
+
+    try:
+        items = manager.get_subscriptions()
+        current = next(item for item in items if item["id"] == sub["id"])
+        current["pending_save_keys"] = [None, True, {}, "   "]
+        current["pending_save_uncertain"] = True
+        current.pop("pending_save_keys_invalid", None)
+        current["status"] = "failed"
+        manager.store.write(items)
+
+        loaded = manager.get_subscriptions()[0]
+        assert loaded["pending_save_keys"] == []
+        assert loaded["pending_save_uncertain"] is True
+        assert loaded["pending_save_keys_invalid"] is True
+
+        def unexpected_check(subscription):
+            calls.append(subscription["id"])
+            return True, "不应执行"
+
+        monkeypatch.setattr(manager, "_check", unexpected_check)
+        ok, message = manager.check_subscription_now(sub["id"])
+        assert ok is False
+        assert "格式异常" in message
+        assert calls == []
+
+        ok, message = manager.resolve_pending_save(sub["id"], "not_saved")
+        assert ok is False
+        assert "格式异常" in message
+    finally:
+        manager.stop_scheduler()
