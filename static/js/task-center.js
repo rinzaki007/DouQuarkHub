@@ -6,6 +6,8 @@ let taskLoadSequence = 0;
 let candidateSearchSequence = 0;
 let taskCategorySequence = 0;
 let taskDestinationSequence = 0;
+let taskStorageTargets = [];
+let taskDefaultStorageTargetId = '';
 
 document.addEventListener('DOMContentLoaded', () => {
     loadTasks();
@@ -57,6 +59,8 @@ async function loadTaskCategories() {
 
         const targets = (Array.isArray(result.targets) ? result.targets : [])
             .filter(target => target && target.id && target.enabled !== false && !target.config_error);
+        taskStorageTargets = targets;
+        taskDefaultStorageTargetId = String(result.default_target_id || '');
         targetSelect.replaceChildren();
         if (!targets.length) {
             targetSelect.add(new Option('没有可用的转存位置', ''));
@@ -71,19 +75,25 @@ async function loadTaskCategories() {
         for (const target of targets) {
             targetSelect.add(new Option(target.name || target.id, target.id));
         }
-        if (result.default_target_id && !targets.some(target => target.id === result.default_target_id)) {
-            targetSelect.add(new Option('默认转存位置不可用', ''));
-            targetSelect.disabled = true;
-            destinationSelect.replaceChildren(new Option('请检查默认转存卡片', ''));
-            destinationSelect.disabled = true;
-            document.getElementById('task-form-status').textContent = '当前默认转存位置不可用。请在全局设置中修复默认位置，或先清除无效的默认设置；系统不会自动改存到其他网盘。';
-            refreshTaskSubmitState();
-            return;
+        const preferred = targets.find(target => target.id === result.default_target_id) || null;
+        if (!preferred && result.default_target_id) {
+            targetSelect.add(new Option('默认位置不可用，请手动选择', ''));
+            document.getElementById('task-form-status').textContent =
+                '默认转存位置不可用；请手动选择一个已启用且支持当前资源类型的存储卡片。系统不会静默改存到其他网盘。';
+        } else if (preferred) {
+            targetSelect.value = preferred.id;
+        } else if (targets.length === 1) {
+            targetSelect.value = targets[0].id;
+        } else {
+            targetSelect.add(new Option('请选择转存位置', ''));
+            targetSelect.value = '';
         }
-        const preferred = targets.find(target => target.id === result.default_target_id) || targets[0];
         targetSelect.disabled = false;
-        targetSelect.value = preferred.id;
-        await loadTaskDestinations(preferred.id);
+        if (targetSelect.value) await loadTaskDestinations(targetSelect.value);
+        else {
+            destinationSelect.replaceChildren(new Option('请先选择转存位置', ''));
+            destinationSelect.disabled = true;
+        }
     } catch (error) {
         if (requestId !== taskCategorySequence) return;
         targetSelect.replaceChildren(new Option('读取转存位置失败', ''));
@@ -93,6 +103,58 @@ async function loadTaskCategories() {
         document.getElementById('task-form-status').textContent = error.message || '读取保存目录失败，请检查卡片配置。';
         refreshTaskSubmitState();
     }
+}
+
+function filterStorageTargetsForCandidate(candidate) {
+    const targetSelect = document.getElementById('task-storage-target');
+    const destinationSelect = document.getElementById('task-target-fid');
+    if (!targetSelect || !destinationSelect) return;
+
+    const resourceType = String(candidate?.resource_type || '').trim().toLowerCase();
+    const required = resourceType ? 'storage.accepts.' + resourceType : '';
+    const compatible = taskStorageTargets.filter(target => {
+        if (!required) return true;
+        const capabilities = Array.isArray(target.capabilities) ? target.capabilities : [];
+        return capabilities.includes(required) || capabilities.includes('storage.accepts.*');
+    });
+
+    targetSelect.replaceChildren();
+    if (!compatible.length) {
+        targetSelect.add(new Option(
+            resourceType
+                ? '没有存储卡片支持此资源类型'
+                : '没有可用的转存位置',
+            ''
+        ));
+        targetSelect.disabled = true;
+        destinationSelect.replaceChildren(new Option('请安装或启用兼容的存储卡片', ''));
+        destinationSelect.disabled = true;
+        document.getElementById('task-form-status').textContent = resourceType
+            ? '当前资源类型为 ' + resourceType + '，没有已启用的存储卡片声明支持它。请安装对应卡片后再试。'
+            : '请先在「卡片管理」中启用并配置一个转存卡片。';
+        refreshTaskSubmitState();
+        return;
+    }
+
+    for (const target of compatible) {
+        targetSelect.add(new Option(target.name || target.id, target.id));
+    }
+    const preferred = compatible.find(target => target.id === candidate?.storage_target_id)
+        || compatible.find(target => target.id === taskDefaultStorageTargetId)
+        || (compatible.length === 1 ? compatible[0] : null);
+    targetSelect.disabled = false;
+    if (preferred) {
+        targetSelect.value = preferred.id;
+        loadTaskDestinations(preferred.id);
+    } else {
+        targetSelect.add(new Option('请选择兼容的转存位置', ''));
+        targetSelect.value = '';
+        destinationSelect.replaceChildren(new Option('请先选择转存位置', ''));
+        destinationSelect.disabled = true;
+        document.getElementById('task-form-status').textContent =
+            '此资源有多个兼容的存储卡片，请明确选择目标后再提交。';
+    }
+    refreshTaskSubmitState();
 }
 
 async function loadTaskDestinations(targetId) {
@@ -560,6 +622,7 @@ async function searchTaskCandidates() {
                     return String(file?.fid || '').trim();
                 }).filter(Boolean));
                 selectedCandidate = {candidate:candidate,row:row,selectedFids:currentSelected};
+                filterStorageTargetsForCandidate(candidate);
                 document.querySelectorAll('.candidate-select').forEach(b => { b.className='candidate-select shrink-0 rounded-xl border border-slate-700 bg-slate-900 px-4 py-2.5 text-[11px] text-slate-400'; b.textContent='选择此源'; });
                 this.className='candidate-select shrink-0 rounded-xl bg-emerald-600 px-4 py-2.5 text-[11px] font-medium text-white';
                 this.textContent='已选择';
