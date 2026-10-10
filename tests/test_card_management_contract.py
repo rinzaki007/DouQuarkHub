@@ -655,16 +655,21 @@ def test_builtin_metadata_provider_can_be_disabled_before_required_config_is_set
 
 
 
-def test_telegram_source_manifest_uses_form_editors_instead_of_raw_json():
+def test_telegram_channels_use_form_editor_and_filename_rules_are_global():
+    from card_templates.filename_recognition import FilenameRecognitionCard
     from card_templates.telegram import TelegramResourceSource
 
     fields = {field["key"]: field for field in TelegramResourceSource.manifest.config_fields}
     channels = fields["channels"]
-    regex = fields["magic_regex"]
+    global_fields = {
+        field["key"]: field
+        for field in FilenameRecognitionCard.manifest.config_fields
+    }
 
     assert channels["type"] == "json"
     assert channels["editor"] == "object_list"
     assert [field["key"] for field in channels["item_fields"]] == ["id", "name"]
-    assert regex["editor"] == "object_fields"
-    assert [field["key"] for field in regex["item_fields"]] == ["pattern", "replace"]
     assert "JSON 数组" not in channels["description"]
+    assert "magic_regex" not in fields
+    assert FilenameRecognitionCard.manifest.type == "filename_processor"
+    assert global_fields["magic_regex"]["editor"] == "object_fields"
