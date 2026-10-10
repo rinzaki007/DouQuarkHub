@@ -58,7 +58,7 @@ async function loadTaskCategories() {
             if (name === '电视剧') item.selected = true;
         }
     } catch (err) {
-        taskToast('目录配置加载失败');
+        taskToast('读取保存目录失败，请刷新页面后重试');
     }
 }
 
@@ -272,7 +272,7 @@ function renderTaskDetail(task) {
             ['validate','校验资源'],
             ['list_files','获取文件列表'],
             ['create_folder','准备目标文件夹'],
-            ['transfer','提交夸克转存'],
+            ['transfer','提交转存任务'],
             ['completed','转存完成']
         ];
     const phaseIndex = task.status === 'failed' ? -1 : phases.findIndex(x => x[0] === task.phase);
@@ -404,7 +404,7 @@ async function searchTaskCandidates() {
             row.className = 'rounded-2xl border border-slate-800 bg-slate-950/80 p-4 transition hover:border-slate-700';
             row.innerHTML =
                 '<div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div class="min-w-0">' +
-                '<div class="flex flex-wrap items-center gap-2"><span class="inline-flex items-center gap-1.5 rounded-lg border border-sky-900/60 bg-sky-950/40 px-2 py-1 text-[11px] font-semibold text-sky-300"><i class="fa-brands fa-telegram"></i>' + escapeTask(candidate.channel) + '</span>' +
+                '<div class="flex flex-wrap items-center gap-2"><span class="inline-flex items-center gap-1.5 rounded-lg border border-sky-900/60 bg-sky-950/40 px-2 py-1 text-[11px] font-semibold text-sky-300"><i class="fa-solid fa-puzzle-piece"></i>' + escapeTask(candidate.source_name || candidate.channel || '资源来源') + '</span>' +
                 '<span class="rounded-lg border border-slate-700 bg-slate-900 px-2 py-1 font-mono text-[10px] text-slate-500">' + escapeTask(candidate.pwd_id) + '</span></div>' +
                 '<div class="mt-3 flex flex-wrap gap-2"><span class="rounded-lg border border-slate-700 bg-slate-900 px-2 py-1 text-[10px] text-slate-400"><i class="fa-solid fa-film mr-1"></i>' + files.length + ' 个视频</span>' +
                 '<span class="rounded-lg border border-slate-700 bg-slate-900 px-2 py-1 text-[10px] text-slate-400"><i class="fa-solid fa-hard-drive mr-1"></i>' + escapeTask(totalSize) + '</span>' +
@@ -554,7 +554,7 @@ async function retryTask(id) {
 async function deleteTask(id) {
     const task=tasks.find(x=>String(x.id)===String(id));
     if(!task) return;
-    if(!confirm('确定删除“' + task.title + '”吗？删除后不会影响已经转存到夸克的文件。')) return;
+    if(!confirm('确定删除“' + task.title + '”吗？删除后不会影响已经保存到网盘的文件。')) return;
     try {
         const resp=await apiFetchTask('/api/tasks/' + encodeURIComponent(id),{method:'DELETE'});
         const res=await resp.json();
