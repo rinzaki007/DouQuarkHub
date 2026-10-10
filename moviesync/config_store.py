@@ -494,8 +494,10 @@ class ConfigStore:
                 if isinstance(quark_config, dict):
                     imported_quark = dict(quark_config)
                     if "cookie" in imported_quark:
+                        # A public config export intentionally redacts secrets to
+                        # an empty string. Treat that as "unchanged", not as an
+                        # explicit request to erase the locally stored cookie.
                         cookie = str(imported_quark.pop("cookie") or "").strip()
-                        imported_quark["clear_cookie"] = not bool(cookie)
                         if cookie:
                             imported_quark["cookie"] = cookie
                     self.save_quark_config(imported_quark)
