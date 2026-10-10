@@ -7,7 +7,44 @@ from typing import Any
 
 from moviesync.cards import CardManifest, ResourceSourceCard
 from moviesync.clients.telegram import TelegramClient
-from moviesync.config_store import ConfigStore, ConfigValidationError
+from moviesync.config_store import ConfigValidationError
+
+_CHANNEL_ID_RE = re.compile(r"^[A-Za-z0-9_]{2,64}$")
+_MAX_CHANNELS = 100
+
+
+def _normalize_channels(channels: object) -> list[dict[str, str]]:
+    """Normalize Telegram channel input locally; do not call ConfigStore internals."""
+    if channels is None:
+        return []
+    if not isinstance(channels, list):
+        raise ConfigValidationError("channels 必须是数组")
+
+    normalized: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for index, item in enumerate(channels):
+        if isinstance(item, str):
+            channel_id = item.strip().lstrip("@")
+            name = channel_id
+        elif isinstance(item, dict):
+            channel_id = str(item.get("id", "")).strip().lstrip("@")
+            name = str(item.get("name", channel_id)).strip()
+        else:
+            raise ConfigValidationError(f"第 {index + 1} 个频道配置无效")
+
+        if not _CHANNEL_ID_RE.fullmatch(channel_id):
+            raise ConfigValidationError(f"第 {index + 1} 个频道 ID 无效")
+        key = channel_id.lower()
+        if key in seen:
+            continue
+        if len(name) > 100:
+            name = name[:100]
+        seen.add(key)
+        normalized.append({"id": channel_id, "name": name or channel_id})
+
+    if len(normalized) > _MAX_CHANNELS:
+        raise ConfigValidationError(f"频道数量不能超过 {_MAX_CHANNELS} 个")
+    return normalized
 
 
 class TelegramResourceSource(ResourceSourceCard):
@@ -46,7 +83,7 @@ class TelegramResourceSource(ResourceSourceCard):
     def validate_config(self, config: dict[str, Any]) -> dict[str, Any]:
         """验证 Telegram 频道与文件名正则，统一通用配置和旧接口规则。"""
         normalized = super().validate_config(config)
-        normalized["channels"] = ConfigStore._normalize_channels(normalized.get("channels", []))
+        normalized["channels"] = _normalize_channels(normalized.get("channels", []))
         magic_regex = normalized.get("magic_regex", {})
         if magic_regex is None:
             magic_regex = {}

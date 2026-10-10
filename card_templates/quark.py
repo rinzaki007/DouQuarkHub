@@ -1,12 +1,25 @@
 """Standalone Quark storage-target card shipped as a single Python file."""
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from moviesync.cards import CardManifest, StorageTargetCard
 from moviesync.clients.quark import QuarkClient, sanitize_pwd_id
-from moviesync.config_store import ConfigStore, ConfigValidationError
-from moviesync.settings import DEFAULT_CATEGORY_FIDS
+from moviesync.config_store import ConfigValidationError
+
+_FID_RE = re.compile(r"^[A-Za-z0-9_-]{1,128}$")
+_CATEGORY_FID_KEYS = ("电影", "电视剧", "综艺", "动漫")
+
+
+def _normalize_fid(value: object, field: str, *, allow_empty: bool = False) -> str:
+    """Validate storage folder IDs inside the storage card, not ConfigStore."""
+    fid = str(value or "").strip()
+    if not fid:
+        return "" if allow_empty else "0"
+    if not _FID_RE.fullmatch(fid):
+        raise ConfigValidationError(f"{field} 格式无效")
+    return fid
 
 
 class QuarkStorageCard(StorageTargetCard):
@@ -63,7 +76,7 @@ class QuarkStorageCard(StorageTargetCard):
     def validate_config(self, config: dict[str, Any]) -> dict[str, Any]:
         """验证夸克目录配置，避免通用表单绕过专用接口的 FID 校验。"""
         normalized = super().validate_config(config)
-        normalized["default_fid"] = ConfigStore._normalize_fid(
+        normalized["default_fid"] = _normalize_fid(
             normalized.get("default_fid", "0"), "cards.quark.config.default_fid"
         )
         category_fids = normalized.get("category_fids", {})
@@ -71,16 +84,16 @@ class QuarkStorageCard(StorageTargetCard):
             category_fids = {}
         if not isinstance(category_fids, dict):
             raise ConfigValidationError("Quark 分类目录 FID 必须是对象")
-        unknown = set(category_fids) - set(DEFAULT_CATEGORY_FIDS)
+        unknown = set(category_fids) - set(_CATEGORY_FID_KEYS)
         if unknown:
             raise ConfigValidationError("未知分类目录: " + ", ".join(sorted(map(str, unknown))))
         normalized["category_fids"] = {
-            key: ConfigStore._normalize_fid(
+            key: _normalize_fid(
                 category_fids.get(key, ""),
                 f"cards.quark.config.category_fids.{key}",
                 allow_empty=True,
             )
-            for key in DEFAULT_CATEGORY_FIDS
+            for key in _CATEGORY_FID_KEYS
         }
         return normalized
 
