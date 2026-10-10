@@ -141,3 +141,24 @@ def test_builtin_cards_are_independent_single_file_plugins(tmp_path):
     assert registry.get("pansou") is not None
     assert registry.get("quark") is not None
     assert registry.get("douban") is not None
+
+
+def test_uninstall_keeps_card_registered_by_another_owner(tmp_path):
+    from moviesync.cards import Card, CardManifest
+
+    plugin_dir = tmp_path / "cards"
+    plugin_dir.mkdir()
+    (plugin_dir / "sample-plugin.py").write_bytes(_plugin_source("sample-plugin"))
+    registry = CardRegistry()
+    manager = CardFilePluginManager(plugin_dir, registry, logging.getLogger("test"))
+    manager.load_all()
+    registry.unregister("sample-plugin")
+
+    class OtherCard(Card):
+        manifest = CardManifest(id="sample-plugin", name="Other", type="custom")
+
+    other = OtherCard()
+    registry.register(other)
+    assert manager.list_plugins()[0]["loaded"] is False
+    manager.uninstall("sample-plugin.py")
+    assert registry.get("sample-plugin") is other
