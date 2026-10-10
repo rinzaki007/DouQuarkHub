@@ -743,12 +743,30 @@ function confirmBatchTransferForCandidate(mIdx, cIdx) {
 }
 
 async function confirmTransferAndSave(movie, candidate, targetFid = '0') {
+    const storageTargetId = String(document.getElementById('batch-storage-target')?.value || '');
+    const storageTarget = (window.storageTargets || []).find(target => target.id === storageTargetId);
+    if (!storageTargetId || !storageTarget) {
+        showToast('请先选择可用的存储卡片', 'error');
+        return;
+    }
+    const resourceType = String(candidate?.resource_type || '').trim().toLowerCase();
+    const capabilities = Array.isArray(storageTarget.capabilities) ? storageTarget.capabilities : [];
+    if (resourceType && !capabilities.includes('storage.accepts.' + resourceType)
+        && !capabilities.includes('storage.accepts.*')) {
+        showToast('当前存储卡片不支持此资源类型。请在弹窗顶部切换到兼容的存储卡片，保存目录会随之更新。', 'error');
+        return;
+    }
     closeCandidateModal();
     try {
         const response = await apiFetch('/api/transfer-selected', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({movie, candidate: {...candidate, storage_target_id: window.defaultStorageTargetId || ''}, target_fid: targetFid, storage_target_id: window.defaultStorageTargetId || ''})
+            body: JSON.stringify({
+                movie,
+                candidate: {...candidate, storage_target_id: storageTargetId},
+                target_fid: targetFid,
+                storage_target_id: storageTargetId
+            })
         });
         const res = await response.json();
         if (!res.success) {
