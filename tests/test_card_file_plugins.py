@@ -444,8 +444,10 @@ def test_custom_legacy_card_keeps_shared_telegram_context(tmp_path):
         "from moviesync.cards import Card, CardManifest\n"
         "class TelegramCard(Card):\n"
         "    manifest = CardManifest(id='telegram', name='Telegram', type='custom')\n"
+        "    def __init__(self, telegram):\n"
+        "        self.telegram = telegram\n"
         "def create_card(context):\n"
-        "    return TelegramCard()\n",
+        "    return TelegramCard(context.get('telegram'))\n",
         encoding="utf-8",
     )
     manager = CardFilePluginManager(
@@ -466,6 +468,8 @@ def test_custom_legacy_card_keeps_shared_telegram_context(tmp_path):
     )
     legacy_client = object()
 
-    card = manager.load_file("legacy_custom.py", {"telegram": legacy_client})
+    bundled_card = manager.load_file("telegram.py", {"telegram": legacy_client})
+    legacy_card = manager.load_file("legacy_custom.py", {"telegram": legacy_client})
 
-    assert card.telegram is legacy_client
+    assert bundled_card.telegram is None
+    assert legacy_card.telegram is legacy_client
