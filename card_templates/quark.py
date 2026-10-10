@@ -88,7 +88,7 @@ class QuarkStorageCard(StorageTargetCard):
         if unknown:
             raise ConfigValidationError("未知分类目录: " + ", ".join(sorted(map(str, unknown))))
         normalized["category_fids"] = {
-            key: ConfigStore._normalize_fid(
+            key: _normalize_fid(
                 category_fids.get(key, ""),
                 f"cards.quark.config.category_fids.{key}",
                 allow_empty=True,
