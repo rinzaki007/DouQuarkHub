@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import io
 import logging
+from pathlib import Path
 
 import pytest
 
@@ -255,3 +256,38 @@ def test_cards_api_does_not_treat_telegram_regex_defaults_as_configuration(tmp_p
     telegram = next(item for item in cards if item["id"] == "telegram")
     assert telegram["configured"] is False
     assert telegram["health"]["status"] == "unknown"
+
+
+
+def test_legacy_persistent_douban_card_factory_is_migrated_safely(tmp_path):
+    plugin_dir = tmp_path / "cards"
+    plugin_dir.mkdir()
+    marker_dir = plugin_dir / ".seeded"
+    marker_dir.mkdir()
+    (marker_dir / "douban.py.seeded").touch()
+    plugin_path = plugin_dir / "douban.py"
+    plugin_path.write_text(
+        'from moviesync.clients.douban import DoubanClient\\n'
+        'from card_templates.douban import DoubanMetadataCard\\n'
+        '\\n'
+        '# Keep this local note when migrating the built-in factory.\\n'
+        'def create_card(context):\\n'
+        '    return DoubanMetadataCard(context["douban"])\\n',
+        encoding="utf-8",
+    )
+
+    manager = CardFilePluginManager(
+        plugin_dir,
+        CardRegistry(),
+        logging.getLogger("test-card-plugins"),
+        Path(__file__).resolve().parents[1] / "card_templates",
+    )
+
+    loaded = manager.load_all()
+
+    assert loaded == ["douban"]
+    assert manager.registry.get("douban") is not None
+    migrated = plugin_path.read_text(encoding="utf-8")
+    assert "return DoubanMetadataCard(DoubanClient())" in migrated
+    assert "context[\"douban\"]" not in migrated
+    assert "# Keep this local note" in migrated
