@@ -1,6 +1,8 @@
 """Architecture regression tests for built-in single-file card independence."""
 from __future__ import annotations
 
+import pathlib
+
 import pytest
 
 from moviesync.app import create_app
@@ -62,9 +64,7 @@ def test_uninstalling_one_builtin_card_does_not_break_other_cards_or_platform(
 
 def test_all_bundled_card_implementations_are_single_file_factories():
     """Bundled implementations must expose the loader contract in their own file."""
-    from pathlib import Path
-
-    template_dir = Path(__file__).resolve().parents[1] / "card_templates"
+    template_dir = pathlib.Path(__file__).resolve().parents[1] / "card_templates"
     files = {
         path.stem: path
         for path in template_dir.glob("*.py")
