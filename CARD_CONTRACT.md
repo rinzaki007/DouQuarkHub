@@ -164,3 +164,15 @@ CI 中的 `tests/test_example_storage_plugin_package.py` 会将示例包安装�
 - 卸载：后台卸载会注销该卡片并删除对应 `.py` 文件；卡片配置和历史任务记录不会被自动清除。若它是默认存储目标，应先切换默认目标。
 - 内置卡片迁移：PanSou 已作为独立单文件卡片放入持久化目录。首次启动时从镜像中的 `card_templates/pansou.py` 初始化；初始化标记会保留，因此用户主动删除后，后续重启不会自动恢复该卡片。
 - 信任边界：加载 Python 文件等价于执行代码。后台入口受管理员会话与 CSRF 保护，但这不是代码沙箱；只安装自己审查过的文件。
+
+
+## Built-in single-file cards
+
+The built-in Telegram resource source, PanSou resource source, Quark storage target, and Douban metadata provider live as independent files under `card_templates/`. On first startup, `CardFilePluginManager` copies each valid template into the persistent `/app/data/cards/` directory and loads it through `create_card(context)`. The core resource, storage, and metadata managers only discover registered cards by their declared interface; they do not instantiate a specific built-in implementation.
+
+- `telegram.py`: Telegram channel search and health checks.
+- `pansou.py`: PanSou resource search.
+- `quark.py`: Quark link resolution, destination folders, and transfers.
+- `douban.py`: Douban metadata lookup and search.
+
+Uninstalling one of these files removes that card from the registry and persistent plugin directory, while other cards and core services continue running. Configuration and history are intentionally retained. Re-upload the same reviewed file to restore it. Shared low-level clients remain platform services injected through the factory context; card-specific behavior stays in the card file.
