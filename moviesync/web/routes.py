@@ -592,9 +592,10 @@ def cards():
         if isinstance(health, dict) and health:
             item["health"] = health
         else:
+            # Listing never performs network checks; unknown health remains idle.
             item["health"] = {
-                "status": "configured" if item["configured"] else "unconfigured",
-                "message": "已完成基础配置" if item["configured"] else "尚未完成配置",
+                "status": "idle",
+                "message": "尚未检查，请手动检查连接",
             }
         cards.append(item)
     plugin_manager = _services().get("file_card_plugins")
