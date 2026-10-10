@@ -162,6 +162,6 @@ def test_bundled_pansou_can_be_disabled_without_marking_movie_sync_unhealthy():
 
     assert "MOVIESYNC_BUNDLED_PANSOU_ENABLED" in entrypoint
     assert "MOVIESYNC_BUNDLED_PANSOU_ENABLED=true" in dockerfile
-    healthcheck = next(line for line in dockerfile.splitlines() if line.startswith("HEALTHCHECK"))
+    healthcheck = dockerfile.split("HEALTHCHECK", 1)[1]
     assert "/healthz" in healthcheck
     assert "/api/health" not in healthcheck
