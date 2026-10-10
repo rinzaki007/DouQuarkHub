@@ -101,14 +101,18 @@ class TaskManager:
                 for item in files
                 if isinstance(item, dict) and str(item.get("fid") or "").strip()
             })
-            pwd_id = str(candidate.get("pwd_id") or "").strip()
-            if pwd_id and file_ids:
+            resource_id = str(
+                candidate.get("resource_id") or candidate.get("share_id") or candidate.get("pwd_id") or ""
+            ).strip()
+            if resource_id and file_ids:
                 fingerprint = {
                     "type": "transfer",
                     "title": " ".join(
                         str(movie.get("title") or movie.get("name") or payload.get("title") or "").split()
                     ).casefold(),
-                    "pwd_id": pwd_id,
+                    "resource_id": resource_id,
+                    "resource_type": str(candidate.get("resource_type") or "").strip().lower(),
+                    "source_id": str(candidate.get("source_id") or "").strip(),
                     "storage_target_id": str(
                         candidate.get("storage_target_id")
                         or candidate.get("target_id")
@@ -136,7 +140,7 @@ class TaskManager:
         if value <= 60:
             return "create_folder", "准备目标文件夹"
         if value < 100:
-            return "transfer", "提交夸克转存"
+            return "transfer", "提交转存"
         return "completed", "转存完成"
 
     @staticmethod
@@ -193,7 +197,7 @@ class TaskManager:
             "failed_count": 0,
             "message": "任务已创建，等待执行",
             "source_channel": str(candidate.get("channel") or ""),
-            "share_code": str(candidate.get("pwd_id") or ""),
+            "share_code": str(candidate.get("resource_id") or candidate.get("share_id") or candidate.get("pwd_id") or ""),
             "target_fid": str(payload.get("target_fid") or "0"),
             "created_at": now,
             "started_at": None,
