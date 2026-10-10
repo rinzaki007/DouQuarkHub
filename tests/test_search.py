@@ -267,3 +267,60 @@ def test_search_and_transfer_accept_provider_neutral_resource_ids():
     assert "pwd_id" not in storage.transferred[0]
     assert storage.transferred[2] == "cloud-b"
     assert storage.transferred[3] == "fresh-token"
+
+
+
+def test_candidate_search_uses_selected_target_capabilities_and_pins_target():
+    import logging
+    from types import SimpleNamespace
+
+    class SelectedSources:
+        def __init__(self):
+            self.search_context = None
+
+        def search(self, movie, config):
+            self.search_context = movie
+            return [{
+                "source_id": "pansou",
+                "source_name": "PanSou",
+                "resource_id": "aliyun-share-1",
+                "resource_type": "aliyun_share",
+                "url": "https://www.alipan.com/s/aliyun-share-1",
+            }]
+
+    class SelectedTargets(FakeStorageTargets):
+        def __init__(self):
+            self.resolved_target = None
+
+        def get(self, target_id=None):
+            assert target_id == "aliyun"
+            return SimpleNamespace(
+                card_id="aliyun",
+                capabilities=("storage.accepts.aliyun_share",),
+            )
+
+        def resolve_resource(self, resource, target_id=None):
+            self.resolved_target = target_id
+            return {
+                "target_id": target_id,
+                "files": [{"fid": "v1", "file_name": "Show.S01E01.1080p.mkv", "size": 10}],
+                "token": None,
+                "error": None,
+            }
+
+    sources = SelectedSources()
+    targets = SelectedTargets()
+    service = SearchService(sources, targets, logging.getLogger("test"))
+
+    candidates = service.search_movie_candidates(
+        {"title": "Show"},
+        {"cards": {}},
+        storage_target_id="aliyun",
+    )
+
+    assert sources.search_context["storage_target_id"] == "aliyun"
+    assert sources.search_context["resource_types"] == ["aliyun_share"]
+    assert targets.resolved_target == "aliyun"
+    assert len(candidates) == 1
+    assert candidates[0]["resource_type"] == "aliyun_share"
+    assert candidates[0]["storage_target_id"] == "aliyun"

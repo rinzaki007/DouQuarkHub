@@ -11,6 +11,7 @@ let candidateModalState = null;
 let chaseCandidateState = [];
 let movieViewRequestSeq = 0;
 let categoryOptionsRequestSeq = 0;
+let candidateSearchRequestSeq = 0;
 
 function escapeHtml(value) {
     return String(value ?? '').replace(/[&<>\"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[char]));
@@ -80,6 +81,12 @@ document.addEventListener("DOMContentLoaded", () => {
         const targetId = String(event.target.value || '');
         window.defaultStorageTargetId = targetId;
         loadCategoryDestinations(targetId);
+        const modal = document.getElementById('candidate-modal');
+        const movies = candidateModalState?.movies;
+        if (targetId && Array.isArray(movies) && movies.length && modal && !modal.classList.contains('hidden')) {
+            // Changing the destination also changes which cloud types PanSou searches.
+            searchAndOpenCandidates(movies, targetId, true);
+        }
     });
     applyGlassmorphismStyles();
 });
@@ -461,13 +468,31 @@ function movieDetailChase() {
     window.location.href = '/tasks?' + params.toString();
 }
 
-async function searchAndOpenCandidates(selectedMovies) {
-    showToast('正在搜索资源，请稍候…', 'info');
+async function searchAndOpenCandidates(selectedMovies, requestedTargetId = null, keepModalOpen = false) {
+    const requestId = ++candidateSearchRequestSeq;
+    const storageTargetId = String(
+        requestedTargetId !== null
+            ? requestedTargetId
+            : (document.getElementById('batch-storage-target')?.value || window.defaultStorageTargetId || '')
+    ).trim();
+    if (!storageTargetId) {
+        showToast('请先选择已启用的存储卡片，再搜索对应网盘资源', 'error');
+        return;
+    }
+    if (keepModalOpen) {
+        candidateModalState = {movies: selectedMovies, candidatesMap: {}};
+        const content = document.getElementById('candidate-content');
+        if (content) {
+            content.innerHTML = '<div class="rounded-xl border border-sky-900/50 bg-sky-950/20 p-5 text-center text-xs text-sky-300">正在按所选存储卡片重新搜索对应网盘资源…</div>';
+        }
+    } else {
+        showToast('正在搜索资源，请稍候…', 'info');
+    }
     try {
         const requestOptions = {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({movies: selectedMovies})
+            body: JSON.stringify({movies: selectedMovies, storage_target_id: storageTargetId})
         };
         let response;
         let res;
@@ -492,11 +517,16 @@ async function searchAndOpenCandidates(selectedMovies) {
             }
             break;
         }
+        if (requestId !== candidateSearchRequestSeq) return;
         if (!res) throw new Error('暂时无法搜索资源，请稍后再试');
-        if (!res.success) return showToast(res.message || '无法搜索资源', 'error');
+        if (!res.success) {
+            if (keepModalOpen) openCandidateModal(selectedMovies, {});
+            return showToast(res.message || '无法搜索资源', 'error');
+        }
         const candidatesMap = res.candidates_map || {};
         const totalFound = selectedMovies.reduce((sum, movie) => sum + ((candidatesMap[movie.title] || []).length), 0);
         if (!totalFound) {
+            if (keepModalOpen) openCandidateModal(selectedMovies, candidatesMap);
             const unavailable = (res.resource_sources || [])
                 .filter(source => source.enabled !== false && source.health?.status === 'unavailable')
                 .map(source => source.name || source.id)
@@ -510,9 +540,11 @@ async function searchAndOpenCandidates(selectedMovies) {
                 'warning'
             );
         }
-        showToast('找到 ' + totalFound + ' 个可用资源版本', 'success');
+        showToast('已按所选存储卡片找到 ' + totalFound + ' 个可用资源版本', 'success');
         openCandidateModal(selectedMovies, candidatesMap);
     } catch (err) {
+        if (requestId !== candidateSearchRequestSeq) return;
+        if (keepModalOpen) openCandidateModal(selectedMovies, {});
         showToast(err.message || '资源检索异常', 'error');
     }
 }

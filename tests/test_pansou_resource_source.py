@@ -165,3 +165,78 @@ def test_bundled_pansou_can_be_disabled_without_marking_movie_sync_unhealthy():
     healthcheck = dockerfile.split("HEALTHCHECK", 1)[1]
     assert "/healthz" in healthcheck
     assert "/api/health" not in healthcheck
+
+
+
+def test_pansou_search_filters_aliyun_links_when_aliyun_storage_is_selected():
+    http = FakeHttpClient(
+        search_payload={
+            "code": 200,
+            "data": {
+                "results": [
+                    {
+                        "title": "测试剧",
+                        "links": [
+                            {"type": "aliyun", "url": "https://www.alipan.com/s/aliyun123"},
+                            {"type": "quark", "url": "https://pan.quark.cn/s/quark123"},
+                            {"type": "baidu", "url": "https://pan.baidu.com/s/baidu123"},
+                        ],
+                    }
+                ],
+                "merged_by_type": {},
+            },
+        }
+    )
+    source = PanSouResourceSource(http)
+
+    results = source.search(
+        {"title": "测试剧", "storage_target_id": "aliyun", "resource_types": ["aliyun_share"]},
+        {"base_url": "http://pansou.local"},
+    )
+
+    assert [item["resource_id"] for item in results] == ["aliyun123"]
+    assert results[0]["resource_type"] == "aliyun_share"
+    assert "pwd_id" not in results[0]
+    assert http.calls[0][3]["params"]["cloud_types"] == "aliyun"
+
+
+def test_pansou_search_filters_baidu_merged_results_when_baidu_storage_is_selected():
+    http = FakeHttpClient(
+        search_payload={
+            "code": 200,
+            "data": {
+                "results": [],
+                "merged_by_type": {
+                    "baidu": [
+                        {"url": "https://pan.baidu.com/s/baidu123", "note": "百度资源"},
+                    ],
+                    "aliyun": [
+                        {"url": "https://www.alipan.com/s/aliyun123", "note": "阿里资源"},
+                    ],
+                },
+            },
+        }
+    )
+    source = PanSouResourceSource(http)
+
+    results = source.search(
+        {"title": "测试剧", "storage_target_id": "baidu", "resource_types": ["baidu_share"]},
+        {"base_url": "http://pansou.local"},
+    )
+
+    assert [item["resource_id"] for item in results] == ["baidu123"]
+    assert results[0]["resource_type"] == "baidu_share"
+    assert http.calls[0][3]["params"]["cloud_types"] == "baidu"
+
+
+def test_pansou_does_not_fall_back_to_quark_for_unknown_selected_storage_type():
+    http = FakeHttpClient()
+    source = PanSouResourceSource(http)
+
+    results = source.search(
+        {"title": "测试剧", "storage_target_id": "unsupported", "resource_types": ["unsupported_share"]},
+        {"base_url": "http://pansou.local"},
+    )
+
+    assert results == []
+    assert http.calls == []

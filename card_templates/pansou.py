@@ -17,8 +17,8 @@ from moviesync.config_store import ConfigValidationError
 class PanSouResourceSource(ResourceSourceCard):
     """PanSou Web 搜索适配器。
 
-    当前输出夸克分享链接并声明资源类型；由平台根据存储卡能力匹配目标，
-    不直接绑定 Quark 卡片 ID。其他网盘类型不会被错误地交给夸克解析。
+    根据所选存储卡片声明的 storage.accepts.* 能力筛选 PanSou cloud_types，
+    并仅规范化所选网盘的分享链接；不把其他网盘的资源交给错误的存储卡片。
     """
 
     source_id = "pansou"
@@ -29,7 +29,7 @@ class PanSouResourceSource(ResourceSourceCard):
         name="PanSou",
         version="1.0.0",
         type="resource_source",
-        description="使用 MovieSync 内置 PanSou 搜索夸克分享资源，也可连接外部 PanSou 服务",
+        description="根据所选存储卡片搜索对应网盘分享资源；可使用内置 PanSou 或外部服务",
         capabilities=("resource.search", "resource.health_check"),
         config_fields=(
             {
@@ -183,7 +183,20 @@ class PanSouResourceSource(ResourceSourceCard):
         return response, self._payload(data)
 
     @staticmethod
-    def _quark_share_id(url: object) -> str:
+    def _cloud_type_for_resource_type(resource_type: object) -> str:
+        value = str(resource_type or "").strip().lower()
+        aliases = {
+            "quark": "quark",
+            "quark_share": "quark",
+            "aliyun": "aliyun",
+            "aliyun_share": "aliyun",
+            "baidu": "baidu",
+            "baidu_share": "baidu",
+        }
+        return aliases.get(value, "")
+
+    @staticmethod
+    def _share_id(url: object, cloud_type: str) -> str:
         from urllib.parse import urlparse
 
         value = str(url or "").strip()
@@ -192,31 +205,50 @@ class PanSouResourceSource(ResourceSourceCard):
         except ValueError:
             return ""
         host = (parsed.hostname or "").lower()
-        if not (host == "quark.cn" or host.endswith(".quark.cn")):
+        host_matches = {
+            "quark": host == "quark.cn" or host.endswith(".quark.cn"),
+            "aliyun": (
+                host == "alipan.com" or host.endswith(".alipan.com")
+                or host == "aliyundrive.com" or host.endswith(".aliyundrive.com")
+            ),
+            "baidu": host == "baidu.com" or host.endswith(".baidu.com"),
+        }
+        if not host_matches.get(cloud_type, False):
             return ""
         match = re.match(r"^/s/([A-Za-z0-9_-]{1,128})(?:/|$)", parsed.path)
         return match.group(1) if match else ""
 
+    @staticmethod
+    def _quark_share_id(url: object) -> str:
+        """兼容旧测试及第三方调用；新代码统一使用按网盘类型解析的 _share_id。"""
+        return PanSouResourceSource._share_id(url, "quark")
+
+    @classmethod
     def _normalize_link(
-        self,
+        cls,
         item: dict[str, Any],
         *,
+        cloud_type: str,
         title: str = "",
         channel: str = "",
     ) -> dict[str, Any] | None:
         link_url = str(item.get("url") or "").strip()
-        share_id = self._quark_share_id(link_url)
+        share_id = cls._share_id(link_url, cloud_type)
         if not share_id:
             return None
-        return {
+        resource_type = f"{cloud_type}_share"
+        normalized = {
             "resource_id": share_id,
-            "pwd_id": share_id,  # Legacy alias for existing clients and saved tasks.
             "url": link_url,
             "password": str(item.get("password") or item.get("passcode") or "").strip(),
-            "resource_type": "quark_share",
+            "resource_type": resource_type,
             "title": title[:500],
             "channel": channel[:200],
         }
+        # Keep the old alias only for Quark data that predates provider-neutral IDs.
+        if cloud_type == "quark":
+            normalized["pwd_id"] = share_id
+        return normalized
 
     def search(self, movie: object, config: dict) -> list[dict[str, Any]]:
         title = str(
@@ -226,6 +258,22 @@ class PanSouResourceSource(ResourceSourceCard):
         ).strip()
         base_url = self._base_url(config)
         if not title or not base_url:
+            return []
+        requested_types = (
+            movie.get("resource_types")
+            if isinstance(movie, dict) and "storage_target_id" in movie
+            else ["quark_share"]
+        )
+        if not isinstance(requested_types, (list, tuple, set)):
+            requested_types = []
+        cloud_types = sorted({
+            cloud_type
+            for resource_type in requested_types
+            if (cloud_type := self._cloud_type_for_resource_type(resource_type))
+        })
+        # An explicit target without a matching PanSou cloud type must not silently
+        # fall back to Quark or search every provider.
+        if not cloud_types:
             return []
         try:
             timeout = int(config.get("timeout", 45))
@@ -240,11 +288,11 @@ class PanSouResourceSource(ResourceSourceCard):
                 "kw": title,
                 "res": "all",
                 "src": "all",
-                "cloud_types": "quark",
+                "cloud_types": ",".join(cloud_types),
             },
         )
         results: list[dict[str, Any]] = []
-        seen: set[str] = set()
+        seen: set[tuple[str, str]] = set()
 
         raw_results = payload.get("results")
         if isinstance(raw_results, list):
@@ -259,34 +307,56 @@ class PanSouResourceSource(ResourceSourceCard):
                 for link in links:
                     if not isinstance(link, dict):
                         continue
-                    link_type = str(link.get("type") or "").lower()
-                    if link_type and "quark" not in link_type and "夸克" not in link_type:
+                    link_type = str(link.get("type") or "").strip().lower()
+                    aliases = {
+                        "quark": "quark", "夸克": "quark",
+                        "aliyun": "aliyun", "alipan": "aliyun", "阿里云盘": "aliyun",
+                        "baidu": "baidu", "百度": "baidu", "百度网盘": "baidu",
+                    }
+                    cloud_type = aliases.get(link_type)
+                    if not cloud_type:
+                        cloud_type = next(
+                            (
+                                candidate_type
+                                for candidate_type in cloud_types
+                                if self._share_id(link.get("url"), candidate_type)
+                            ),
+                            "",
+                        )
+                    if cloud_type not in cloud_types:
                         continue
                     normalized = self._normalize_link(
-                        link, title=result_title, channel=channel
+                        link, cloud_type=cloud_type, title=result_title, channel=channel
                     )
-                    if normalized and normalized["pwd_id"] not in seen:
-                        seen.add(normalized["pwd_id"])
+                    key = (normalized["resource_type"], normalized["resource_id"]) if normalized else None
+                    if normalized and key not in seen:
+                        seen.add(key)
                         results.append(normalized)
 
         # 兼容只返回按网盘类型聚合结果的 PanSou 部署版本。
         merged = payload.get("merged_by_type")
         if isinstance(merged, dict):
-            for cloud_type, items in merged.items():
-                if "quark" not in str(cloud_type).lower() and "夸克" not in str(cloud_type):
-                    continue
-                if not isinstance(items, list):
+            aliases = {
+                "quark": "quark", "夸克": "quark",
+                "aliyun": "aliyun", "alipan": "aliyun", "阿里云盘": "aliyun",
+                "baidu": "baidu", "百度": "baidu", "百度网盘": "baidu",
+            }
+            for raw_cloud_type, items in merged.items():
+                cloud_type = aliases.get(str(raw_cloud_type).strip().lower())
+                if cloud_type not in cloud_types or not isinstance(items, list):
                     continue
                 for item in items:
                     if not isinstance(item, dict):
                         continue
                     normalized = self._normalize_link(
                         item,
+                        cloud_type=cloud_type,
                         title=str(item.get("note") or title),
                         channel=str(item.get("source") or ""),
                     )
-                    if normalized and normalized["pwd_id"] not in seen:
-                        seen.add(normalized["pwd_id"])
+                    key = (normalized["resource_type"], normalized["resource_id"]) if normalized else None
+                    if normalized and key not in seen:
+                        seen.add(key)
                         results.append(normalized)
         return results
 
