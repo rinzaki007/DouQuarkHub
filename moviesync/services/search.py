@@ -148,16 +148,57 @@ class SearchService:
 
         return files, token, error, target_id
 
-    def search_movie_candidates(self, movie: object, config: dict) -> list[dict]:
+    def search_movie_candidates(
+        self,
+        movie: object,
+        config: dict,
+        storage_target_id: str | None = None,
+    ) -> list[dict]:
         title, cleaned_title = self._title(movie)
         if not title:
             return []
-        self.logger.info("开始检索《%s》", title)
+        selected_target_id = str(storage_target_id or "").strip()
+        resource_types: list[str] = []
+        if selected_target_id:
+            getter = getattr(self.storage_targets, "get", None)
+            target = getter(selected_target_id) if callable(getter) else None
+            if target is None:
+                self.logger.warning(
+                    "资源搜索已取消：指定的存储目标 %s 不存在或已停用",
+                    selected_target_id,
+                )
+                return []
+            capabilities = getattr(target, "capabilities", None)
+            if capabilities is None:
+                manifest = getattr(target, "manifest", None)
+                capabilities = getattr(manifest, "capabilities", ())
+            resource_types = sorted({
+                capability.removeprefix("storage.accepts.")
+                for capability in (capabilities or ())
+                if isinstance(capability, str)
+                and capability.startswith("storage.accepts.")
+                and capability != "storage.accepts.*"
+            })
+            if not resource_types:
+                self.logger.warning(
+                    "资源搜索已取消：存储目标 %s 未声明可搜索的资源类型",
+                    selected_target_id,
+                )
+                return []
 
-        discovered = self.resource_sources.search(
-            {"title": cleaned_title},
-            config,
+        self.logger.info(
+            "开始检索《%s》%s",
+            title,
+            f"（存储目标：{selected_target_id}）" if selected_target_id else "",
         )
+
+        search_context = {"title": cleaned_title}
+        if selected_target_id:
+            search_context.update({
+                "storage_target_id": selected_target_id,
+                "resource_types": resource_types,
+            })
+        discovered = self.resource_sources.search(search_context, config)
         candidates: list[dict] = []
         seen_resource_keys: set[tuple[str, str]] = set()
 
@@ -172,6 +213,7 @@ class SearchService:
             resource = {
                 **source,
                 "resource_id": resource_id,
+                **({"storage_target_id": selected_target_id} if selected_target_id else {}),
             }
             if source.get("pwd_id"):
                 resource["pwd_id"] = str(source.get("pwd_id") or "").strip()
