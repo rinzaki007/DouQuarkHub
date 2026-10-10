@@ -254,4 +254,4 @@ def test_cards_api_does_not_treat_telegram_regex_defaults_as_configuration(tmp_p
     cards = client.get("/api/cards").get_json()["cards"]
     telegram = next(item for item in cards if item["id"] == "telegram")
     assert telegram["configured"] is False
-    assert telegram["health"]["status"] == "idle"
+    assert telegram["health"]["status"] == "unknown"
