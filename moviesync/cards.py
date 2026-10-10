@@ -336,7 +336,13 @@ class ResourceSourceCard(Card):
 
 
 class StorageTargetCard(Card):
-    """存储/转存目标卡片接口。"""
+    """存储/转存目标卡片接口。
+
+    资源来源应优先输出通用 resource_id 和 resource_type；pwd_id 只作为旧数据
+    兼容字段。目标卡片通过 storage.accepts.<resource_type> 声明可解析并原生
+    接收的分享类型；storage.accepts.* 表示该卡片明确支持多种类型。
+    resource_id 在不同 resource_type 之间不保证唯一，核心会按类型隔离缓存和任务指纹。
+    """
 
     manifest = CardManifest(
         id="unknown.storage",
