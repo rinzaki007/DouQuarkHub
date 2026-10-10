@@ -409,14 +409,19 @@ def test_bundled_telegram_card_owns_its_client(monkeypatch):
 
 
 def test_legacy_telegram_adapter_constructs_client_only_on_demand(monkeypatch):
-    from moviesync.clients.compat import LazyTelegramClient
     import moviesync.clients.telegram as telegram_module
+    from moviesync.clients.compat import LazyTelegramClient
 
     created = []
 
     class FakeTelegramClient:
         def __init__(self):
-            self.http = type("Http", (), {"session": type("Session", (), {"close": lambda self: created.append("closed")})()})()
+            session = type(
+                "Session",
+                (),
+                {"close": lambda self: created.append("closed")},
+            )()
+            self.http = type("Http", (), {"session": session})()
 
         def check_channel(self, channel):
             return channel == "demo"
