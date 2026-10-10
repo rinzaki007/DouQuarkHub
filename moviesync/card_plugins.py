@@ -41,7 +41,7 @@ class CardFilePluginManager:
         self.plugin_dir.mkdir(parents=True, exist_ok=True)
         self._seed_bundled_cards(Path(bundled_dir).resolve() if bundled_dir else None)
         self._lock = RLock()
-        self._loaded: dict[str, tuple[str, str]] = {}
+        # Keep the exact instance so stale file bookkeeping can never remove a\n        # different card that later registers under the same ID.\n        self._loaded: dict[str, tuple[str, str, Card]] = {}
         self._errors: dict[str, str] = {}
         self._context: dict[str, Any] = {}
 
@@ -85,7 +85,7 @@ class CardFilePluginManager:
                 loaded = self._loaded.get(filename)
                 items.append({
                     "filename": filename,
-                    "loaded": bool(loaded and self.registry.get(loaded[0]) is not None),
+                    "loaded": bool(loaded and self.registry.get(loaded[0]) is loaded[2]),
                     "card_id": loaded[0] if loaded else None,
                     "error": self._errors.get(filename, ""),
                     "size": path.stat().st_size,
@@ -131,7 +131,7 @@ class CardFilePluginManager:
                 self._errors[name] = str(exc)[:300]
                 sys.modules.pop(module_name, None)
                 raise
-            self._loaded[name] = (card.card_id, module_name)
+            self._loaded[name] = (card.card_id, module_name, card)
             self._errors.pop(name, None)
             self.logger.info("已加载单文件卡片 %s（%s）", card.card_id, name)
             return card
