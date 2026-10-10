@@ -55,7 +55,9 @@ def test_resource_source_uses_telegram_card_config():
                 "health": {},
             }]
 
-    manager = ResourceSourceManager(Store(), FakeLogger(), resource_cards=[TelegramResourceSource(FakeTelegramClient())])
+    manager = ResourceSourceManager(
+        Store(), FakeLogger(), resource_cards=[TelegramResourceSource(FakeTelegramClient())]
+    )
     results = manager.search(
         {"title": "测试电影"},
         Store().load(),
