@@ -383,3 +383,48 @@ def test_douban_normalizer_preserves_string_shaped_cover_fields():
 
     assert item_cover["cover"] == "https://img3.doubanio.com/view/photo/s_ratio_poster/public/p123.jpg"
     assert target_cover["cover"] == "https://img1.doubanio.com/view/photo/s_ratio_poster/public/p456.jpg"
+
+
+
+def test_douban_normalizer_extracts_nested_poster_url_shapes():
+    from moviesync.clients.douban import DoubanClient
+
+    normalize = DoubanClient._normalize_item
+
+    nested_pic = normalize({
+        "id": "123",
+        "title": "嵌套 pic 海报",
+        "pic": {
+            "normal": {
+                "url": "//img3.doubanio.com/view/photo/s_ratio_poster/public/p123.webp",
+            },
+        },
+    })
+    nested_cover = normalize({
+        "target": {
+            "id": "456",
+            "title": "嵌套 cover 海报",
+            "cover": {
+                "large": {
+                    "url": "http://img1.doubanio.com/view/photo/s_ratio_poster/public/p456.jpg",
+                },
+            },
+        },
+    })
+    fallback_cover = normalize({
+        "id": "789",
+        "title": "回退 img 海报",
+        "pic": {"normal": {"not_a_url": True}},
+        "img": {"url": "https://img2.doubanio.com/view/photo/s_ratio_poster/public/p789.jpg"},
+    })
+
+    assert nested_pic["cover"] == "https://img3.doubanio.com/view/photo/s_ratio_poster/public/p123.webp"
+    assert nested_cover["cover"] == "https://img1.doubanio.com/view/photo/s_ratio_poster/public/p456.jpg"
+    assert fallback_cover["cover"] == "https://img2.doubanio.com/view/photo/s_ratio_poster/public/p789.jpg"
+
+
+def test_douban_cover_normalizer_rejects_non_string_values():
+    from moviesync.clients.douban import DoubanClient
+
+    assert DoubanClient._normalize_cover_url({"url": "https://img1.doubanio.com/poster.jpg"}) == ""
+    assert DoubanClient._extract_cover_url({"url": {"normal": "https://img1.doubanio.com/poster.jpg"}}) == "https://img1.doubanio.com/poster.jpg"
