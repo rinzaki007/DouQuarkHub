@@ -373,6 +373,23 @@ class StorageTargetCard(Card):
         raise NotImplementedError
 
 
+class FilenameProcessorCard(Card):
+    """文件名识别能力接口；资源源只依赖此能力，不依赖具体卡片 ID。"""
+
+    manifest = CardManifest(
+        id="unknown.filename-processor",
+        name="未命名文件名识别器",
+        type="filename_processor",
+        capabilities=("filename.parse",),
+    )
+
+    def parse_episode(
+        self, file_name: str, config: dict[str, Any]
+    ) -> tuple[int | None, int | None]:
+        """识别文件名中的季集信息；无法识别时返回 (None, None)。"""
+        raise NotImplementedError
+
+
 class MetadataProviderCard(Card):
     """影视/媒体元数据卡片接口。"""
 
