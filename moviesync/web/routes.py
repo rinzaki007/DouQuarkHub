@@ -921,12 +921,19 @@ def get_movies():
         "U",
     )
 
+    provider_id = str(request.args.get("provider_id") or "").strip() or None
+
     try:
-        movies = _services()["metadata"].list_movies(tag, sort_type)
+        movies = _services()["metadata"].list_movies(
+            tag,
+            sort_type,
+            provider_id=provider_id,
+        )
 
         return jsonify(
             {
                 "success": True,
+                "provider_id": provider_id,
                 "movies": movies,
             }
         )
@@ -956,11 +963,17 @@ def search_metadata():
             }
         )
 
+    provider_id = str(request.args.get("provider_id") or "").strip() or None
+
     try:
         return jsonify(
             {
                 "success": True,
-                "movies": _services()["metadata"].search(query),
+                "provider_id": provider_id,
+                "movies": _services()["metadata"].search(
+                    query,
+                    provider_id=provider_id,
+                ),
             }
         )
 

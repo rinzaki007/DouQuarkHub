@@ -38,8 +38,12 @@
 
             <!-- 中间：搜索框 -->
             <div class="order-last lg:order-none w-full lg:flex-1 lg:max-w-xl lg:mx-2 relative">
+                <select id="metadata-provider-select" aria-label="影视数据源" onchange="onMetadataProviderChange()"
+                        class="absolute left-1.5 top-1.5 z-10 max-w-28 rounded-lg border border-slate-700/70 bg-slate-900 px-2 py-1 text-xs text-slate-300 focus:outline-none focus:border-blue-500">
+                    <option value="">自动来源</option>
+                </select>
                 <input type="text" id="search-input" placeholder="搜索影视资源..." 
-                       class="w-full glass-control bg-slate-950/55 border border-slate-700/60 rounded-xl px-3.5 py-2 text-sm text-slate-200 focus:outline-none focus:border-blue-500 shadow-inner"
+                       class="w-full glass-control bg-slate-950/55 border border-slate-700/60 rounded-xl pl-28 pr-10 py-2 text-sm text-slate-200 focus:outline-none focus:border-blue-500 shadow-inner"
                        onkeydown="if(event.key==='Enter') doSearch()">
                 <button onclick="doSearch()" class="absolute right-3 top-2 text-slate-400 hover:text-white text-xs">
                     <i class="fa-solid fa-magnifying-glass"></i>
