@@ -299,20 +299,20 @@ def test_seeded_card_template_updates_when_persisted_copy_is_unchanged(tmp_path)
     bundled_dir = tmp_path / "bundled"
     bundled_dir.mkdir()
     source = bundled_dir / "demo.py"
-    source.write_text("# version 1\\n", encoding="utf-8")
+    source.write_text("# version 1\n", encoding="utf-8")
     plugin_dir = tmp_path / "cards"
     logger = logging.getLogger("test-card-seed-upgrade")
 
     CardFilePluginManager(plugin_dir, CardRegistry(), logger, bundled_dir)
     persisted = plugin_dir / "demo.py"
     marker = plugin_dir / ".seeded" / "demo.py.seeded"
-    assert persisted.read_text(encoding="utf-8") == "# version 1\\n"
+    assert persisted.read_text(encoding="utf-8") == "# version 1\n"
     assert marker.read_text(encoding="ascii") == card_plugins._git_blob_sha(persisted.read_bytes())
 
-    source.write_text("# version 2\\n", encoding="utf-8")
+    source.write_text("# version 2\n", encoding="utf-8")
     CardFilePluginManager(plugin_dir, CardRegistry(), logger, bundled_dir)
 
-    assert persisted.read_text(encoding="utf-8") == "# version 2\\n"
+    assert persisted.read_text(encoding="utf-8") == "# version 2\n"
     assert marker.read_text(encoding="ascii") == card_plugins._git_blob_sha(source.read_bytes())
 
 
@@ -320,30 +320,30 @@ def test_seeded_card_template_preserves_administrator_edits(tmp_path):
     bundled_dir = tmp_path / "bundled"
     bundled_dir.mkdir()
     source = bundled_dir / "demo.py"
-    source.write_text("# bundled version 1\\n", encoding="utf-8")
+    source.write_text("# bundled version 1\n", encoding="utf-8")
     plugin_dir = tmp_path / "cards"
     logger = logging.getLogger("test-card-seed-custom")
 
     CardFilePluginManager(plugin_dir, CardRegistry(), logger, bundled_dir)
     persisted = plugin_dir / "demo.py"
-    persisted.write_text("# administrator custom version\\n", encoding="utf-8")
-    source.write_text("# bundled version 2\\n", encoding="utf-8")
+    persisted.write_text("# administrator custom version\n", encoding="utf-8")
+    source.write_text("# bundled version 2\n", encoding="utf-8")
 
     CardFilePluginManager(plugin_dir, CardRegistry(), logger, bundled_dir)
 
-    assert persisted.read_text(encoding="utf-8") == "# administrator custom version\\n"
+    assert persisted.read_text(encoding="utf-8") == "# administrator custom version\n"
 
 
 def test_seeded_card_template_migrates_known_legacy_copy_with_empty_marker(tmp_path, monkeypatch):
     bundled_dir = tmp_path / "bundled"
     bundled_dir.mkdir()
     source = bundled_dir / "demo.py"
-    source.write_text("# new bundled version\\n", encoding="utf-8")
+    source.write_text("# new bundled version\n", encoding="utf-8")
     plugin_dir = tmp_path / "cards"
     plugin_dir.mkdir()
     (plugin_dir / ".seeded").mkdir()
     persisted = plugin_dir / "demo.py"
-    old_content = b"# known legacy bundled version\\n"
+    old_content = b"# known legacy bundled version\n"
     persisted.write_bytes(old_content)
     (plugin_dir / ".seeded" / "demo.py.seeded").write_text("", encoding="ascii")
     monkeypatch.setitem(
@@ -356,7 +356,7 @@ def test_seeded_card_template_migrates_known_legacy_copy_with_empty_marker(tmp_p
         plugin_dir, CardRegistry(), logging.getLogger("test-card-seed-legacy"), bundled_dir
     )
 
-    assert persisted.read_text(encoding="utf-8") == "# new bundled version\\n"
+    assert persisted.read_text(encoding="utf-8") == "# new bundled version\n"
     assert (plugin_dir / ".seeded" / "demo.py.seeded").read_text(encoding="ascii") == (
         card_plugins._git_blob_sha(source.read_bytes())
     )
