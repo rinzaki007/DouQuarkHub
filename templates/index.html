@@ -53,9 +53,6 @@
 
             <!-- 右侧：设置 -->
             <div class="flex items-center space-x-2 shrink-0">
-                <a href="/about" class="px-2.5 py-1.5 text-xs glass-control bg-slate-900/55 hover:bg-slate-800/80 text-slate-300 rounded-xl border border-slate-700/60 flex items-center gap-1">
-                    <i class="fa-solid fa-circle-info"></i> 关于
-                </a>
                 <a href="/admin" class="px-2.5 py-1.5 text-xs glass-control bg-slate-900/55 hover:bg-slate-800/80 text-slate-300 rounded-xl border border-slate-700/60 flex items-center gap-1">
                     <i class="fa-solid fa-gear"></i> 设置
                 </a>
@@ -174,6 +171,11 @@
             </div>
         </div>
     </div>
+
+    <!-- 低调的页尾说明入口：不占用首页顶部空间，保留第三方署名与项目说明的访问方式。 -->
+    <footer class="mt-auto px-4 py-3 text-center text-[10px] text-slate-500/50">
+        <a href="/about" class="transition hover:text-slate-300">关于 MovieSync · 第三方数据来源与署名说明</a>
+    </footer>
 
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
