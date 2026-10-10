@@ -27,6 +27,7 @@ CARD_TYPES = {
     "metadata_provider",
     "notification",
     "automation",
+    "filename_processor",
     "custom",
 }
 
