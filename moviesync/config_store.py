@@ -293,6 +293,8 @@ class ConfigStore:
         incoming: dict,
         *,
         enabled: bool | None = None,
+        config_version: int | None = None,
+        replace_config: bool = False,
     ) -> dict:
         """保存已注册卡片的通用配置；调用方必须先确认卡片已加载。"""
         card_id = str(card_id or "").strip()
@@ -306,8 +308,19 @@ class ConfigStore:
         saved = saved if isinstance(saved, dict) else {}
         config = saved.get("config")
         config = dict(config) if isinstance(config, dict) else {}
-        config.update(deepcopy(incoming))
+        if replace_config:
+            config = deepcopy(incoming)
+        else:
+            config.update(deepcopy(incoming))
         saved["config"] = config
+        if config_version is not None:
+            if (
+                isinstance(config_version, bool)
+                or not isinstance(config_version, int)
+                or config_version < 1
+            ):
+                raise ConfigValidationError("卡片配置版本必须是正整数")
+            saved["config_version"] = config_version
         if enabled is not None:
             saved["enabled"] = bool(enabled)
         else:
