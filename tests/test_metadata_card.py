@@ -19,3 +19,141 @@ def test_douban_metadata_card_uses_standard_interface():
     assert card.list_movies("电影", "U") == [{"title": "电影", "sort": "U"}]
     assert card.search("测试") == [{"title": "测试"}]
     assert card.get_detail("123") is None
+
+
+def test_metadata_manager_falls_back_when_one_card_raises_or_returns_empty():
+    import logging
+
+    from moviesync.cards import CardManifest, CardRegistry, MetadataProviderCard
+    from moviesync.services.metadata import MetadataProviderManager
+
+    class BrokenProvider(MetadataProviderCard):
+        manifest = CardManifest(
+            id="broken-provider",
+            name="Broken",
+            type="metadata_provider",
+            capabilities=("metadata.list", "metadata.search"),
+        )
+
+        def list_movies(self, tag, sort_type):
+            raise RuntimeError("upstream unavailable")
+
+        def search(self, query):
+            return []
+
+        def get_detail(self, item_id):
+            return None
+
+    class HealthyProvider(MetadataProviderCard):
+        manifest = CardManifest(
+            id="healthy-provider",
+            name="Healthy",
+            type="metadata_provider",
+            capabilities=("metadata.list", "metadata.search", "metadata.detail"),
+        )
+
+        def list_movies(self, tag, sort_type):
+            return [{"title": "healthy"}]
+
+        def search(self, query):
+            return [{"title": query}]
+
+        def get_detail(self, item_id):
+            return {"id": item_id}
+
+    registry = CardRegistry()
+    registry.register(BrokenProvider())
+    registry.register(HealthyProvider())
+    manager = MetadataProviderManager(registry, logging.getLogger("test.metadata"))
+
+    assert manager.list_movies() == [{"title": "healthy"}]
+    assert manager.search("测试") == [{"title": "测试"}]
+    assert manager.get_detail("123") == {"id": "123"}
+
+
+def test_metadata_manager_keeps_explicit_provider_selection_and_validates_results():
+    import logging
+
+    from moviesync.cards import CardManifest, CardRegistry, MetadataProviderCard
+    from moviesync.services.metadata import MetadataProviderManager
+
+    class MalformedProvider(MetadataProviderCard):
+        manifest = CardManifest(
+            id="malformed-provider",
+            name="Malformed",
+            type="metadata_provider",
+            capabilities=("metadata.list", "metadata.search", "metadata.detail"),
+        )
+
+        def list_movies(self, tag, sort_type):
+            return {"title": "not-a-list"}
+
+        def search(self, query):
+            raise RuntimeError("secret cookie")
+
+        def get_detail(self, item_id):
+            return ["not", "a", "detail"]
+
+    class HealthyProvider(MetadataProviderCard):
+        manifest = CardManifest(
+            id="healthy-provider",
+            name="Healthy",
+            type="metadata_provider",
+            capabilities=("metadata.list", "metadata.search", "metadata.detail"),
+        )
+
+        def list_movies(self, tag, sort_type):
+            return [{"title": "healthy"}]
+
+        def search(self, query):
+            return [{"title": query}]
+
+        def get_detail(self, item_id):
+            return {"id": item_id}
+
+    registry = CardRegistry()
+    registry.register(MalformedProvider())
+    registry.register(HealthyProvider())
+    manager = MetadataProviderManager(registry, logging.getLogger("test.metadata"))
+
+    # An explicitly selected provider is authoritative: never silently swap providers.
+    assert manager.list_movies(provider_id="malformed-provider") == []
+    assert manager.search("测试", provider_id="malformed-provider") == []
+    assert manager.get_detail("123", provider_id="malformed-provider") is None
+
+    # Without explicit selection, invalid result contracts are isolated and fallback works.
+    assert manager.list_movies() == [{"title": "healthy"}]
+    assert manager.search("测试") == [{"title": "测试"}]
+    assert manager.get_detail("123") == {"id": "123"}
+
+
+def test_metadata_manager_respects_card_capabilities():
+    import logging
+
+    from moviesync.cards import CardManifest, CardRegistry, MetadataProviderCard
+    from moviesync.services.metadata import MetadataProviderManager
+
+    class ListOnlyProvider(MetadataProviderCard):
+        manifest = CardManifest(
+            id="list-only-provider",
+            name="List Only",
+            type="metadata_provider",
+            capabilities=("metadata.list",),
+        )
+
+        def list_movies(self, tag, sort_type):
+            return [{"title": tag}]
+
+        def search(self, query):
+            raise AssertionError("unsupported capability must not be called")
+
+        def get_detail(self, item_id):
+            raise AssertionError("unsupported capability must not be called")
+
+    registry = CardRegistry()
+    registry.register(ListOnlyProvider())
+    manager = MetadataProviderManager(registry, logging.getLogger("test.metadata"))
+
+    assert manager.list_movies() == [{"title": "电影"}]
+    assert manager.search("测试") == []
+    assert manager.get_detail("123") is None
