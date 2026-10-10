@@ -310,3 +310,31 @@ def test_storage_manager_catches_plugin_exceptions_without_leaking_details():
     assert "转存结果不确定" in message
     from moviesync.services.transfer_outcome import is_uncertain_transfer_message
     assert is_uncertain_transfer_message(message) is True
+
+
+def test_storage_plugin_factory_closes_card_when_registration_fails(monkeypatch):
+    from moviesync.services import storage_targets as module
+
+    class CandidateStorage(DemoStorage):
+        def __init__(self):
+            self.closed = False
+
+        def close(self):
+            self.closed = True
+
+    candidate = CandidateStorage()
+
+    class EntryPoint:
+        name = "duplicate-storage"
+
+        def load(self):
+            return lambda context: candidate
+
+    monkeypatch.setattr(module, "entry_points", lambda group: [EntryPoint()])
+    registry = CardRegistry()
+    registry.register(DemoStorage())
+    manager = StorageTargetManager(registry, FakeStore(), FakeLogger())
+
+    assert manager.load_plugins() == []
+    assert candidate.closed is True
+    assert registry.get("demo-storage") is not candidate
