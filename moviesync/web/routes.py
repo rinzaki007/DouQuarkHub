@@ -589,7 +589,7 @@ def cards():
         # 状态由卡片接口自身提供；平台只调用通用方法，不识别 Telegram/Quark 等 ID。
         item["configured"] = bool(card.is_configured(card_config))
         health = card_config.get("health")
-        if isinstance(health, dict) and health:
+        if isinstance(health, dict) and health and health.get("status") not in {None, "", "unknown"}:
             item["health"] = health
         else:
             # Listing never performs network checks; unknown health remains idle.
