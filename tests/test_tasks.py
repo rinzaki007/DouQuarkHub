@@ -483,3 +483,47 @@ def test_task_recovery_survives_malformed_counts_and_event_history(tmp_path):
         assert "检查目标网盘" in running["message"]
     finally:
         manager.shutdown()
+
+
+def test_transfer_task_fingerprint_is_namespaced_by_resource_provider():
+    base = {
+        "movie": {"title": "Same title"},
+        "candidate": {
+            "resource_id": "same-share-id",
+            "files": [{"fid": "same-file"}],
+            "storage_target_id": "cloud-a",
+        },
+        "target_fid": "0",
+    }
+    other_provider = {
+        "movie": {"title": "Same title"},
+        "candidate": {
+            "resource_id": "same-share-id",
+            "resource_type": "cloud_b_share",
+            "files": [{"fid": "same-file"}],
+            "storage_target_id": "cloud-a",
+        },
+        "target_fid": "0",
+    }
+    assert TaskManager._payload_key(base) != TaskManager._payload_key(other_provider)
+    assert TaskManager._phase_for_progress(70)[1] == "提交转存"
+
+
+def test_subscription_accepts_provider_neutral_resource_identity(tmp_path):
+    manager = SubscriptionManager(
+        tmp_path / "subscriptions.json",
+        lambda: "unused",
+        logging.getLogger("test"),
+    )
+    try:
+        sub = manager.add_subscription(
+            title="跨网盘测试",
+            resource_id="share-789",
+            resource_type="cloud_b_share",
+            storage_target_id="cloud-b",
+        )
+        assert sub["resource_id"] == "share-789"
+        assert sub["resource_type"] == "cloud_b_share"
+        assert sub["pwd_id"] == ""
+    finally:
+        manager.stop_scheduler()

@@ -209,7 +209,8 @@ class PanSouResourceSource(ResourceSourceCard):
         if not share_id:
             return None
         return {
-            "pwd_id": share_id,
+            "resource_id": share_id,
+            "pwd_id": share_id,  # Legacy alias for existing clients and saved tasks.
             "url": link_url,
             "password": str(item.get("password") or item.get("passcode") or "").strip(),
             "resource_type": "quark_share",

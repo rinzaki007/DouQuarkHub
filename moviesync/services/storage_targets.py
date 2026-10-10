@@ -357,6 +357,17 @@ class StorageTargetManager:
         if not card:
             return False, self._unavailable_message(storage_target_id)
         payload = dict(resource) if isinstance(resource, dict) else {}
+        resource_type = str(payload.get("resource_type") or "").strip().lower()
+        if resource_type:
+            required_capability = f"storage.accepts.{resource_type}"
+            if (
+                required_capability not in card.capabilities
+                and "storage.accepts.*" not in card.capabilities
+            ):
+                return False, (
+                    f"存储目标卡片「{card.manifest.name}」不支持此资源类型，"
+                    "请重新选择兼容的存储目标"
+                )
         if token:
             payload["stoken"] = token
         try:

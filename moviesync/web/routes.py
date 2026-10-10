@@ -1143,13 +1143,35 @@ def transfer_selected():
     except ValueError as exc:
         return _json_error(str(exc))
 
+    storage_manager = _services()["storage_targets"]
     storage_target_id = str(
         data.get("storage_target_id")
         or candidate.get("storage_target_id")
         or ""
     ).strip()
-    if storage_target_id and not _services()["storage_targets"].get(storage_target_id):
+    if not storage_target_id and candidate.get("resource_type"):
+        storage_target_id = storage_manager.select_target_id(candidate)
+    storage_target = storage_manager.get(storage_target_id or None)
+    if storage_target_id and not storage_target:
         return _json_error("指定的存储目标不存在或已停用", 400)
+
+    resource_type = str(candidate.get("resource_type") or "").strip().lower()
+    if resource_type and not storage_target:
+        return _json_error(
+            "没有已启用的存储卡片支持此资源类型，请安装或启用兼容的存储卡片",
+            400,
+        )
+    if resource_type and storage_target:
+        required_capability = f"storage.accepts.{resource_type}"
+        if (
+            required_capability not in storage_target.capabilities
+            and "storage.accepts.*" not in storage_target.capabilities
+        ):
+            return _json_error(
+                f"存储卡片「{storage_target.manifest.name}」不支持此资源类型，"
+                "请在资源选择窗口中切换到兼容的存储卡片",
+                400,
+            )
 
     candidate = {
         **candidate,
@@ -1391,9 +1413,9 @@ def subscriptions():
                 title=data.get(
                     "title"
                 ),
-                pwd_id=data.get(
-                    "pwd_id"
-                ),
+                pwd_id=data.get("pwd_id", ""),
+                resource_id=data.get("resource_id", ""),
+                resource_type=data.get("resource_type", ""),
                 target_fid=target_fid,
                 interval_hours=int(
                     data.get(

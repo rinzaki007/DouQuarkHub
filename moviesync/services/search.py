@@ -105,13 +105,19 @@ class SearchService:
                 "没有已启用的存储卡片支持此资源类型，请检查存储卡片配置",
                 "",
             )
-        pwd_id = str(resource.get("pwd_id") or "").strip()
-        if not pwd_id:
+        resource_id = str(
+            resource.get("resource_id") or resource.get("share_id") or resource.get("pwd_id") or ""
+        ).strip()
+        if not resource_id:
             return [], None, "资源标识无效", storage_target_id
+        resource_type = str(resource.get("resource_type") or "").strip().lower()
+        source_id = str(resource.get("source_id") or "").strip()
 
         password = str(resource.get("password") or resource.get("passcode") or "")
         password_digest = hashlib.sha256(password.encode("utf-8")).hexdigest()
-        cache_key = f"{storage_target_id}:{pwd_id}:{password_digest}"
+        # Resource IDs are scoped to their provider; don't share cache entries
+        # between clouds that happen to use the same ID.
+        cache_key = f"{storage_target_id}:{resource_type}:{source_id}:{resource_id}:{password_digest}"
         now = time.monotonic()
 
         if not refresh:
@@ -153,22 +159,28 @@ class SearchService:
             config,
         )
         candidates: list[dict] = []
-        seen_pwd_ids: set[str] = set()
+        seen_resource_keys: set[tuple[str, str]] = set()
 
         for source in discovered:
-            pwd_id = str(source.get("pwd_id") or "").strip()
-            if not pwd_id or pwd_id in seen_pwd_ids:
+            resource_id = str(
+                source.get("resource_id") or source.get("share_id") or source.get("pwd_id") or ""
+            ).strip()
+            resource_type = str(source.get("resource_type") or "").strip().lower()
+            resource_key = (resource_type, resource_id)
+            if not resource_id or resource_key in seen_resource_keys:
                 continue
             resource = {
                 **source,
-                "pwd_id": pwd_id,
+                "resource_id": resource_id,
             }
+            if source.get("pwd_id"):
+                resource["pwd_id"] = str(source.get("pwd_id") or "").strip()
             files, _stoken, err, storage_target_id = self._get_resource_files(resource)
             if err or not files:
                 self.logger.debug(
                     "资源源 %s 命中 %s 但解析失败: %s",
                     source.get("source_name") or source.get("source_id"),
-                    pwd_id,
+                    resource_id,
                     err,
                 )
                 continue
@@ -195,15 +207,17 @@ class SearchService:
                 resolutions[resolution] = resolutions.get(resolution, 0) + 1
 
             total_size = sum(int(v.get("size") or 0) for v in videos)
-            seen_pwd_ids.add(pwd_id)
+            seen_resource_keys.add(resource_key)
             candidates.append({
                 "source_id": source.get("source_id", "unknown"),
                 "source_name": source.get("source_name", "未知来源"),
                 "cover": str(movie.get("cover", "") if isinstance(movie, dict) else "").strip()[:1000],
                 "storage_target_id": storage_target_id,
+                "resource_type": resource_type,
+                "resource_id": resource_id,
                 "channel": source.get("channel", ""),
                 "channel_id": source.get("channel_id", ""),
-                "pwd_id": pwd_id,
+                **({"pwd_id": str(source.get("pwd_id") or "").strip()} if source.get("pwd_id") else {}),
                 "password": str(source.get("password") or source.get("passcode") or ""),
                 "url": str(source.get("url") or ""),
                 "files": videos,
@@ -249,7 +263,9 @@ class SearchService:
         # 前端传入 target_fid 即表示用户明确选择了目标目录；分类目录仅作为资源选择页的默认值。
         # 不再在服务层强制覆盖用户选择，避免“下拉框看似可选但实际始终按分类目录转存”。
         parent_fid = str(target_fid or (category_fids or {}).get(tag) or "0").strip() or "0"
-        pwd_id = str(candidate.get("pwd_id") or "").strip()
+        resource_id = str(
+            candidate.get("resource_id") or candidate.get("share_id") or candidate.get("pwd_id") or ""
+        ).strip()
         selected_fids = [
             str(item.get("fid"))
             for item in candidate.get("files", [])
@@ -257,13 +273,13 @@ class SearchService:
         ]
         selected_fids = list(dict.fromkeys(selected_fids))
         total = len(selected_fids)
-        if not pwd_id or not selected_fids:
+        if not resource_id or not selected_fids:
             return False, "候选资源参数无效", {"success": 0, "skipped": 0, "failed": total}
 
         storage_target_id = str(candidate.get("storage_target_id") or "").strip()
         resource = {
             **candidate,
-            "pwd_id": pwd_id,
+            "resource_id": resource_id,
             "storage_target_id": storage_target_id,
         }
         progress(20, "正在重新验证分享资源…")
@@ -304,7 +320,7 @@ class SearchService:
             fresh_stoken,
         )
         if ok:
-            self.logger.info("《%s》转存成功，pwd_id=%s", title, pwd_id)
+            self.logger.info("《%s》转存成功，resource_id=%s", title, resource_id)
             progress(100, "转存完成")
             return True, f"《{title}》转存成功！已精准归档至专属文件夹", {"success": total, "skipped": 0, "failed": 0}
         self.logger.warning("《%s》转存失败: %s", title, msg)
