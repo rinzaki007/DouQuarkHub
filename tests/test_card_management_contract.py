@@ -620,3 +620,35 @@ def test_get_card_config_reads_arbitrary_card_without_card_specific_accessors(tm
         "language": "zh-CN",
     }
     assert store.get_card_config("not-installed") == {}
+
+
+def test_builtin_metadata_provider_can_be_disabled_before_required_config_is_set(tmp_path):
+    from moviesync.app import create_app
+
+    app = create_app({"MOVIESYNC_DATA_DIR": str(tmp_path)}, start_scheduler=False)
+    services = app.extensions["moviesync"]
+    client = app.test_client()
+    client.post("/api/setup", json={"username": "admin", "password": "password123"})
+    with client.session_transaction() as session:
+        csrf = session["csrf_token"]
+
+    # TMDB is a required-token provider, but its independent card can be disabled
+    # before a token has been entered.
+    response = client.post(
+        "/api/cards/tmdb/config",
+        json={"enabled": False, "config": {}},
+        headers={"X-CSRF-Token": csrf},
+    )
+    assert response.status_code == 200
+    assert response.get_json()["enabled"] is False
+    assert services["config"].load()["cards"]["tmdb"]["enabled"] is False
+
+    # Re-enabling without a token must still be rejected.
+    response = client.post(
+        "/api/cards/tmdb/config",
+        json={"enabled": True, "config": {}},
+        headers={"X-CSRF-Token": csrf},
+    )
+    assert response.status_code == 400
+    assert "API Read Access Token" in response.get_json()["message"]
+    assert services["config"].load()["cards"]["tmdb"]["enabled"] is False
