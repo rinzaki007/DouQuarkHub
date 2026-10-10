@@ -189,11 +189,23 @@ class ResourceSourceManager:
         if isinstance(card, dict) and not card.get("enabled", True):
             return []
         try:
-            return source.search_channel(
+            items = source.search_channel(
                 channel,
                 str(title or "").strip(),
                 self._card_config(config, source.card_id),
             )
+            if not isinstance(items, list):
+                raise TypeError("资源卡片 search_channel 必须返回列表")
+            return [
+                {
+                    **item,
+                    # 资源身份由管理器确定，避免插件结果伪造其他卡片的来源。
+                    "source_id": source.card_id,
+                    "source_name": self._source_name(source),
+                }
+                for item in items
+                if isinstance(item, dict)
+            ]
         except Exception as exc:
             self.logger.exception("资源源 %s 频道检索异常: %s", source.card_id, exc)
             return []
