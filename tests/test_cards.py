@@ -161,3 +161,78 @@ def test_card_config_regex_input_is_bounded_without_manifest_max_length():
 
     with pytest.raises(ConfigValidationError, match="不能超过 4096"):
         PatternCard().validate_config({"value": "a" * 4097})
+
+
+
+def test_card_registry_closes_replaced_card():
+    closed = []
+
+    class ClosableCard(DemoCard):
+        def __init__(self, name):
+            self.name = name
+
+        def close(self):
+            closed.append(self.name)
+
+    registry = CardRegistry()
+    old = ClosableCard("old")
+    new = ClosableCard("new")
+    registry.register(old)
+    registry.register(new, replace=True)
+
+    assert registry.get("demo.card") is new
+    assert closed == ["old"]
+
+
+def test_card_registry_unregister_closes_card_and_returns_instance():
+    closed = []
+
+    class ClosableCard(DemoCard):
+        def close(self):
+            closed.append(self.card_id)
+
+    registry = CardRegistry()
+    card = ClosableCard()
+    registry.register(card)
+
+    assert registry.unregister("demo.card") is card
+    assert registry.get("demo.card") is None
+    assert closed == ["demo.card"]
+
+
+def test_card_registry_close_all_isolates_cleanup_errors():
+    closed = []
+
+    class ClosableCard(DemoCard):
+        def __init__(self, card_id, should_fail=False):
+            self.manifest = CardManifest(id=card_id, name=card_id)
+            self.should_fail = should_fail
+
+        def close(self):
+            closed.append(self.card_id)
+            if self.should_fail:
+                raise RuntimeError("cleanup failed")
+
+    registry = CardRegistry()
+    registry.register(ClosableCard("first.card", should_fail=True))
+    registry.register(ClosableCard("second.card"))
+
+    registry.close_all()
+
+    assert registry.list() == []
+    assert closed == ["first.card", "second.card"]
+
+
+def test_card_registry_does_not_close_same_instance_when_re_registered():
+    closed = []
+
+    class ClosableCard(DemoCard):
+        def close(self):
+            closed.append(self.card_id)
+
+    registry = CardRegistry()
+    card = ClosableCard()
+    registry.register(card)
+    registry.register(card, replace=True)
+
+    assert closed == []
