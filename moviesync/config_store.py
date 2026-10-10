@@ -10,8 +10,8 @@ from copy import deepcopy
 from pathlib import Path
 from urllib.parse import urlparse
 
-from .settings import DEFAULT_CATEGORY_FIDS, DEFAULT_OPENLIST_URL
 from .regex_safety import has_nested_unbounded_quantifier
+from .settings import DEFAULT_CATEGORY_FIDS, DEFAULT_OPENLIST_URL
 from .storage import JsonStore
 
 CHANNEL_ID_RE = re.compile(r"^[A-Za-z0-9_]{2,64}$")
