@@ -25,6 +25,9 @@ def test_broken_card_does_not_break_card_list_or_other_platform_pages(tmp_path):
     services["card_registry"].register(BrokenStatusCard())
 
     client = app.test_client()
+    with client.session_transaction() as session:
+        session["logged_in"] = True
+        session["csrf_token"] = "test-token"
     response = client.get("/api/cards")
 
     assert response.status_code == 200
