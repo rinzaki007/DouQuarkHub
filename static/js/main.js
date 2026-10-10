@@ -3,6 +3,7 @@
  * 维护说明：apiFetch() 统一携带同源 Cookie 与 CSRF；当前版本还提供 getNoCoverImage()，避免无海报时因缺少函数导致整页渲染中断。 */
 let currentTag = '电影';
 let currentSort = 'U';
+let currentMetadataProviderId = '';
 
 let moviesData = [];
 let currentChaseSelectedCandidate = null;
@@ -31,12 +32,47 @@ async function apiFetch(url, options = {}) {
     return response;
 }
 
+async function loadMetadataProviders() {
+    const select = document.getElementById('metadata-provider-select');
+    if (!select) return;
+    try {
+        const response = await apiFetch('/api/cards');
+        const result = await response.json();
+        if (!result.success || !Array.isArray(result.cards)) return;
+        const providers = result.cards
+            .filter(card => card.type === 'metadata_provider' && card.enabled !== false)
+            .sort((a, b) => String(a.name || a.id).localeCompare(String(b.name || b.id)));
+        select.replaceChildren(new Option('自动来源', ''));
+        for (const provider of providers) {
+            const label = provider.configured === false
+                ? `${provider.name || provider.id}（未配置）`
+                : (provider.name || provider.id);
+            select.add(new Option(label, provider.id));
+        }
+        if (providers.some(provider => provider.id === currentMetadataProviderId)) {
+            select.value = currentMetadataProviderId;
+        } else {
+            currentMetadataProviderId = '';
+            select.value = '';
+        }
+    } catch (err) {
+        console.warn('读取影视数据源列表失败，将使用自动来源:', err);
+    }
+}
+
+function onMetadataProviderChange() {
+    currentMetadataProviderId = document.getElementById('metadata-provider-select')?.value || '';
+    const query = document.getElementById('search-input')?.value.trim();
+    if (query) doSearch();
+    else fetchMovies();
+}
+
 let logTimerInterval = null;
 let logTimerSeconds = 0;
 let logAutoCloseTimer = null;
 
 document.addEventListener("DOMContentLoaded", () => {
-    fetchMovies();loadCategoryOptions();
+    loadMetadataProviders().finally(() => fetchMovies());loadCategoryOptions();
     applyGlassmorphismStyles();
 });
 
@@ -112,8 +148,9 @@ async function fetchMovies() {
     grid.classList.add('hidden');
 
     try {
-        const url = `/api/get-movies?tag=${encodeURIComponent(currentTag)}&sort=${currentSort}`;
-        const resp = await apiFetch(url);
+        const params = new URLSearchParams({ tag: currentTag, sort: currentSort });
+        if (currentMetadataProviderId) params.set('provider_id', currentMetadataProviderId);
+        const resp = await apiFetch(`/api/get-movies?${params.toString()}`);
         const res = await resp.json();
 
         if (requestId !== movieRequestSeq) return;
@@ -149,7 +186,9 @@ async function doSearch() {
     grid.classList.add('hidden');
 
     try {
-        const resp = await apiFetch(`/api/search-metadata?q=${encodeURIComponent(query)}`);
+        const params = new URLSearchParams({ q: query });
+        if (currentMetadataProviderId) params.set('provider_id', currentMetadataProviderId);
+        const resp = await apiFetch(`/api/search-metadata?${params.toString()}`);
         const res = await resp.json();
 
         if (requestId !== searchRequestSeq) return;
