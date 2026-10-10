@@ -116,3 +116,28 @@ def test_pansou_is_seeded_as_a_removable_file_card(tmp_path):
 
     restarted = create_app({"MOVIESYNC_DATA_DIR": str(tmp_path)}, start_scheduler=False)
     assert restarted.extensions["moviesync"]["card_registry"].get("pansou") is None
+
+
+def test_builtin_cards_are_independent_single_file_plugins(tmp_path):
+    from moviesync.app import create_app
+
+    app = create_app({"MOVIESYNC_DATA_DIR": str(tmp_path)}, start_scheduler=False)
+    services = app.extensions["moviesync"]
+    registry = services["card_registry"]
+    plugin_manager = services["file_card_plugins"]
+
+    assert registry.get("telegram") is not None
+    assert registry.get("pansou") is not None
+    assert registry.get("quark") is not None
+    assert registry.get("douban") is not None
+    assert all((tmp_path / "cards" / name).is_file() for name in (
+        "telegram.py", "pansou.py", "quark.py", "douban.py"
+    ))
+
+    removed = plugin_manager.uninstall("telegram.py")
+
+    assert removed["card_id"] == "telegram"
+    assert registry.get("telegram") is None
+    assert registry.get("pansou") is not None
+    assert registry.get("quark") is not None
+    assert registry.get("douban") is not None
