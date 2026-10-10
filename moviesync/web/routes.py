@@ -932,21 +932,17 @@ def get_movies():
         )
 
     except Exception:
-        _services()["logger"].exception(
-            "获取豆瓣影片失败"
-        )
-
-        return jsonify(
-            {
-                "success": False,
-                "movies": [],
-                "message": "获取影片数据失败，请稍后重试",
-            }
-        )
+        _services()["logger"].exception("获取影视列表失败")
+        return jsonify({
+            "success": False,
+            "movies": [],
+            "message": "获取影视数据失败，请稍后重试",
+        })
 
 
 @api.get("/search-douban")
-def search_douban():
+@api.get("/search-metadata")
+def search_metadata():
     query = request.args.get(
         "q",
         "",
@@ -969,15 +965,13 @@ def search_douban():
         )
 
     except Exception:
-        _services()["logger"].warning(
-            "豆瓣搜索失败"
-        )
+        _services()["logger"].warning("影视元数据搜索失败")
 
         return jsonify(
             {
                 "success": False,
                 "movies": [],
-                "message": "豆瓣搜索失败",
+                "message": "影视搜索失败",
             }
         )
 
@@ -1473,142 +1467,75 @@ def resolve_pending_subscription():
     return jsonify({"success": success, "message": message})
 
 
-@api.get("/proxy-img")
-def proxy_img():
-    target = request.args.get(
-        "url",
-        "",
-    ).strip()
-
+def _metadata_image_policy(target: str, metadata_cards) -> dict[str, str] | None:
+    """Resolve image hosts from loaded metadata-card manifests, not provider IDs."""
     parsed = urlparse(target)
-
-    if (
-        parsed.scheme != "https"
-        or not parsed.hostname
-    ):
-        return Response(
-            "Invalid URL",
-            status=400,
-        )
+    if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password:
+        return None
+    try:
+        if parsed.port not in (None, 443):
+            return None
+    except ValueError:
+        return None
 
     host = parsed.hostname.lower()
+    for card in metadata_cards:
+        manifest = getattr(card, "manifest", None)
+        for allowed_suffix in getattr(manifest, "image_hosts", ()):
+            suffix = str(allowed_suffix or "").lower().strip(".")
+            if suffix and (host == suffix or host.endswith("." + suffix)):
+                return {"referer": str(getattr(manifest, "image_referer", "") or "")}
+    return None
 
-    if not (
-        host.endswith(
-            ".doubanio.com"
+
+@api.get("/proxy-img")
+def proxy_img():
+    target = request.args.get("url", "").strip()
+    metadata_cards = _services()["card_registry"].find_by_type("metadata_provider")
+    policy = _metadata_image_policy(target, metadata_cards)
+    if policy is None:
+        return Response("Host not allowed", status=403)
+
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/131.0.0.0 Safari/537.36"
         )
-        or host == "doubanio.com"
-    ):
-        return Response(
-            "Host not allowed",
-            status=403,
-        )
+    }
+    if policy["referer"]:
+        headers["Referer"] = policy["referer"]
 
     try:
-        with _services()[
-            "http"
-        ].session.get(
+        with _services()["http"].session.get(
             target,
-            headers={
-                "User-Agent": (
-                    "Mozilla/5.0 "
-                    "(Windows NT 10.0; Win64; x64) "
-                    "AppleWebKit/537.36 "
-                    "(KHTML, like Gecko) "
-                    "Chrome/131.0.0.0 "
-                    "Safari/537.36"
-                ),
-                "Referer": (
-                    "https://movie.douban.com/"
-                ),
-            },
-            timeout=(
-                3,
-                8,
-            ),
+            headers=headers,
+            timeout=(3, 8),
             stream=True,
         ) as response:
-
             if response.status_code != 200:
-                return Response(
-                    "Image unavailable",
-                    status=404,
-                )
+                return Response("Image unavailable", status=404)
 
             content_type = (
-                response.headers.get(
-                    "Content-Type",
-                    "image/jpeg",
-                ).split(
-                    ";",
-                    1,
-                )[0]
+                response.headers.get("Content-Type", "image/jpeg")
+                .split(";", 1)[0]
                 .strip()
                 .lower()
             )
-
             allowed_image_types = {
-                "image/jpeg",
-                "image/png",
-                "image/webp",
-                "image/gif",
-                "image/avif",
+                "image/jpeg", "image/png", "image/webp", "image/gif", "image/avif",
             }
-
             if content_type not in allowed_image_types:
-                return Response(
-                    "Not an image",
-                    status=415,
-                )
+                return Response("Not an image", status=415)
 
-            max_size = 5 * 1024 * 1024
-
-            content_length = (
-                response.headers.get(
-                    "Content-Length"
-                )
+            return Response(
+                response.iter_content(chunk_size=16 * 1024),
+                content_type=content_type,
+                headers={"Cache-Control": "public, max-age=86400"},
             )
-
-            if content_length:
-                try:
-                    if (
-                        int(content_length)
-                        > max_size
-                    ):
-                        return Response(
-                            "Image too large",
-                            status=413,
-                        )
-
-                except ValueError:
-                    pass
-
-            content = response.raw.read(
-                max_size + 1
-            )
-
-            if len(content) > max_size:
-                return Response(
-                    "Image too large",
-                    status=413,
-                )
-
-            result = Response(
-                content,
-                mimetype=content_type,
-            )
-
-            result.headers[
-                "Cache-Control"
-            ] = "public, max-age=86400"
-
-            return result
-
     except Exception:
-        return Response(
-            "Image unavailable",
-            status=404,
-        )
+        _services()["logger"].debug("代理元数据海报失败", exc_info=True)
+        return Response("Image unavailable", status=502)
 
 
 @api.post("/change-username")
