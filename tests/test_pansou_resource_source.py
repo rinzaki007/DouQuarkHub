@@ -1,4 +1,4 @@
-from moviesync.services.resource_sources import PanSouResourceSource
+from card_templates.pansou import PanSouResourceSource
 
 
 class FakeResponse:
