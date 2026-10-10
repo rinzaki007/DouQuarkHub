@@ -125,13 +125,23 @@ def normalize_legacy_card_config(
     ) if isinstance(old_sources, list) else None
     if source:
         telegram["enabled"] = bool(source.get("enabled", telegram.get("enabled", True)))
-        if source.get("health"):
-            telegram_config["health"] = dict(source["health"])
+        source_health = source.get("health")
+        if isinstance(source_health, dict):
+            telegram_config["health"] = dict(source_health)
 
     telegram["enabled"] = bool(telegram.get("enabled", True))
-    telegram_config["channels"] = normalize_channels(telegram_config.get("channels", []))
+    # Invalid legacy Telegram data must not prevent unrelated cards or the host
+    # from starting. Keep the card's other settings and fall back to no channels.
+    try:
+        telegram_config["channels"] = normalize_channels(
+            telegram_config.get("channels", [])
+        )
+    except Exception:
+        telegram_config["channels"] = []
     health = dict(legacy_card_defaults()["cards"]["telegram"]["config"]["health"])
-    health.update(telegram_config.get("health") or {})
+    saved_health = telegram_config.get("health")
+    if isinstance(saved_health, dict):
+        health.update(saved_health)
     telegram_config["health"] = health
     telegram["config"] = telegram_config
     cards["telegram"] = telegram
@@ -147,19 +157,30 @@ def normalize_legacy_card_config(
     data["schema_version"] = max(version, schema_version)
 
     quark_config = data["cards"]["quark"].setdefault("config", {})
-    quark_config["default_fid"] = normalize_fid(
-        quark_config.get("default_fid", "0"),
-        "cards.quark.config.default_fid",
-    )
-    incoming_category_fids = quark_config.get("category_fids") or {}
-    quark_config["category_fids"] = {
-        key: normalize_fid(
-            incoming_category_fids.get(key, ""),
-            f"cards.quark.config.category_fids.{key}",
-            allow_empty=True,
+    # Normalize legacy Quark fields independently. One malformed value must not
+    # block startup or migration of Telegram and third-party cards.
+    try:
+        quark_config["default_fid"] = normalize_fid(
+            quark_config.get("default_fid", "0"),
+            "cards.quark.config.default_fid",
         )
-        for key in default_category_fids
-    }
+    except Exception:
+        quark_config["default_fid"] = "0"
+
+    incoming_category_fids = quark_config.get("category_fids")
+    if not isinstance(incoming_category_fids, dict):
+        incoming_category_fids = {}
+    normalized_category_fids = {}
+    for key in default_category_fids:
+        try:
+            normalized_category_fids[key] = normalize_fid(
+                incoming_category_fids.get(key, ""),
+                f"cards.quark.config.category_fids.{key}",
+                allow_empty=True,
+            )
+        except Exception:
+            normalized_category_fids[key] = ""
+    quark_config["category_fids"] = normalized_category_fids
     return data
 
 
