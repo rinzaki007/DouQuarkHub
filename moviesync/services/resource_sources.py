@@ -289,7 +289,6 @@ class PanSouResourceSource(ResourceSource):
         normalized["timeout"] = timeout
         return normalized
 
-    @staticmethod
     def _base_url(self, config: dict[str, Any]) -> str:
         import os
 
