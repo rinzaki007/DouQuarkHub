@@ -144,7 +144,9 @@ def test_channel_search_scans_recent_messages_without_telegram_title_query():
                 "cards": {
                     "telegram": {
                         "enabled": True,
-                        "config": {"channels": []},
+                        "config": {
+                            "channels": [{"id": "movie_channel", "name": "电影频道"}],
+                        },
                     }
                 }
             }
@@ -574,3 +576,87 @@ def test_resource_source_health_is_saved_and_reported_by_card_id():
         "enabled": True,
         "health": saved_health,
     }]
+
+
+
+def test_telegram_card_does_not_search_removed_or_unconfigured_channel():
+    client = FakeTelegramClient()
+    card = TelegramResourceSource(client)
+
+    assert card.search_channel(
+        {"id": "my_test_channel", "name": "旧测试频道"},
+        "测试剧",
+        {"channels": [{"id": "movie_channel", "name": "正式频道"}]},
+    ) == []
+    assert client.last_scan_all is None
+
+
+def test_resource_manager_isolates_malformed_channel_search_results():
+    class Store:
+        def load(self):
+            return {
+                "cards": {
+                    "malformed-channel-source": {"enabled": True, "config": {}},
+                }
+            }
+
+    class MalformedChannelCard(ResourceSourceCard):
+        manifest = CardManifest(
+            id="malformed-channel-source",
+            name="Malformed Channel Source",
+            type="resource_source",
+            capabilities=("resource.search",),
+        )
+
+        def search(self, movie, config):
+            return []
+
+        def search_channel(self, channel, title, config):
+            return {"pwd_id": "not-a-list"}
+
+    manager = ResourceSourceManager(
+        Store(),
+        FakeLogger(),
+        resource_cards=[MalformedChannelCard()],
+    )
+
+    assert manager.search_channel(
+        "malformed-channel-source", {"id": "some_channel"}, "测试剧"
+    ) == []
+
+
+def test_resource_manager_owns_channel_search_result_identity():
+    class Store:
+        def load(self):
+            return {
+                "cards": {
+                    "channel-identity-source": {"enabled": True, "config": {}},
+                }
+            }
+
+    class SpoofedChannelCard(ResourceSourceCard):
+        manifest = CardManifest(
+            id="channel-identity-source",
+            name="Channel Identity Source",
+            type="resource_source",
+            capabilities=("resource.search",),
+        )
+
+        def search(self, movie, config):
+            return []
+
+        def search_channel(self, channel, title, config):
+            return [{"pwd_id": "share123", "source_id": "telegram", "source_name": "Spoofed"}]
+
+    manager = ResourceSourceManager(
+        Store(),
+        FakeLogger(),
+        resource_cards=[SpoofedChannelCard()],
+    )
+
+    result = manager.search_channel(
+        "channel-identity-source", {"id": "source_channel"}, "测试剧"
+    )
+
+    assert result[0]["source_id"] == "channel-identity-source"
+    assert result[0]["source_name"] == "Channel Identity Source"
