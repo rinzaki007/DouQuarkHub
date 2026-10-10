@@ -1,5 +1,5 @@
 <!-- MovieSync 主页面
-     用途：豆瓣影视浏览/搜索、候选资源检索、白名单转存、OpenList 入口和自动追剧管理。
+     用途：影视元数据浏览/搜索、候选资源检索、白名单转存、OpenList 入口和自动追剧管理。
      维护说明：页面主要负责 UI；实际认证、豆瓣数据、资源解析和转存均由后端 API 完成。 -->
 <!DOCTYPE html>
 <html lang="zh-CN">
@@ -51,7 +51,10 @@
             </div>
 
             <!-- 右侧：设置 -->
-            <div class="hidden sm:flex items-center space-x-2 shrink-0">
+            <div class="flex items-center space-x-2 shrink-0">
+                <a href="/about" class="px-2.5 py-1.5 text-xs glass-control bg-slate-900/55 hover:bg-slate-800/80 text-slate-300 rounded-xl border border-slate-700/60 flex items-center gap-1">
+                    <i class="fa-solid fa-circle-info"></i> 关于
+                </a>
                 <a href="/admin" class="px-2.5 py-1.5 text-xs glass-control bg-slate-900/55 hover:bg-slate-800/80 text-slate-300 rounded-xl border border-slate-700/60 flex items-center gap-1">
                     <i class="fa-solid fa-gear"></i> 设置
                 </a>
