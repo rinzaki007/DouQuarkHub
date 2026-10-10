@@ -17,8 +17,8 @@ from moviesync.config_store import ConfigValidationError
 class PanSouResourceSource(ResourceSourceCard):
     """PanSou Web 搜索适配器。
 
-    当前输出夸克分享链接并声明资源类型；由平台根据存储卡能力匹配目标，
-    不直接绑定 Quark 卡片 ID。其他网盘类型不会被错误地交给夸克解析。
+    根据所选存储卡片声明的 storage.accepts.* 能力筛选 PanSou cloud_types，
+    并仅规范化所选网盘的分享链接；不把其他网盘的资源交给错误的存储卡片。
     """
 
     source_id = "pansou"
@@ -29,7 +29,7 @@ class PanSouResourceSource(ResourceSourceCard):
         name="PanSou",
         version="1.0.0",
         type="resource_source",
-        description="使用 MovieSync 内置 PanSou 搜索夸克分享资源，也可连接外部 PanSou 服务",
+        description="根据所选存储卡片搜索对应网盘分享资源；可使用内置 PanSou 或外部服务",
         capabilities=("resource.search", "resource.health_check"),
         config_fields=(
             {
@@ -287,7 +287,7 @@ class PanSouResourceSource(ResourceSourceCard):
             },
         )
         results: list[dict[str, Any]] = []
-        seen: set[str] = set()
+        seen: set[tuple[str, str]] = set()
 
         raw_results = payload.get("results")
         if isinstance(raw_results, list):
