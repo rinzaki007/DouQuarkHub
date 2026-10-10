@@ -10,7 +10,6 @@ import re
 from collections.abc import Iterable
 from concurrent.futures import ThreadPoolExecutor
 from importlib.metadata import entry_points
-from threading import RLock
 from typing import Any
 
 from ..cards import CardManifest, CardRegistry, ResourceSourceCard
@@ -213,7 +212,6 @@ class ResourceSourceManager:
         self.logger = logger
         self.config_store = config_store
         self.registry = registry or CardRegistry()
-        self.lock = RLock()
 
         # 默认资源源仅在未注册时加载；允许应用装配层预先注册卡片。
         if self.registry.get("telegram") is None:
