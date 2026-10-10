@@ -236,3 +236,146 @@ def test_card_registry_does_not_close_same_instance_when_re_registered():
     registry.register(card, replace=True)
 
     assert closed == []
+
+
+
+def test_card_registry_migrates_old_config_and_persists_version():
+    from copy import deepcopy
+
+    class FakeConfigStore:
+        def __init__(self):
+            self.data = {
+                "cards": {
+                    "versioned.card": {
+                        "enabled": False,
+                        "config": {"old_name": "value", "obsolete": True},
+                    }
+                }
+            }
+
+        def load(self):
+            return deepcopy(self.data)
+
+        def save_card_config(
+            self,
+            card_id,
+            incoming,
+            *,
+            enabled=None,
+            config_version=None,
+            replace_config=False,
+        ):
+            saved = self.data["cards"][card_id]
+            saved["config"] = deepcopy(incoming) if replace_config else {
+                **saved.get("config", {}),
+                **deepcopy(incoming),
+            }
+            if enabled is not None:
+                saved["enabled"] = enabled
+            if config_version is not None:
+                saved["config_version"] = config_version
+            return deepcopy(saved)
+
+    class VersionedCard(DemoCard):
+        manifest = CardManifest(
+            id="versioned.card",
+            name="Versioned",
+            config_version=2,
+        )
+
+        def migrate_config(self, config, from_version):
+            assert from_version == 1
+            return {"new_name": config["old_name"]}
+
+    registry = CardRegistry()
+    registry.register(VersionedCard())
+    store = FakeConfigStore()
+
+    assert registry.migrate_configs(store) == ["versioned.card"]
+    saved = store.data["cards"]["versioned.card"]
+    assert saved["config"] == {"new_name": "value"}
+    assert saved["config_version"] == 2
+    assert saved["enabled"] is False
+
+
+def test_card_registry_keeps_old_config_when_migration_fails():
+    from copy import deepcopy
+
+    class FakeConfigStore:
+        def __init__(self):
+            self.data = {
+                "cards": {
+                    "broken.migration": {
+                        "enabled": True,
+                        "config": {"keep": "me"},
+                    }
+                }
+            }
+
+        def load(self):
+            return deepcopy(self.data)
+
+        def save_card_config(self, *args, **kwargs):
+            raise AssertionError("failed migration must not save")
+
+    class BrokenMigrationCard(DemoCard):
+        manifest = CardManifest(
+            id="broken.migration",
+            name="Broken Migration",
+            config_version=3,
+        )
+
+        def migrate_config(self, config, from_version):
+            raise RuntimeError("migration failed")
+
+    registry = CardRegistry()
+    registry.register(BrokenMigrationCard())
+    store = FakeConfigStore()
+
+    assert registry.migrate_configs(store) == []
+    assert store.data["cards"]["broken.migration"]["config"] == {"keep": "me"}
+    assert "config_version" not in store.data["cards"]["broken.migration"]
+
+
+def test_card_registry_does_not_downgrade_newer_saved_config():
+    from copy import deepcopy
+
+    class FakeConfigStore:
+        def __init__(self):
+            self.data = {
+                "cards": {
+                    "future.card": {
+                        "enabled": True,
+                        "config_version": 4,
+                        "config": {"future": True},
+                    }
+                }
+            }
+
+        def load(self):
+            return deepcopy(self.data)
+
+        def save_card_config(self, *args, **kwargs):
+            raise AssertionError("future config version must not be overwritten")
+
+    class OlderCard(DemoCard):
+        manifest = CardManifest(
+            id="future.card",
+            name="Older Card",
+            config_version=2,
+        )
+
+        def migrate_config(self, config, from_version):
+            raise AssertionError("must not migrate a newer saved version")
+
+    registry = CardRegistry()
+    registry.register(OlderCard())
+    store = FakeConfigStore()
+
+    assert registry.migrate_configs(store) == []
+    assert store.data["cards"]["future.card"]["config_version"] == 4
+
+
+def test_card_manifest_requires_positive_config_version():
+    with pytest.raises(ValueError, match="config_version"):
+        CardManifest(id="bad-version", name="Bad Version", config_version=0)
