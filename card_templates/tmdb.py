@@ -98,11 +98,12 @@ class TMDBMetadataCard(MetadataProviderCard):
         credential_type = "bearer" if token else "api_key"
         if not token:
             query["api_key"] = api_key
+        cache_params = {key: value for key, value in query.items() if key != "api_key"}
         cache_key = (
             path,
             query.get("language", "zh-CN"),
             hashlib.sha256(f"{credential_type}:{credential}".encode("utf-8")).hexdigest(),
-            tuple(sorted(query.items())),
+            tuple(sorted(cache_params.items())),
         )
         now = time.monotonic()
         with self._cache_lock:
