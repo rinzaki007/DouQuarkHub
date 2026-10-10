@@ -48,7 +48,7 @@ class CardFilePluginManager:
         self._context: dict[str, Any] = {}
 
     def _seed_bundled_cards(self, bundled_dir: Path | None) -> None:
-        """Copy bundled examples once into persistent storage; deletions stay deleted."""
+        """Copy bundled examples once and apply narrow migrations to known legacy factories."""
         if bundled_dir is None or not bundled_dir.is_dir():
             return
         marker_dir = self.plugin_dir / ".seeded"
@@ -59,15 +59,41 @@ class CardFilePluginManager:
             except ValueError:
                 continue
             marker = marker_dir / f"{filename}.seeded"
-            if marker.exists():
-                continue
             destination = self.plugin_dir / filename
+            if marker.exists():
+                self._migrate_legacy_builtin_card(filename, destination)
+                continue
             try:
                 if not destination.exists():
                     destination.write_bytes(source.read_bytes())
                 marker.touch(exist_ok=True)
+                self._migrate_legacy_builtin_card(filename, destination)
             except OSError:
                 self.logger.exception("初始化内置卡片文件 %s 失败", filename)
+
+    def _migrate_legacy_builtin_card(self, filename: str, destination: Path) -> None:
+        """Apply narrowly-scoped upgrades without replacing administrator card files."""
+        migrations = {
+            "douban.py": (
+                'return DoubanMetadataCard(context["douban"])',
+                "return DoubanMetadataCard(DoubanClient())",
+            ),
+        }
+        migration = migrations.get(filename)
+        if migration is None or not destination.is_file():
+            return
+        legacy_factory, updated_factory = migration
+        try:
+            content = destination.read_text(encoding="utf-8")
+            if legacy_factory not in content:
+                return
+            if "from moviesync.clients.douban import DoubanClient" not in content:
+                return
+            destination.write_text(content.replace(legacy_factory, updated_factory, 1), encoding="utf-8")
+        except OSError:
+            self.logger.exception("迁移旧版内置卡片 %s 失败", filename)
+            return
+        self.logger.info("已迁移旧版内置卡片 %s 的工厂依赖", filename)
 
     @staticmethod
     def validate_filename(filename: str) -> str:
