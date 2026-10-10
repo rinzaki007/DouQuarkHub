@@ -12,8 +12,8 @@ from pathlib import Path
 from flask import Flask, session
 
 from .auth import AuthStore
-from .cards import CardRegistry, QuarkStorageCard
 from .card_plugins import CardFilePluginManager
+from .cards import CardRegistry, QuarkStorageCard
 from .cards_metadata import DoubanMetadataCard
 from .clients.douban import DoubanClient
 from .clients.http import HttpClient
