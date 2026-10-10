@@ -223,5 +223,12 @@ class TelegramResourceSource(ResourceSourceCard):
 
 
 def create_card(context):
-    """Create Telegram card using the injected Telegram client."""
-    return TelegramResourceSource(context["telegram"], context.get("config_store"))
+    """Create the Telegram card and own its platform client.
+
+    The host may inject a client for tests or advanced deployments, but the core
+    application does not need to construct or expose a Telegram-specific service.
+    """
+    client = context.get("telegram")
+    if client is None:
+        client = TelegramClient()
+    return TelegramResourceSource(client, context.get("config_store"))
