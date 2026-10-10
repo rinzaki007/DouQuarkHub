@@ -136,7 +136,7 @@ def test_tmdb_details_return_external_ids_and_health_check_never_exposes_token()
     assert detail["external_ids"] == {"imdb_id": "tt123"}
     assert card.check({}) == {
         "status": "unconfigured",
-        "message": "请先填写 TMDB API Read Access Token",
+        "message": "请填写 API Read Access Token 或 API Key",
     }
     assert "secret-token" not in str(card.check({"api_read_access_token": "secret-token"}))
 
