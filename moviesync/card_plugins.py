@@ -89,7 +89,10 @@ class CardFilePluginManager:
                 return
             if "from moviesync.clients.douban import DoubanClient" not in content:
                 return
-            destination.write_text(content.replace(legacy_factory, updated_factory, 1), encoding="utf-8")
+            destination.write_text(
+                content.replace(legacy_factory, updated_factory, 1),
+                encoding="utf-8",
+            )
         except OSError:
             self.logger.exception("迁移旧版内置卡片 %s 失败", filename)
             return
