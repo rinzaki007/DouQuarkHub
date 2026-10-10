@@ -1,7 +1,7 @@
 # MovieSync production image with the PanSou search API bundled in the same container.
 # PanSou source is pinned to a reviewed upstream commit for reproducible builds.
 ARG PANSOU_REF=7a73fbc3f62c6647183f33931477e055ee3d6847
-FROM --platform=$BUILDPLATFORM golang:1.24-alpine AS pansou-builder
+FROM --platform=$BUILDPLATFORM golang:1.25-alpine AS pansou-builder
 ARG TARGETARCH
 ARG PANSOU_REF
 RUN apk add --no-cache git ca-certificates
