@@ -1,0 +1,168 @@
+"""Standalone Quark storage-target card shipped as a single Python file."""
+from __future__ import annotations
+
+from typing import Any
+
+from moviesync.cards import CardManifest, StorageTargetCard
+from moviesync.clients.quark import QuarkClient, sanitize_pwd_id
+from moviesync.config_store import ConfigStore, ConfigValidationError
+from moviesync.settings import DEFAULT_CATEGORY_FIDS
+
+
+class QuarkStorageCard(StorageTargetCard):
+    """内置夸克存储卡。
+
+    这里只负责把现有 QuarkClient 包装成标准 StorageTargetCard；
+    原有 QuarkClient 业务保持不变，降低迁移风险。
+    """
+
+    manifest = CardManifest(
+        id="quark",
+        name="Quark",
+        version="1.0.0",
+        type="storage_target",
+        description="夸克网盘存储与转存卡片",
+        capabilities=(
+            "storage.check",
+            "storage.resolve_resource",
+            "storage.list_files",
+            "storage.create_folder",
+            "storage.transfer",
+        ),
+        config_fields=(
+            {
+                "key": "cookie",
+                "label": "夸克 Cookie",
+                "type": "password",
+                "secret": True,
+                "required": False,
+                "placeholder": "粘贴 Cookie；留空则保留已保存的值",
+                "description": "敏感凭据不会回显到页面。",
+            },
+            {
+                "key": "default_fid",
+                "label": "默认目录 FID",
+                "type": "string",
+                "required": True,
+                "default": "0",
+                "placeholder": "0",
+            },
+            {
+                "key": "category_fids",
+                "label": "分类目录 FID",
+                "type": "json",
+                "default": {},
+                "description": "JSON 对象，例如电影和电视剧对应的目录 FID。",
+            },
+        ),
+    )
+
+    def __init__(self, config_store):
+        self.config_store = config_store
+
+    def validate_config(self, config: dict[str, Any]) -> dict[str, Any]:
+        """验证夸克目录配置，避免通用表单绕过专用接口的 FID 校验。"""
+        normalized = super().validate_config(config)
+        normalized["default_fid"] = ConfigStore._normalize_fid(
+            normalized.get("default_fid", "0"), "cards.quark.config.default_fid"
+        )
+        category_fids = normalized.get("category_fids", {})
+        if category_fids is None:
+            category_fids = {}
+        if not isinstance(category_fids, dict):
+            raise ConfigValidationError("Quark 分类目录 FID 必须是对象")
+        unknown = set(category_fids) - set(DEFAULT_CATEGORY_FIDS)
+        if unknown:
+            raise ConfigValidationError("未知分类目录: " + ", ".join(sorted(map(str, unknown))))
+        normalized["category_fids"] = {
+            key: ConfigStore._normalize_fid(
+                category_fids.get(key, ""),
+                f"cards.quark.config.category_fids.{key}",
+                allow_empty=True,
+            )
+            for key in DEFAULT_CATEGORY_FIDS
+        }
+        return normalized
+
+    def destination_options(self) -> list[dict[str, Any]]:
+        config = self.config_store.get_quark_config()
+        options = []
+        default_fid = str(config.get("default_fid") or "0")
+        options.append({"id": default_fid, "name": "默认目录", "is_default": True})
+        for name, fid in (config.get("category_fids") or {}).items():
+            fid = str(fid or "").strip()
+            if fid:
+                options.append({
+                    "id": fid,
+                    "name": f"{name}目录",
+                    "category": name,
+                    "is_default": False,
+                })
+        seen = set()
+        return [item for item in options if not (item["id"] in seen or seen.add(item["id"]))]
+
+
+    def _client(self) -> QuarkClient:
+        return QuarkClient(self.config_store.get_cookie())
+
+    def check(self, config: dict | None = None) -> dict[str, Any]:
+        cookie = self.config_store.get_cookie()
+        if not cookie:
+            return {
+                "status": "unconfigured",
+                "message": "尚未配置夸克 Cookie",
+            }
+        valid = self._client().check_cookie_valid()
+        return {
+            "status": "healthy" if valid else "unavailable",
+            "message": "夸克 Cookie 有效" if valid else "夸克 Cookie 无效或已过期",
+        }
+
+    def resolve_resource(self, resource: object) -> dict[str, Any]:
+        if not isinstance(resource, dict):
+            return {"files": [], "token": None, "error": "资源参数无效"}
+        pwd_id = sanitize_pwd_id(resource.get("pwd_id"))
+        if not pwd_id:
+            return {"files": [], "token": None, "error": "分享资源 ID 无效"}
+        files, stoken, error = self._client().get_share_files(
+            pwd_id,
+            passcode=str(resource.get("password") or resource.get("passcode") or ""),
+        )
+        return {
+            "files": files or [],
+            "token": stoken,
+            "error": error,
+        }
+
+    def list_files(self, resource: object) -> list[dict[str, Any]]:
+        return self.resolve_resource(resource).get("files") or []
+
+    def create_folder(self, name: str, parent_id: str = "0") -> str:
+        fid, error = self._client().get_or_create_subfolder(name, parent_id)
+        if not fid:
+            raise RuntimeError(error or "创建目录失败")
+        return fid
+
+    def transfer(
+        self,
+        resource: object,
+        files: list[dict[str, Any]],
+        target_id: str = "0",
+    ) -> tuple[bool, str]:
+        if not isinstance(resource, dict):
+            return False, "资源参数无效"
+        pwd_id = sanitize_pwd_id(resource.get("pwd_id"))
+        stoken = resource.get("stoken")
+        if not pwd_id or not stoken:
+            return False, "分享资源参数无效"
+        return self._client().save_files(
+            pwd_id,
+            files,
+            stoken,
+            target_id,
+        )
+
+
+def create_card(context):
+    """Create this card using the platform's shared configuration store."""
+    return QuarkStorageCard(context["config_store"])
