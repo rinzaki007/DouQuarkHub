@@ -526,4 +526,4 @@ def test_subscription_accepts_provider_neutral_resource_identity(tmp_path):
         assert sub["resource_type"] == "cloud_b_share"
         assert sub["pwd_id"] == ""
     finally:
-        manager.shutdown()
+        manager.stop_scheduler()
