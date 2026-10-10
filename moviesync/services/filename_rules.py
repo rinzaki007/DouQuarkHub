@@ -8,6 +8,8 @@ import re
 from datetime import datetime
 from pathlib import PurePosixPath
 
+from ..regex_safety import has_nested_unbounded_quantifier
+
 DEFAULT_TV_MAGIC_REGEX = {
     "pattern": r".*?(?<!\d)([Ss]\d{1,2})?([Ee]?[Pp]?[Xx]?\d{1,3})(?!\d).*?\.(mp4|mkv)",
     "replace": r"\1\2.\3",
@@ -35,7 +37,9 @@ def _apply_magic_regex(file_name: str, magic_regex: object = None) -> str:
         magic_regex = DEFAULT_TV_MAGIC_REGEX
     pattern = str(magic_regex.get("pattern") or "").strip()
     replacement = str(magic_regex.get("replace") or "")
-    if not pattern:
+    if not pattern or has_nested_unbounded_quantifier(pattern):
+        # Old/imported config may predate validation; never run an obviously
+        # dangerous pattern on filenames from remote resource sources.
         return file_name
     try:
         return re.sub(pattern, replacement, file_name, count=1, flags=re.IGNORECASE)
