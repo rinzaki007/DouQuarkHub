@@ -23,6 +23,7 @@ def test_broken_card_does_not_break_card_list_or_other_platform_pages(tmp_path):
     app.config["TESTING"] = True
     services = app.extensions["moviesync"]
     services["card_registry"].register(BrokenStatusCard())
+    services["auth"].is_initialized = lambda: True
 
     client = app.test_client()
     with client.session_transaction() as session:
