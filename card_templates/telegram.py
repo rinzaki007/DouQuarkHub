@@ -223,5 +223,9 @@ class TelegramResourceSource(ResourceSourceCard):
 
 
 def create_card(context):
-    """Create Telegram card using the injected Telegram client."""
-    return TelegramResourceSource(context["telegram"], context.get("config_store"))
+    """Create a Telegram card with a client owned by this card.
+
+    The host-provided Telegram context remains available to older/custom cards,
+    but the bundled Telegram card no longer relies on a core-owned client.
+    """
+    return TelegramResourceSource(TelegramClient(), context.get("config_store"))
