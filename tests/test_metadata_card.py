@@ -428,3 +428,45 @@ def test_douban_cover_normalizer_rejects_non_string_values():
 
     assert DoubanClient._normalize_cover_url({"url": "https://img1.doubanio.com/poster.jpg"}) == ""
     assert DoubanClient._extract_cover_url({"url": {"normal": "https://img1.doubanio.com/poster.jpg"}}) == "https://img1.doubanio.com/poster.jpg"
+
+
+
+def test_metadata_manager_config_load_failure_does_not_break_home_or_search():
+    import logging
+
+    from moviesync.cards import CardManifest, CardRegistry, MetadataProviderCard
+    from moviesync.services.metadata import MetadataProviderManager
+
+    class ConfigStoreThatFails:
+        def load(self):
+            raise OSError("simulated config read failure")
+
+    class HealthyProvider(MetadataProviderCard):
+        manifest = CardManifest(
+            id="healthy-after-config-error",
+            name="Healthy After Config Error",
+            type="metadata_provider",
+            capabilities=("metadata.list", "metadata.search"),
+        )
+
+        def list_movies(self, tag, sort_type):
+            return [{"title": tag}]
+
+        def search(self, query):
+            return [{"title": query}]
+
+        def get_detail(self, item_id):
+            return None
+
+    registry = CardRegistry()
+    registry.register(HealthyProvider())
+    manager = MetadataProviderManager(
+        registry,
+        logging.getLogger("test.metadata.config-failure"),
+        ConfigStoreThatFails(),
+    )
+
+    # If config storage is temporarily unreadable, default-enabled cards remain
+    # usable; a failed config read must not escape into the home/search routes.
+    assert manager.list_movies() == [{"title": "电影"}]
+    assert manager.search("测试") == [{"title": "测试"}]

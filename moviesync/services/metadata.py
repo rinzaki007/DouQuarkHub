@@ -65,11 +65,20 @@ class MetadataProviderManager:
                 self.logger.exception("元数据卡片插件 %s 加载失败", entry_point.name)
         return loaded
 
-    def _is_enabled(self, card: MetadataProviderCard) -> bool:
+    def _card_config(self) -> dict[str, Any]:
+        """读取卡片配置；配置文件暂时不可读时，不让元数据功能拖垮页面。"""
         if self.config_store is None:
-            return True
-        config = self.config_store.load()
-        cards = config.get("cards", {}) if isinstance(config, dict) else {}
+            return {}
+        try:
+            config = self.config_store.load()
+        except Exception:
+            self.logger.exception("读取元数据卡片配置失败，将暂按卡片默认启用状态处理")
+            return {}
+        return config if isinstance(config, dict) else {}
+
+    @staticmethod
+    def _is_enabled(card: MetadataProviderCard, config: dict[str, Any]) -> bool:
+        cards = config.get("cards", {})
         saved = cards.get(card.card_id, {}) if isinstance(cards, dict) else {}
         return not isinstance(saved, dict) or bool(saved.get("enabled", True))
 
@@ -88,9 +97,10 @@ class MetadataProviderManager:
                 if isinstance(card, MetadataProviderCard)
             ]
 
+        config = self._card_config()
         result = []
         for card in candidates:
-            if not self._is_enabled(card):
+            if not self._is_enabled(card, config):
                 continue
             if capability and capability not in card.capabilities:
                 continue
