@@ -380,3 +380,47 @@ def test_card_registry_does_not_downgrade_newer_saved_config():
 def test_card_manifest_requires_positive_config_version():
     with pytest.raises(ValueError, match="config_version"):
         CardManifest(id="bad-version", name="Bad Version", config_version=0)
+
+
+
+def test_bundled_telegram_card_owns_its_client(monkeypatch):
+    import card_templates.telegram as telegram_module
+
+    created = []
+
+    class FakeTelegramClient:
+        def __init__(self):
+            created.append(self)
+
+    monkeypatch.setattr(telegram_module, "TelegramClient", FakeTelegramClient)
+    injected_legacy_client = object()
+
+    card = telegram_module.create_card({"telegram": injected_legacy_client})
+
+    assert card.client is created[0]
+    assert card.client is not injected_legacy_client
+
+
+def test_legacy_telegram_adapter_constructs_client_only_on_demand(monkeypatch):
+    from moviesync.clients.compat import LazyTelegramClient
+    import moviesync.clients.telegram as telegram_module
+
+    created = []
+
+    class FakeTelegramClient:
+        def __init__(self):
+            self.http = type("Http", (), {"session": type("Session", (), {"close": lambda self: created.append("closed")})()})()
+
+        def check_channel(self, channel):
+            return channel == "demo"
+
+    monkeypatch.setattr(telegram_module, "TelegramClient", FakeTelegramClient)
+    client = LazyTelegramClient()
+
+    assert client._client is None
+    assert client.check_channel("demo") is True
+    assert len(created) == 0
+    assert isinstance(client._client, FakeTelegramClient)
+
+    client.close()
+    assert created == ["closed"]
