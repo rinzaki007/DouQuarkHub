@@ -1252,6 +1252,16 @@
                     try { value = JSON.parse(input.value || (field.default === undefined ? "{}" : JSON.stringify(field.default))); }
                     catch (_) { throw new Error("配置字段「" + (field.label || key) + "」不是有效 JSON"); }
                     if (!value || typeof value !== "object") throw new Error("配置字段「" + (field.label || key) + "」必须是 JSON 对象或数组");
+                } else if (type === "number") {
+                    const raw = String(input.value || "").trim();
+                    if (!raw) {
+                        if (field.required) throw new Error("请填写必填项：" + (field.label || key));
+                        continue;
+                    }
+                    value = Number(raw);
+                    if (!Number.isFinite(value)) {
+                        throw new Error("配置字段「" + (field.label || key) + "」必须是数字");
+                    }
                 } else value = input.value;
                 if (field.secret && !String(value || "").trim()) continue;
                 if (field.required && !field.secret && (value === "" || value === null || value === undefined)) {
