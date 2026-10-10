@@ -722,8 +722,24 @@ def resource_card_config(card_id):
             return _json_error(f"配置字段「{field.get('label') or key}」必须是 JSON 对象或数组")
         if field_type == "boolean" and not isinstance(value, bool):
             return _json_error(f"配置字段「{field.get('label') or key}」必须是布尔值")
-        if field_type == "number" and (isinstance(value, bool) or not isinstance(value, (int, float))):
-            return _json_error(f"配置字段「{field.get('label') or key}」必须是数字")
+        if field_type == "number":
+            # HTML input.value is always a string. Accept numeric strings as well as
+            # JSON numbers so card enable/disable saves are not blocked by the UI type.
+            if isinstance(value, bool):
+                return _json_error(f"配置字段「{field.get('label') or key}」必须是数字")
+            if isinstance(value, str):
+                raw_number = value.strip()
+                if not raw_number:
+                    return _json_error(f"配置字段「{field.get('label') or key}」必须是数字")
+                try:
+                    number_value = float(raw_number)
+                except ValueError:
+                    return _json_error(f"配置字段「{field.get('label') or key}」必须是数字")
+                if not math.isfinite(number_value):
+                    return _json_error(f"配置字段「{field.get('label') or key}」必须是有限数字")
+                value = int(number_value) if number_value.is_integer() else number_value
+            elif not isinstance(value, (int, float)) or not math.isfinite(value):
+                return _json_error(f"配置字段「{field.get('label') or key}」必须是有限数字")
         if field_type in {"string", "password", "textarea"} and not isinstance(value, str):
             return _json_error(f"配置字段「{field.get('label') or key}」必须是文本")
         merged[key] = value
