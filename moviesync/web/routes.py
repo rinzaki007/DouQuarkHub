@@ -849,6 +849,11 @@ def resource_card_config(card_id):
         # are enforced when enabling it, not when explicitly turning it off.
         if will_be_enabled and field.get("required") and not has_value and not has_saved_secret:
             return _json_error(f"请填写必填配置：{field.get('label') or key}")
+    if will_be_enabled:
+        try:
+            card.validate_enabled_config(merged)
+        except (ValueError, TypeError) as exc:
+            return _json_error(str(exc))
     try:
         validated = card.validate_config(merged)
         if not isinstance(validated, dict):
