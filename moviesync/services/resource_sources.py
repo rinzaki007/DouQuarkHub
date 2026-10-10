@@ -288,8 +288,12 @@ class ResourceSourceManager:
             self.logger.exception("清理未注册资源卡片插件 %s 失败", plugin_name)
 
     def get_cards(self) -> list[dict[str, Any]]:
-        """返回已加载资源卡片的 Manifest。"""
-        return self.registry.manifests()
+        """仅返回已加载资源来源卡片的 Manifest。"""
+        return [
+            card.manifest.to_dict()
+            for card in self.registry.find_by_type("resource_source")
+            if isinstance(card, ResourceSourceCard)
+        ]
     def _card_config(self, config: dict, source_id: str) -> dict[str, Any]:
         cards = config.get("cards") if isinstance(config, dict) else {}
         card = cards.get(source_id) if isinstance(cards, dict) else {}
