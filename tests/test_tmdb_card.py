@@ -135,3 +135,20 @@ def test_tmdb_details_return_external_ids_and_health_check_never_exposes_token()
         "message": "请先填写 TMDB API Read Access Token",
     }
     assert "secret-token" not in str(card.check({"api_read_access_token": "secret-token"}))
+
+
+def test_about_page_contains_required_tmdb_attribution(tmp_path):
+    from moviesync.app import create_app
+
+    app = create_app({"MOVIESYNC_DATA_DIR": str(tmp_path)}, start_scheduler=False)
+    app.extensions["moviesync"]["auth"].setup("admin", "test-password-123")
+    client = app.test_client()
+    with client.session_transaction() as session:
+        session["logged_in"] = True
+
+    response = client.get("/about")
+
+    assert response.status_code == 200
+    assert b"This product uses the TMDB API but is not endorsed or certified by TMDB." in response.data
+    assert b"logos-attribution" in response.data
+    assert b"blue_square_2-" in response.data
