@@ -905,7 +905,8 @@ class SubscriptionManager:
                     else f"{target_id}:{key_base}" if target_id else key_base
                 )
                 queue_key = (resource_type, resource_id, target_id, fid)
-                if (key in tracked or legacy_key in tracked) or queue_key in queued_keys:
+                legacy_selected_key = target_id == selected_target_id and legacy_key in tracked
+                if (key in tracked or legacy_selected_key) or queue_key in queued_keys:
                     continue
                 file_name = str(item.get("file_name") or "")
                 if not file_name.lower().endswith(VIDEO_EXTENSIONS):
