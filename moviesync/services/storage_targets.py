@@ -9,7 +9,7 @@ from __future__ import annotations
 from importlib.metadata import entry_points
 from typing import Any
 
-from ..cards import CardRegistry, StorageTargetCard
+from ..cards import Card, CardRegistry, StorageTargetCard
 
 
 class StorageTargetManager:
@@ -19,6 +19,17 @@ class StorageTargetManager:
         self.registry = registry
         self.config_store = config_store
         self.logger = logger
+
+    def _close_unregistered_plugin_card(self, card: object, plugin_name: str) -> None:
+        """工厂已创建但未成功注册的卡片也必须释放资源。"""
+        if not isinstance(card, Card):
+            return
+        try:
+            if self.registry.get(card.card_id) is card:
+                return
+            card.close()
+        except Exception:
+            self.logger.exception("清理未注册存储卡片插件 %s 失败", plugin_name)
 
     def load_plugins(self, context: dict[str, Any] | None = None) -> list[str]:
         """加载已安装可信 Python 包声明的存储卡片插件。
@@ -36,6 +47,7 @@ class StorageTargetManager:
             return loaded
 
         for entry_point in candidates:
+            card = None
             try:
                 factory = entry_point.load()
                 if not callable(factory):
@@ -49,6 +61,7 @@ class StorageTargetManager:
                 loaded.append(registered.card_id)
                 self.logger.info("已加载存储卡片插件: %s", registered.card_id)
             except Exception:
+                self._close_unregistered_plugin_card(card, entry_point.name)
                 self.logger.exception("存储卡片插件 %s 加载失败", entry_point.name)
         return loaded
 
