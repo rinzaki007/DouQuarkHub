@@ -61,3 +61,11 @@ def test_quark_legacy_episode_parser_uses_shared_filename_rules():
         assert episode == expected_episode
         assert unchanged_name == file_name
 
+def test_legacy_nested_unbounded_magic_regex_is_skipped_at_runtime():
+    # Old/imported config may bypass current save-time validation. Parsing must
+    # skip an obviously dangerous pattern instead of executing it on remote names.
+    assert parse_tv_episode(
+        "A filename with no episode marker.mkv",
+        {"pattern": r"(.+)+$", "replace": r"\\1"},
+    ) == (None, None)
+
