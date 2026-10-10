@@ -89,11 +89,24 @@ class StorageTargetManager:
                 cards.append(card)
         return cards
 
+    def _default_target_id(self) -> tuple[str, bool]:
+        """读取默认目标；配置读取失败时明确返回不可用，不尝试其他目标。"""
+        getter = getattr(self.config_store, "get_default_storage_target_id", None)
+        if not callable(getter):
+            return "", True
+        try:
+            return str(getter() or "").strip(), True
+        except Exception:
+            if self.logger is not None:
+                self.logger.exception("读取默认存储目标失败")
+            return "", False
+
     def _unavailable_message(self, target_id: str | None = None) -> str:
         is_default_target = not target_id
         if is_default_target:
-            getter = getattr(self.config_store, "get_default_storage_target_id", None)
-            target_id = str(getter() or "").strip() if callable(getter) else ""
+            target_id, default_available = self._default_target_id()
+            if not default_available:
+                return "无法读取默认存储目标配置，请检查配置文件和服务日志后重试"
 
         if not target_id:
             _, available = self._load_card_config()
@@ -135,8 +148,9 @@ class StorageTargetManager:
             if isinstance(saved, dict) and not saved.get("enabled", True):
                 return None
             return card
-        getter = getattr(self.config_store, "get_default_storage_target_id", None)
-        default_id = str(getter() or "").strip() if callable(getter) else ""
+        default_id, default_available = self._default_target_id()
+        if not default_available:
+            return None
         if default_id:
             card = self.registry.get(default_id)
             if not isinstance(card, StorageTargetCard):
