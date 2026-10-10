@@ -6,7 +6,6 @@ code, not a sandboxed data format; the web UI must warn users to install trusted
 from __future__ import annotations
 
 import importlib.util
-import hashlib
 import re
 import sys
 from pathlib import Path
