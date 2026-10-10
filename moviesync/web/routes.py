@@ -1126,6 +1126,16 @@ def transfer_selected():
     if not isinstance(movie, dict) or not isinstance(candidate, dict):
         return _json_error("参数不完整")
 
+    files = candidate.get("files")
+    if not isinstance(files, list) or not files:
+        return _json_error("请至少选择一个要转存的文件")
+    if any(
+        not isinstance(item, dict)
+        or not str(item.get("fid") or "").strip()
+        for item in files
+    ):
+        return _json_error("所选文件信息不完整，请重新选择资源")
+
     try:
         target_fid = _normalize_fid(
             data.get("target_fid") or "0"
