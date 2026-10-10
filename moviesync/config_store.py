@@ -11,8 +11,12 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from .errors import ConfigValidationError
-from .legacy_card_config import legacy_card_defaults, migrate_legacy_files, normalize_legacy_card_config
-from .regex_safety import has_nested_unbounded_quantifier
+from .legacy_card_config import (
+    LegacyCardConfigAdapter,
+    legacy_card_defaults,
+    migrate_legacy_files,
+    normalize_legacy_card_config,
+)
 from .settings import DEFAULT_CATEGORY_FIDS, DEFAULT_OPENLIST_URL
 from .storage import JsonStore
 
@@ -27,6 +31,7 @@ class ConfigStore:
     def __init__(self, config_file: Path, legacy_root: Path):
         self.store = JsonStore(config_file, self._defaults)
         self.legacy_root = legacy_root
+        self.legacy_cards = LegacyCardConfigAdapter(self, CONFIG_SCHEMA_VERSION)
         self._migrate_legacy()
 
     @staticmethod
@@ -212,48 +217,14 @@ class ConfigStore:
         return deepcopy(card_config) if isinstance(card_config, dict) else {}
 
     def get_quark_config(self) -> dict:
-        return deepcopy(self.load()["cards"]["quark"]["config"])
+        """Legacy compatibility wrapper; new card code should use get_card_config()."""
+        return self.legacy_cards.get_quark_config()
 
     def save_quark_config(self, incoming: dict) -> dict:
-        if not isinstance(incoming, dict):
-            raise ConfigValidationError("Quark 卡片配置必须是 JSON 对象")
-        current = self.load()
-        quark = current["cards"]["quark"]
-        config = quark["config"]
-        if incoming.get("clear_cookie") is True:
-            config["cookie"] = ""
-        elif "cookie" in incoming:
-            cookie = str(incoming.get("cookie") or "").strip()
-            if cookie:
-                config["cookie"] = cookie
-        if "enabled" in incoming:
-            quark["enabled"] = bool(incoming["enabled"])
-        if "default_fid" in incoming:
-            config["default_fid"] = self._normalize_fid(
-                incoming["default_fid"],
-                "cards.quark.config.default_fid",
-            )
-        if "category_fids" in incoming:
-            category_fids = incoming["category_fids"] or {}
-            if not isinstance(category_fids, dict):
-                raise ConfigValidationError("Quark 分类目录 FID 必须是对象")
-            config["category_fids"] = {
-                key: self._normalize_fid(
-                    category_fids.get(key, config["category_fids"].get(key, "")),
-                    f"cards.quark.config.category_fids.{key}",
-                    allow_empty=True,
-                )
-                for key in DEFAULT_CATEGORY_FIDS
-            }
-        current["cards"]["quark"] = quark
-        current["schema_version"] = CONFIG_SCHEMA_VERSION
-        self.store.write(current)
-        return deepcopy(quark)
+        return self.legacy_cards.save_quark_config(incoming)
 
     def get_cookie(self) -> str:
-        return str(
-            self.get_quark_config().get("cookie") or ""
-        ).strip()
+        return self.legacy_cards.get_cookie()
 
     def get_default_storage_target_id(self) -> str:
         return str(self.load().get("default_storage_target_id") or "").strip()
@@ -269,40 +240,14 @@ class ConfigStore:
         return target_id
 
     def get_channels(self) -> list[dict[str, str]]:
-        return self.load()["cards"]["telegram"]["config"]["channels"]
+        return self.legacy_cards.get_channels()
 
     def get_telegram_config(self) -> dict:
-        return deepcopy(self.load()["cards"]["telegram"]["config"])
+        """Legacy compatibility wrapper for the Telegram card."""
+        return self.legacy_cards.get_telegram_config()
 
     def save_telegram_config(self, incoming: dict) -> dict:
-        if not isinstance(incoming, dict):
-            raise ConfigValidationError("Telegram 卡片配置必须是 JSON 对象")
-        current = self.load()
-        card = current["cards"]["telegram"]
-        config = card["config"]
-        if "channels" in incoming:
-            config["channels"] = self._normalize_channels(incoming["channels"])
-        if "magic_regex" in incoming:
-            magic_regex = incoming.get("magic_regex")
-            if not isinstance(magic_regex, dict):
-                raise ConfigValidationError("magic_regex 必须是 JSON 对象")
-            pattern = str(magic_regex.get("pattern") or "").strip()
-            replacement = str(magic_regex.get("replace") or "")
-            if len(pattern) > 1000 or len(replacement) > 200:
-                raise ConfigValidationError("文件名正则或替换规则过长")
-            try:
-                re.compile(pattern) if pattern else None
-            except re.error as exc:
-                raise ConfigValidationError(f"文件名正则无效：{exc}") from exc
-            if pattern and has_nested_unbounded_quantifier(pattern):
-                raise ConfigValidationError("文件名正则包含高风险的嵌套无限量词")
-            config["magic_regex"] = {"pattern": pattern, "replace": replacement}
-        if "enabled" in incoming:
-            card["enabled"] = bool(incoming["enabled"])
-        current["cards"]["telegram"] = card
-        current["schema_version"] = CONFIG_SCHEMA_VERSION
-        self.store.write(current)
-        return deepcopy(card)
+        return self.legacy_cards.save_telegram_config(incoming)
 
     @classmethod
     def _sanitize_public_value(cls, value):
@@ -476,15 +421,7 @@ class ConfigStore:
         return current
 
     def get_resource_sources(self) -> list[dict]:
-        config = self.get_telegram_config()
-        card = self.load()["cards"]["telegram"]
-        return [{
-            "id": "telegram",
-            "name": "Telegram",
-            "type": "telegram",
-            "enabled": bool(card.get("enabled", True)),
-            "health": config.get("health", {}),
-        }]
+        return self.legacy_cards.get_resource_sources()
 
     def update_resource_source_health(
         self,
@@ -493,36 +430,15 @@ class ConfigStore:
         message: str,
         channels: list[dict] | None = None,
     ) -> None:
-        current = self.load()
-        import time
-
-        now = time.time()
-        if source_id != "telegram":
-            return
-        card = current["cards"]["telegram"]
-        health = card["config"].setdefault("health", {})
-        health["status"] = str(status or "unknown")
-        health["message"] = str(message or "")[:200]
-        health["last_checked_at"] = now
-        if channels is not None:
-            health["channels"] = [
-                {
-                    "id": str(channel.get("id") or ""),
-                    "name": str(channel.get("name") or ""),
-                    "status": str(channel.get("status") or "unknown"),
-                    "message": str(channel.get("message") or "")[:200],
-                }
-                for channel in channels
-                if isinstance(channel, dict)
-            ]
-        if status == "healthy":
-            health["last_success_at"] = now
-        elif status == "unavailable":
-            health["failure_count"] = int(health.get("failure_count", 0) or 0) + 1
-        self.store.write(current)
+        self.legacy_cards.update_resource_source_health(
+            source_id,
+            status,
+            message,
+            channels,
+        )
 
     def save_channels(
         self,
         channels: object,
     ) -> list[dict[str, str]]:
-        return self.save_telegram_config({"channels": channels})["config"]["channels"]
+        return self.legacy_cards.save_channels(channels)
