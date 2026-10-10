@@ -152,3 +152,22 @@ def test_about_page_contains_required_tmdb_attribution(tmp_path):
     assert b"This product uses the TMDB API but is not endorsed or certified by TMDB." in response.data
     assert b"logos-attribution" in response.data
     assert b"blue_square_2-" in response.data
+
+
+def test_tmdb_is_seeded_and_can_be_uninstalled_without_affecting_douban(tmp_path):
+    from moviesync.app import create_app
+
+    app = create_app({"MOVIESYNC_DATA_DIR": str(tmp_path)}, start_scheduler=False)
+    services = app.extensions["moviesync"]
+    plugin_path = tmp_path / "cards" / "tmdb.py"
+
+    assert plugin_path.is_file()
+    assert services["card_registry"].get("tmdb") is not None
+    assert services["card_registry"].get("douban") is not None
+
+    removed = services["file_card_plugins"].uninstall("tmdb.py")
+
+    assert removed["card_id"] == "tmdb"
+    assert services["card_registry"].get("tmdb") is None
+    assert services["card_registry"].get("douban") is not None
+    assert not plugin_path.exists()
