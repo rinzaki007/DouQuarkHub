@@ -87,11 +87,24 @@ class SearchService:
         普通搜索允许短时复用文件列表；转存前必须 refresh，重新获取文件状态和
         临时 token。缓存键只保留提取码摘要，缓存内容不保存 token。
         """
-        storage_target_id = str(resource.get("storage_target_id") or "").strip()
+        storage_target_id = str(
+            resource.get("storage_target_id") or resource.get("target_id") or ""
+        ).strip()
         if not storage_target_id:
-            getter = getattr(self.storage_targets, "get", None)
-            target = getter() if callable(getter) else None
-            storage_target_id = target.card_id if target else ""
+            selector = getattr(self.storage_targets, "select_target_id", None)
+            if callable(selector):
+                storage_target_id = str(selector(resource) or "").strip()
+            else:
+                getter = getattr(self.storage_targets, "get", None)
+                target = getter() if callable(getter) else None
+                storage_target_id = target.card_id if target else ""
+        if resource.get("resource_type") and not storage_target_id:
+            return (
+                [],
+                None,
+                "没有已启用的存储卡片支持此资源类型，请检查存储卡片配置",
+                "",
+            )
         pwd_id = str(resource.get("pwd_id") or "").strip()
         if not pwd_id:
             return [], None, "资源标识无效", storage_target_id
