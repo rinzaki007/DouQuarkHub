@@ -501,7 +501,7 @@ def test_transfer_task_fingerprint_is_namespaced_by_resource_provider():
             "resource_id": "same-share-id",
             "resource_type": "cloud_b_share",
             "files": [{"fid": "same-file"}],
-            "storage_target_id": "cloud-b",
+            "storage_target_id": "cloud-a",
         },
         "target_fid": "0",
     }
