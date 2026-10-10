@@ -95,6 +95,23 @@ def test_storage_target_selection_uses_resource_capabilities_not_card_ids():
     assert result["token"] == "demo-token"
 
 
+
+def test_capability_matching_fails_closed_when_default_target_lookup_fails():
+    class BrokenDefaultStore(FakeStore):
+        def get_default_storage_target_id(self):
+            raise OSError("simulated default target lookup failure")
+
+    registry = CardRegistry()
+    registry.register(QuarkCompatibleStorage())
+    manager = StorageTargetManager(registry, BrokenDefaultStore(), FakeLogger())
+
+    assert manager.select_target_id({"resource_type": "quark_share"}) == ""
+    result = manager.resolve_resource({"pwd_id": "abc", "resource_type": "quark_share"})
+    assert result["files"] == []
+    assert "没有已启用的存储卡片支持此资源类型" in result["error"]
+
+
+
 def test_resource_type_without_compatible_target_does_not_fall_back_to_default():
     registry = CardRegistry()
     registry.register(DemoStorage())
