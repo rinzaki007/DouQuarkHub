@@ -80,7 +80,7 @@ async function loadTaskCategories() {
             targetSelect.add(new Option('默认位置不可用，请手动选择', ''));
             targetSelect.value = '';
             document.getElementById('task-form-status').textContent =
-                '默认转存位置不可用；请手动选择一个已启用且支持当前资源类型的存储卡片。系统不会静默改存到其他网盘。';
+                '默认转存位置不可用；请手动选择一个已启用且支持当前资源类型的存储卡片。系统不会自动改存到其他网盘。';
         } else if (preferred) {
             targetSelect.value = preferred.id;
         } else if (targets.length === 1) {
