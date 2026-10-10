@@ -52,6 +52,14 @@ def test_task_center_handles_malformed_persisted_timestamps(tmp_path):
             "malformed-time",
             "non-finite-time",
         ]
+        non_finite = next(task for task in tasks if task["id"] == "non-finite-time")
+        assert non_finite["updated_at"] == 0
+        assert non_finite["created_at"] == 0
+
+        detail = client.get("/api/tasks/non-finite-time")
+        assert detail.status_code == 200
+        assert detail.get_json()["task"]["updated_at"] == 0
+        assert detail.get_json()["task"]["created_at"] == 0
     finally:
         services["tasks"].shutdown()
         services["subscriptions"].stop_scheduler()
