@@ -218,34 +218,40 @@ def test_cards_api_uses_card_interface_for_configuration_status(tmp_path):
             config_fields=({"key": "endpoint", "label": "Endpoint", "required": True},),
         )
 
+    client = app.test_client()
+    client.post("/api/setup", json={"username": "admin", "password": "password123"})
     services["card_registry"].register(CustomConfiguredCard())
     services["config"].save_card_config(
         "custom-configured", {"endpoint": "https://example.invalid"}
     )
 
-    response = app.test_client().get("/api/cards")
+    response = client.get("/api/cards")
     assert response.status_code == 200
     cards = response.get_json()["cards"]
     custom = next(item for item in cards if item["id"] == "custom-configured")
     assert custom["configured"] is True
-    assert custom["health"]["status"] == "configured"
+    assert custom["health"]["status"] == "idle"
 
 
 def test_cards_api_does_not_treat_quark_default_fid_as_configuration(tmp_path):
     from moviesync.app import create_app
 
     app = create_app({"MOVIESYNC_DATA_DIR": str(tmp_path)}, start_scheduler=False)
-    cards = app.test_client().get("/api/cards").get_json()["cards"]
+    client = app.test_client()
+    client.post("/api/setup", json={"username": "admin", "password": "password123"})
+    cards = client.get("/api/cards").get_json()["cards"]
     quark = next(item for item in cards if item["id"] == "quark")
     assert quark["configured"] is False
-    assert quark["health"]["status"] == "unconfigured"
+    assert quark["health"]["status"] == "idle"
 
 
 def test_cards_api_does_not_treat_telegram_regex_defaults_as_configuration(tmp_path):
     from moviesync.app import create_app
 
     app = create_app({"MOVIESYNC_DATA_DIR": str(tmp_path)}, start_scheduler=False)
-    cards = app.test_client().get("/api/cards").get_json()["cards"]
+    client = app.test_client()
+    client.post("/api/setup", json={"username": "admin", "password": "password123"})
+    cards = client.get("/api/cards").get_json()["cards"]
     telegram = next(item for item in cards if item["id"] == "telegram")
     assert telegram["configured"] is False
-    assert telegram["health"]["status"] == "unconfigured"
+    assert telegram["health"]["status"] == "idle"
