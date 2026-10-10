@@ -5,6 +5,7 @@ code, not a sandboxed data format; the web UI must warn users to install trusted
 """
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import re
 import sys
@@ -20,7 +21,6 @@ from .cards import (
     ResourceSourceCard,
     StorageTargetCard,
 )
-
 
 # Git blob IDs for bundled card versions shipped before automatic card upgrades.
 # These hashes allow safe migration of old empty-marker installs without replacing
@@ -41,7 +41,7 @@ _LEGACY_BUNDLED_CARD_BLOBS = {
 def _git_blob_sha(content: bytes) -> str:
     """Return the Git blob object ID for exact-byte version comparisons."""
     header = f"blob {len(content)}\0".encode("ascii")
-    return __import__("hashlib").sha1(header + content).hexdigest()
+    return hashlib.sha1(header + content).hexdigest()
 
 
 _PLUGIN_FILE_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}\.py$")
