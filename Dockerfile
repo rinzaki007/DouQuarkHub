@@ -25,6 +25,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     MOVIESYNC_DATA_DIR=/app/data \
     MOVIESYNC_PANSOU_URL=http://127.0.0.1:8888 \
+    MOVIESYNC_BUNDLED_PANSOU_ENABLED=true \
     PORT=8888 \
     CACHE_PATH=/app/data/pansou/cache \
     CACHE_ENABLED=true \
@@ -54,6 +55,6 @@ VOLUME ["/app/data"]
 EXPOSE 5000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
-  CMD python -c "import urllib.request; [urllib.request.urlopen(u, timeout=3).close() for u in ('http://127.0.0.1:5000/healthz', 'http://127.0.0.1:8888/api/health')]"
+  CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/healthz', timeout=3).close()"
 
 ENTRYPOINT ["/app/docker-entrypoint.sh"]
