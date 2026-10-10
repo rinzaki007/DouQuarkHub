@@ -205,6 +205,10 @@ class TMDBMetadataCard(MetadataProviderCard):
             or str(config.get("api_key") or "").strip()
         )
 
+    def validate_enabled_config(self, config: dict[str, Any]) -> None:
+        if not self.is_configured(config):
+            raise ValueError("启用 TMDB 前，请填写 API Read Access Token 或 API Key")
+
     def check(self, config: dict) -> dict[str, Any]:
         config = config if isinstance(config, dict) else {}
         token = str(config.get("api_read_access_token") or "").strip()
