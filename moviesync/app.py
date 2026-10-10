@@ -5,6 +5,7 @@
 """
 from __future__ import annotations
 
+import os
 import secrets
 from datetime import timedelta
 from pathlib import Path
@@ -89,6 +90,10 @@ def create_app(
         card_registry,
         logger,
         PROJECT_ROOT / "card_templates",
+        seed_missing=(
+            os.getenv("MOVIESYNC_AUTO_INSTALL_BUNDLED_CARDS", "").strip().lower()
+            in {"1", "true", "yes", "on"}
+        ),
     )
     card_context = {
         "telegram": telegram,

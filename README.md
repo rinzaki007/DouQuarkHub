@@ -146,6 +146,8 @@ services:
     environment:
       - TZ=Asia/Shanghai
       - MOVIESYNC_COOKIE_SECURE=0
+      # 可选：首次启动时安装镜像内置的全部卡片；默认不自动安装任何卡片
+      # - MOVIESYNC_AUTO_INSTALL_BUNDLED_CARDS=1
 ```
 
 启动：
@@ -187,18 +189,16 @@ docker run -d \
 
 ## ⚙️ 初次配置
 
-1. 创建管理员账号
-2. 登录后台
-3. 配置夸克 Cookie
-4. 设置默认 FID / 分类 FID
-5. 在「卡片管理」中启用 PanSou（默认地址已内置，无需填写）
-6. 如需使用 TMDB，在「卡片管理」中打开 TMDB 卡片并填写 API Read Access Token；豆瓣与 TMDB 可分别启用或停用
+1. 创建管理员账号并登录后台
+2. 新装默认不自动安装任何卡片；在「卡片管理」上传你需要的卡片文件，或将单个 `.py` 卡片文件挂载到 `/app/data/cards/` 后重启
+3. 如需一次性安装镜像内置的全部卡片，可设置环境变量 `MOVIESYNC_AUTO_INSTALL_BUNDLED_CARDS=1`。已有安装中的卡片文件会继续保留并按原规则升级
+4. 安装夸克存储卡片后，在该卡片的配置中填写 Cookie 和保存目录
+5. 安装 PanSou 资源卡片即可使用内置搜索 API，默认地址已配置，无需单独部署或填写地址
+6. 如需使用 TMDB，安装 TMDB 卡片并填写 API Read Access Token；豆瓣与 TMDB 可分别启用或停用
 7. 首页搜索框左侧可以选择影视数据源；自动来源模式不会拼接多个来源的结果
-8. 如需额外搜索 Telegram，再配置对应频道
-9. 使用首页搜索影视
-10. 选择候选资源和文件
-11. 提交转存任务
-12. 需要时创建自动追剧任务
+8. 如需额外搜索 Telegram，安装 Telegram 卡片后再配置对应频道
+9. 使用首页搜索影视，选择候选资源及文件并提交转存任务
+10. 需要时创建自动追剧任务
 
 ## 💾 数据目录
 

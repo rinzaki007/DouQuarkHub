@@ -59,13 +59,15 @@ class CardFilePluginManager:
         registry: CardRegistry,
         logger,
         bundled_dir: Path | None = None,
+        *,
+        seed_missing: bool = True,
     ):
         self.plugin_dir = Path(plugin_dir).resolve()
         self.registry = registry
         self.logger = logger
         self.bundled_dir = Path(bundled_dir).resolve() if bundled_dir else None
         self.plugin_dir.mkdir(parents=True, exist_ok=True)
-        self._seed_bundled_cards(self.bundled_dir)
+        self._seed_bundled_cards(self.bundled_dir, seed_missing=seed_missing)
         self._lock = RLock()
         # Keep the exact instance so stale file bookkeeping can never remove a
         # different card that later registers under the same ID.
@@ -73,8 +75,13 @@ class CardFilePluginManager:
         self._errors: dict[str, str] = {}
         self._context: dict[str, Any] = {}
 
-    def _seed_bundled_cards(self, bundled_dir: Path | None) -> None:
-        """Seed bundled cards and safely upgrade copies that have not been edited."""
+    def _seed_bundled_cards(
+        self,
+        bundled_dir: Path | None,
+        *,
+        seed_missing: bool = True,
+    ) -> None:
+        """Optionally seed new bundled cards and safely upgrade existing unmodified copies."""
         if bundled_dir is None or not bundled_dir.is_dir():
             return
         marker_dir = self.plugin_dir / ".seeded"
@@ -92,8 +99,9 @@ class CardFilePluginManager:
 
             if not destination.exists():
                 # A marker with no file means an administrator intentionally
-                # uninstalled this card. Only seed files on first installation.
-                if marker.exists():
+                # uninstalled this card. Fresh installs also remain empty unless
+                # the administrator explicitly opts into installing bundled cards.
+                if marker.exists() or not seed_missing:
                     continue
                 try:
                     destination.write_bytes(source_content)
