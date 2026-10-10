@@ -24,6 +24,7 @@ def test_app_starts_and_core_pages_render_without_any_cards(tmp_path, monkeypatc
         assert client.get("/admin").status_code == 200
         assert client.get("/healthz").status_code == 200
         assert app.extensions["moviesync"]["card_registry"].list() == []
+        assert list((tmp_path / "cards").glob("*.py")) == []
     finally:
         app.extensions["moviesync"]["shutdown"]()
 
@@ -67,3 +68,17 @@ def test_about_link_is_only_in_the_homepage_footer(tmp_path, monkeypatch):
         assert 'href="/admin"' in html
     finally:
         app.extensions["moviesync"]["shutdown"]()
+
+
+def test_bundled_cards_can_be_installed_explicitly(tmp_path, monkeypatch):
+    monkeypatch.setenv("MOVIESYNC_AUTO_INSTALL_BUNDLED_CARDS", "1")
+    app = app_module.create_app(
+        {"MOVIESYNC_DATA_DIR": str(tmp_path)},
+        start_scheduler=False,
+    )
+    services = app.extensions["moviesync"]
+    try:
+        assert services["card_registry"].get("pansou") is not None
+        assert (tmp_path / "cards" / "pansou.py").is_file()
+    finally:
+        services["shutdown"]()
