@@ -55,7 +55,7 @@ def test_resource_source_uses_telegram_card_config():
                 "health": {},
             }]
 
-    manager = ResourceSourceManager(Store(), FakeLogger())
+    manager = ResourceSourceManager(Store(), FakeLogger(), resource_cards=[TelegramResourceSource(FakeTelegramClient())])
     results = manager.search(
         {"title": "测试电影"},
         Store().load(),
@@ -91,7 +91,7 @@ def test_resource_source_parses_episode_using_card_magic_regex():
         def get_resource_sources(self):
             return []
 
-    manager = ResourceSourceManager(FakeTelegramClient(), Store(), FakeLogger())
+    manager = ResourceSourceManager(Store(), FakeLogger())
     assert manager.parse_tv_episode(
         "telegram",
         "Stranger.Things.S04E01.2022.NF.WEB-DL.2160p.HEVC.HDR.DDP.mkv",
@@ -123,7 +123,7 @@ def test_resource_source_health_uses_telegram_card_config():
             return []
 
     store = Store()
-    manager = ResourceSourceManager(store, FakeLogger())
+    manager = ResourceSourceManager(store, FakeLogger(), resource_cards=[TelegramResourceSource(FakeTelegramClient())])
     results = manager.check_all()
 
     assert results[0]["id"] == "telegram"
@@ -152,7 +152,7 @@ def test_channel_search_scans_recent_messages_without_telegram_title_query():
             return []
 
     client = FakeTelegramClient()
-    manager = ResourceSourceManager(Store(), FakeLogger())
+    manager = ResourceSourceManager(Store(), FakeLogger(), resource_cards=[TelegramResourceSource(client)])
 
     results = manager.search_channel(
         "telegram",
@@ -240,7 +240,7 @@ def test_manager_loads_installed_resource_card_entry_points(monkeypatch):
             return lambda context: PluginCard()
 
     monkeypatch.setattr(resource_sources_module, "entry_points", lambda **kwargs: [FakeEntryPoint()])
-    manager = ResourceSourceManager(FakeTelegramClient(), object(), FakeLogger())
+    manager = ResourceSourceManager(object(), FakeLogger())
 
     assert manager.load_plugins({"example": True}) == ["entrypoint-source"]
     assert manager.registry.get("entrypoint-source") is not None
@@ -396,7 +396,6 @@ def test_resource_source_manager_reflects_registry_unregister():
 
     registry = CardRegistry()
     manager = ResourceSourceManager(
-        FakeTelegramClient(),
         Store(),
         FakeLogger(),
         registry=registry,
