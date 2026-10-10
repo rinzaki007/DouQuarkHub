@@ -360,3 +360,75 @@ def test_seeded_card_template_migrates_known_legacy_copy_with_empty_marker(tmp_p
     assert (plugin_dir / ".seeded" / "demo.py.seeded").read_text(encoding="ascii") == (
         card_plugins._git_blob_sha(source.read_bytes())
     )
+
+
+
+def test_legacy_customized_builtin_card_gets_bundled_form_schema_without_replacing_code(tmp_path):
+    from moviesync.card_plugins import CardFilePluginManager
+    from moviesync.cards import CardRegistry
+
+    plugin_dir = tmp_path / "data-cards"
+    bundled_dir = tmp_path / "bundled-cards"
+    plugin_dir.mkdir()
+    bundled_dir.mkdir()
+
+    legacy_code = '''from moviesync.cards import CardManifest, ResourceSourceCard
+
+class TelegramResourceSource(ResourceSourceCard):
+    manifest = CardManifest(
+        id="telegram",
+        name="Telegram",
+        type="resource_source",
+        capabilities=("resource.search",),
+        config_fields=(
+            {"key": "channels", "label": "资源频道", "type": "json",
+             "default": [], "description": "JSON 数组"},
+        ),
+    )
+
+    def search(self, movie, config):
+        return []
+
+def create_card(context):
+    return TelegramResourceSource()
+'''
+    canonical_code = '''from moviesync.cards import CardManifest, ResourceSourceCard
+
+class TelegramResourceSource(ResourceSourceCard):
+    manifest = CardManifest(
+        id="telegram",
+        name="Telegram",
+        type="resource_source",
+        capabilities=("resource.search",),
+        config_fields=(
+            {"key": "channels", "label": "资源频道", "type": "json",
+             "editor": "object_list",
+             "item_fields": ({"key": "id", "label": "频道用户名"},),
+             "default": [], "description": "点击添加频道"},
+        ),
+    )
+
+    def search(self, movie, config):
+        return []
+
+def create_card(context):
+    return TelegramResourceSource()
+'''
+    (plugin_dir / "telegram.py").write_text(legacy_code, encoding="utf-8")
+    (bundled_dir / "telegram.py").write_text(canonical_code, encoding="utf-8")
+
+    class Logger:
+        def exception(self, *args, **kwargs):
+            pass
+
+        def info(self, *args, **kwargs):
+            pass
+
+    manager = CardFilePluginManager(plugin_dir, CardRegistry(), Logger(), bundled_dir)
+    loaded = manager.load_file("telegram.py")
+    fields = {field["key"]: field for field in loaded.manifest.config_fields}
+
+    assert fields["channels"]["editor"] == "object_list"
+    assert fields["channels"]["item_fields"][0]["key"] == "id"
+    assert fields["channels"]["description"] == "点击添加频道"
+    assert "JSON 数组" in (plugin_dir / "telegram.py").read_text(encoding="utf-8")
