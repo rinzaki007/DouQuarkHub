@@ -12,6 +12,7 @@ from pathlib import Path
 from flask import Flask, session
 
 from .auth import AuthStore
+from .card_plugins import CardFilePluginManager
 from .cards import CardRegistry, QuarkStorageCard
 from .cards_metadata import DoubanMetadataCard
 from .clients.douban import DoubanClient
@@ -21,7 +22,7 @@ from .config_store import ConfigStore
 from .logging_setup import configure_logging, recent_logs
 from .services.metadata import MetadataProviderManager
 from .services.notifications import NotificationManager
-from .services.resource_sources import PanSouResourceSource, ResourceSourceManager
+from .services.resource_sources import ResourceSourceManager
 from .services.search import SearchService
 from .services.storage_targets import StorageTargetManager
 from .services.subscriptions import SubscriptionManager
@@ -77,7 +78,6 @@ def create_app(
         config_store,
         logger,
         registry=card_registry,
-        resource_cards=[PanSouResourceSource()],
     )
     resource_sources.load_plugins({
         "telegram": telegram,
@@ -102,6 +102,18 @@ def create_app(
     })
     notifications = NotificationManager(card_registry, logger, config_store=config_store)
     notifications.load_plugins({
+        "config_store": config_store,
+        "logger": logger,
+    })
+    file_card_plugins = CardFilePluginManager(
+        settings.data_dir / "cards",
+        card_registry,
+        logger,
+        PROJECT_ROOT / "card_templates",
+    )
+    file_card_plugins.load_all({
+        "telegram": telegram,
+        "douban": douban,
         "config_store": config_store,
         "logger": logger,
     })
@@ -157,6 +169,7 @@ def create_app(
         "telegram": telegram,
         "resource_sources": resource_sources,
         "card_registry": card_registry,
+        "file_card_plugins": file_card_plugins,
         "storage_targets": storage_targets,
         "http": http,
         "subscriptions": subscriptions,
