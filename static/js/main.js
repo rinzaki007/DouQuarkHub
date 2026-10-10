@@ -9,8 +9,8 @@ let moviesData = [];
 let currentChaseSelectedCandidate = null;
 let candidateModalState = null;
 let chaseCandidateState = [];
-let movieRequestSeq = 0;
-let searchRequestSeq = 0;
+let movieViewRequestSeq = 0;
+let categoryOptionsRequestSeq = 0;
 
 function escapeHtml(value) {
     return String(value ?? '').replace(/[&<>\"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[char]));
@@ -86,19 +86,35 @@ function applyGlassmorphismStyles() {
 }
 
 async function loadCategoryOptions() {
+    const requestId = ++categoryOptionsRequestSeq;
+    const selects = document.querySelectorAll('.global-category-select');
     try {
         const targetResp = await apiFetch('/api/storage-targets');
         const targetData = await targetResp.json();
-        if (!targetData.success) throw new Error(targetData.message || '读取保存位置失败');
-        const targetId = targetData.default_target_id || targetData.targets?.find(t => t.enabled !== false)?.id;
+        if (requestId !== categoryOptionsRequestSeq) return;
+        if (!targetResp.ok || !targetData.success) throw new Error(targetData.message || '读取保存位置失败');
+        const targets = Array.isArray(targetData.targets) ? targetData.targets : [];
+        const targetId = targetData.default_target_id || targets.find(t => t.enabled !== false && !t.config_error)?.id;
         window.defaultStorageTargetId = targetId || '';
-        if (!targetId) return;
+        if (!targetId) {
+            selects.forEach(selectEl => {
+                selectEl.replaceChildren(new Option('没有可用的保存位置', ''));
+                selectEl.disabled = true;
+            });
+            return;
+        }
         const destResp = await apiFetch('/api/storage-targets/' + encodeURIComponent(targetId) + '/destinations');
         const destData = await destResp.json();
-        if (!destData.success) throw new Error(destData.message || '读取保存目录失败');
+        if (requestId !== categoryOptionsRequestSeq) return;
+        if (!destResp.ok || !destData.success) throw new Error(destData.message || '读取保存目录失败');
         const options = Array.isArray(destData.destinations) ? destData.destinations : [];
-        document.querySelectorAll('.global-category-select').forEach(selectEl => {
-            selectEl.innerHTML = '';
+        selects.forEach(selectEl => {
+            selectEl.replaceChildren();
+            if (!options.length) {
+                selectEl.add(new Option('该转存位置没有可用目录', ''));
+                selectEl.disabled = true;
+                return;
+            }
             for (const item of options) {
                 const opt = document.createElement('option');
                 opt.value = item.id;
@@ -111,8 +127,14 @@ async function loadCategoryOptions() {
                 || options.find(item => item.is_default)
                 || options[0];
             if (matched) selectEl.value = matched.id;
+            selectEl.disabled = false;
         });
     } catch (err) {
+        if (requestId !== categoryOptionsRequestSeq) return;
+        selects.forEach(selectEl => {
+            selectEl.replaceChildren(new Option('读取目录失败，请刷新重试', ''));
+            selectEl.disabled = true;
+        });
         console.error("读取保存目录失败:", err);
     }
 }
@@ -143,7 +165,7 @@ function changeSort(sort) {
 }
 
 async function fetchMovies() {
-    const requestId = ++movieRequestSeq;
+    const requestId = ++movieViewRequestSeq;
     const loading = document.getElementById('loading');
     const grid = document.getElementById('movie-grid');
     loading.classList.remove('hidden');
@@ -155,22 +177,22 @@ async function fetchMovies() {
         const resp = await apiFetch(`/api/get-movies?${params.toString()}`);
         const res = await resp.json();
 
-        if (requestId !== movieRequestSeq) return;
+        if (requestId !== movieViewRequestSeq) return;
 
         if (res.success) {
             moviesData = Array.isArray(res.movies) ? res.movies : [];
             renderGrid();
             updateEmptyState();
-        } else if (requestId === movieRequestSeq) {
+        } else if (requestId === movieViewRequestSeq) {
             showToast(res.message || '加载影片失败', 'error');
         }
     } catch (err) {
-        if (requestId === movieRequestSeq) {
+        if (requestId === movieViewRequestSeq) {
             console.error(err);
             showToast('影片加载失败，请稍后重试', 'error');
         }
     } finally {
-        if (requestId === movieRequestSeq) {
+        if (requestId === movieViewRequestSeq) {
             loading.classList.add('hidden');
             grid.classList.remove('hidden');
         }
@@ -178,10 +200,13 @@ async function fetchMovies() {
 }
 
 async function doSearch() {
-    const query = document.getElementById('search-input').value.trim();
-    if (!query) return;
+    const query = document.getElementById('search-input')?.value.trim() || '';
+    if (!query) {
+        fetchMovies();
+        return;
+    }
 
-    const requestId = ++searchRequestSeq;
+    const requestId = ++movieViewRequestSeq;
     const loading = document.getElementById('loading');
     const grid = document.getElementById('movie-grid');
     loading.classList.remove('hidden');
@@ -193,22 +218,22 @@ async function doSearch() {
         const resp = await apiFetch(`/api/search-metadata?${params.toString()}`);
         const res = await resp.json();
 
-        if (requestId !== searchRequestSeq) return;
+        if (requestId !== movieViewRequestSeq) return;
 
         if (res.success) {
             moviesData = Array.isArray(res.movies) ? res.movies : [];
             renderGrid();
             updateEmptyState();
-        } else if (requestId === searchRequestSeq) {
+        } else if (requestId === movieViewRequestSeq) {
             showToast(res.message || '搜索失败', 'error');
         }
     } catch (err) {
-        if (requestId === searchRequestSeq) {
+        if (requestId === movieViewRequestSeq) {
             console.error(err);
             showToast('搜索失败，请稍后重试', 'error');
         }
     } finally {
-        if (requestId === searchRequestSeq) {
+        if (requestId === movieViewRequestSeq) {
             loading.classList.add('hidden');
             grid.classList.remove('hidden');
         }
