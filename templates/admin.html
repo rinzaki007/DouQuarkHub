@@ -1167,6 +1167,7 @@
                 window.moviesyncCards = result.cards || [];
                 renderCards(window.moviesyncCards);
                 renderFileCardPlugins(result.file_plugins || []);
+                document.getElementById("cards-summary").classList.remove("text-amber-300");
                 if (Array.isArray(result.warnings) && result.warnings.length) {
                     const summary = document.getElementById("cards-summary");
                     summary.textContent += " · " + result.warnings.join(" ");
