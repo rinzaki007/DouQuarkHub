@@ -320,6 +320,7 @@ def test_metadata_routes_forward_explicit_provider_selection(tmp_path):
             return [{"title": tag, "provider_id": provider_id}]
 
     app = create_app({"MOVIESYNC_DATA_DIR": str(tmp_path)}, start_scheduler=False)
+    app.extensions["moviesync"]["auth"].setup("admin", "test-password-123")
     metadata = RecordingMetadata()
     app.extensions["moviesync"]["metadata"] = metadata
     client = app.test_client()
