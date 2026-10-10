@@ -1,6 +1,7 @@
 """Standalone TMDB metadata-provider card."""
 from __future__ import annotations
 
+import hashlib
 import threading
 import time
 from typing import Any
@@ -52,7 +53,7 @@ class TMDBMetadataCard(MetadataProviderCard):
     def __init__(self, config_store, http_client: HttpClient | None = None):
         self.config_store = config_store
         self.http = http_client or HttpClient()
-        self._cache: dict[tuple[str, str, tuple[tuple[str, str], ...]], tuple[float, dict[str, Any]]] = {}
+        self._cache: dict[tuple[str, str, str, tuple[tuple[str, str], ...]], tuple[float, dict[str, Any]]] = {}
         self._cache_lock = threading.RLock()
 
     def _config(self) -> dict[str, Any]:
@@ -85,6 +86,7 @@ class TMDBMetadataCard(MetadataProviderCard):
         cache_key = (
             path,
             query.get("language", "zh-CN"),
+            hashlib.sha256(token.encode("utf-8")).hexdigest(),
             tuple(sorted(query.items())),
         )
         now = time.monotonic()
