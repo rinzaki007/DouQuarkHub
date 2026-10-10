@@ -7,7 +7,7 @@ from typing import Any
 
 from moviesync.cards import CardManifest, ResourceSourceCard
 from moviesync.clients.telegram import TelegramClient
-from moviesync.config_store import ConfigValidationError
+from moviesync.errors import ConfigValidationError
 
 _CHANNEL_ID_RE = re.compile(r"^[A-Za-z0-9_]{2,64}$")
 _MAX_CHANNELS = 100
