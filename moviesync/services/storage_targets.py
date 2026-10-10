@@ -191,7 +191,10 @@ class StorageTargetManager:
             if not compatible:
                 return ""
             default_id, available = self._default_target_id()
-            if available and default_id:
+            if not available:
+                # Do not guess a destination when the configured default cannot be read.
+                return ""
+            if default_id:
                 if any(card.card_id == default_id for card in compatible):
                     return default_id
             # A single compatible target is unambiguous. If there are multiple,
