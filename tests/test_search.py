@@ -203,7 +203,23 @@ def test_search_and_transfer_accept_provider_neutral_resource_ids():
                     "resource_type": "cloud_b_share",
                     "storage_target_id": "cloud-b",
                     "url": "https://example.invalid/share-456",
-                }
+                },
+                {
+                    "source_id": "cloud-b-secondary",
+                    "source_name": "Cloud B mirror",
+                    "resource_id": "share-456",
+                    "resource_type": "cloud_b_share",
+                    "storage_target_id": "cloud-b",
+                    "url": "https://example.invalid/share-456-mirror",
+                },
+                {
+                    "source_id": "cloud-c",
+                    "source_name": "Cloud C",
+                    "resource_id": "share-456",
+                    "resource_type": "cloud_c_share",
+                    "storage_target_id": "cloud-c",
+                    "url": "https://example.invalid/cloud-c/share-456",
+                },
             ]
 
     class GenericStorage:
@@ -212,7 +228,7 @@ def test_search_and_transfer_accept_provider_neutral_resource_ids():
 
         def resolve_resource(self, resource, target_id=None):
             assert resource["resource_id"] == "share-456"
-            assert resource["resource_type"] == "cloud_b_share"
+            assert resource["resource_type"] in {"cloud_b_share", "cloud_c_share"}
             assert "pwd_id" not in resource
             return {
                 "target_id": target_id or "cloud-b",
@@ -231,11 +247,13 @@ def test_search_and_transfer_accept_provider_neutral_resource_ids():
     storage = GenericStorage()
     service = SearchService(GenericSources(), storage, logging.getLogger("test"))
     candidates = service.search_movie_candidates({"title": "Show"}, {})
-    assert len(candidates) == 1
-    candidate = candidates[0]
+    assert len(candidates) == 2
+    assert {candidate["resource_type"] for candidate in candidates} == {
+        "cloud_b_share", "cloud_c_share"
+    }
+    candidate = next(item for item in candidates if item["resource_type"] == "cloud_b_share")
     assert candidate["resource_id"] == "share-456"
-    assert candidate["resource_type"] == "cloud_b_share"
-    assert candidate["pwd_id"] == ""
+    assert "pwd_id" not in candidate
 
     ok, message, counts = service.transfer_selected_resource_with_progress(
         {"title": "Show"},
@@ -246,5 +264,6 @@ def test_search_and_transfer_accept_provider_neutral_resource_ids():
     assert counts["success"] == 1
     assert storage.transferred[0]["resource_id"] == "share-456"
     assert storage.transferred[0]["resource_type"] == "cloud_b_share"
+    assert "pwd_id" not in storage.transferred[0]
     assert storage.transferred[2] == "cloud-b"
     assert storage.transferred[3] == "fresh-token"
