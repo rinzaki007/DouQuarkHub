@@ -1,6 +1,6 @@
-from moviesync.cards import CardRegistry
 from card_templates.douban import DoubanMetadataCard
 from card_templates.telegram import TelegramResourceSource
+from moviesync.cards import CardRegistry
 
 
 def test_card_management_uses_registry_manifests():
