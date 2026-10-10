@@ -146,6 +146,8 @@ services:
     environment:
       - TZ=Asia/Shanghai
       - MOVIESYNC_COOKIE_SECURE=0
+      # 可选：首次启动时安装镜像内置的全部卡片；默认不自动安装任何卡片
+      # - MOVIESYNC_AUTO_INSTALL_BUNDLED_CARDS=1
 ```
 
 启动：
