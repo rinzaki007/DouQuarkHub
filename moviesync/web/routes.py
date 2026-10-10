@@ -1060,7 +1060,24 @@ def search_candidates():
             "一次最多检索 10 部影片"
         )
 
-    service = _services()["search"]
+    services = _services()
+    storage_manager = services["storage_targets"]
+    storage_target_id = str(data.get("storage_target_id") or "").strip()
+    if not storage_target_id:
+        default_target = storage_manager.get()
+        storage_target_id = str(getattr(default_target, "card_id", "") or "").strip()
+    storage_target = storage_manager.get(storage_target_id or None)
+    if not storage_target_id or storage_target is None:
+        return _json_error("请先选择一个已启用的存储卡片，再搜索对应网盘的资源", 400)
+    target_capabilities = set(getattr(storage_target, "capabilities", ()) or ())
+    if not any(
+        capability.startswith("storage.accepts.")
+        and capability != "storage.accepts.*"
+        for capability in target_capabilities
+    ) and "storage.accepts.*" not in target_capabilities:
+        return _json_error("所选存储卡片没有声明支持的分享类型，暂时无法按该网盘搜索", 400)
+
+    service = services["search"]
 
     candidates_map = {}
 
@@ -1083,6 +1100,7 @@ def search_candidates():
             ] = service.search_movie_candidates(
                 movie,
                 config.load(),
+                storage_target_id=storage_target_id,
             )
         except Exception:
             _services()["logger"].exception("资源检索失败: %s", title)
@@ -1111,6 +1129,7 @@ def search_candidates():
         {
             "success": True,
             "candidates_map": candidates_map,
+            "storage_target_id": storage_target_id,
             "resource_sources": source_status,
             "message": message,
         }
