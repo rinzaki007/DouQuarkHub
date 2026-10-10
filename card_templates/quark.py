@@ -1,6 +1,7 @@
 """Standalone Quark storage-target card shipped as a single Python file."""
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from moviesync.cards import CardManifest, StorageTargetCard
