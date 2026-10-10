@@ -157,3 +157,63 @@ def test_metadata_manager_respects_card_capabilities():
     assert manager.list_movies() == [{"title": "电影"}]
     assert manager.search("测试") == []
     assert manager.get_detail("123") is None
+
+
+def test_metadata_manager_loads_installed_card_plugins_and_isolates_failures(monkeypatch):
+    import logging
+
+    from moviesync.cards import CardManifest, CardRegistry, MetadataProviderCard
+    from moviesync.services import metadata as metadata_module
+    from moviesync.services.metadata import MetadataProviderManager
+
+    received_context = {}
+
+    class PluginProvider(MetadataProviderCard):
+        manifest = CardManifest(
+            id="plugin-metadata",
+            name="Plugin Metadata",
+            type="metadata_provider",
+            capabilities=("metadata.list", "metadata.search"),
+        )
+
+        def list_movies(self, tag, sort_type):
+            return [{"title": "plugin"}]
+
+        def search(self, query):
+            return [{"title": query}]
+
+        def get_detail(self, item_id):
+            return None
+
+    class EntryPoint:
+        def __init__(self, name, factory):
+            self.name = name
+            self.factory = factory
+
+        def load(self):
+            return self.factory
+
+    def factory(context):
+        received_context.update(context)
+        return PluginProvider()
+
+    monkeypatch.setattr(
+        metadata_module,
+        "entry_points",
+        lambda group: (
+            [
+                EntryPoint("good-provider", factory),
+                EntryPoint("bad-provider", lambda context: object()),
+            ]
+            if group == "moviesync.metadata_providers"
+            else [],
+        )[0],
+    )
+
+    registry = CardRegistry()
+    manager = MetadataProviderManager(registry, logging.getLogger("test.metadata.plugins"))
+    context = {"config_store": object(), "logger": logging.getLogger("plugin")}
+    assert manager.load_plugins(context) == ["plugin-metadata"]
+    assert registry.get("plugin-metadata").card_id == "plugin-metadata"
+    assert received_context == context
+    assert manager.list_movies() == [{"title": "plugin"}]
