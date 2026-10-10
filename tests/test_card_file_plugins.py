@@ -115,4 +115,4 @@ def test_pansou_is_seeded_as_a_removable_file_card(tmp_path):
     assert services["card_registry"].get("pansou") is None
 
     restarted = create_app({"MOVIESYNC_DATA_DIR": str(tmp_path)}, start_scheduler=False)
-    assert restarted.extensions["card_registry"].get("pansou") is None
+    assert restarted.extensions["moviesync"]["card_registry"].get("pansou") is None
