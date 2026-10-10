@@ -520,3 +520,57 @@ def test_health_persistence_failure_does_not_stop_other_resource_checks():
         "health-two",
     ]
     assert all(item["status"] == "healthy" for item in results if item["id"].startswith("health-"))
+
+
+
+def test_resource_source_health_is_saved_and_reported_by_card_id():
+    class Store:
+        def __init__(self):
+            self.data = {
+                "cards": {
+                    "custom-source": {
+                        "enabled": True,
+                        "config": {"endpoint": "https://source.example"},
+                    },
+                },
+            }
+
+        def load(self):
+            from copy import deepcopy
+            return deepcopy(self.data)
+
+        def save_card_config(self, card_id, incoming):
+            card = self.data["cards"].setdefault(card_id, {"enabled": True, "config": {}})
+            card["config"].update(incoming)
+            return card
+
+    class CustomSource(ResourceSourceCard):
+        manifest = CardManifest(
+            id="custom-source",
+            name="Custom Source",
+            type="resource_source",
+            capabilities=("resource.search", "resource.health_check"),
+        )
+
+        def search(self, movie, config):
+            return []
+
+        def check(self, config):
+            return {"status": "healthy", "message": "custom source ok", "total": 2, "valid_count": 2}
+
+    store = Store()
+    manager = ResourceSourceManager(store, FakeLogger(), resource_cards=[CustomSource()])
+    result = manager.check_all()[0]
+
+    assert result["id"] == "custom-source"
+    saved_health = store.data["cards"]["custom-source"]["config"]["health"]
+    assert saved_health["status"] == "healthy"
+    assert saved_health["message"] == "custom source ok"
+    status = manager.get_status()
+    assert status == [{
+        "id": "custom-source",
+        "name": "Custom Source",
+        "type": "resource_source",
+        "enabled": True,
+        "health": saved_health,
+    }]
