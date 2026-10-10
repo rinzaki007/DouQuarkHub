@@ -1,5 +1,5 @@
 /* MovieSync 主页面 JavaScript
- * 用途：负责豆瓣列表加载/渲染、搜索、选择影片、资源候选弹窗、白名单转存、日志、频道状态和自动追剧。
+ * 用途：负责影视列表加载/渲染、搜索、选择影片、资源候选弹窗、白名单转存、日志、频道状态和自动追剧。
  * 维护说明：apiFetch() 统一携带同源 Cookie 与 CSRF；当前版本还提供 getNoCoverImage()，避免无海报时因缺少函数导致整页渲染中断。 */
 let currentTag = '电影';
 let currentSort = 'U';
@@ -149,7 +149,7 @@ async function doSearch() {
     grid.classList.add('hidden');
 
     try {
-        const resp = await apiFetch(`/api/search-douban?q=${encodeURIComponent(query)}`);
+        const resp = await apiFetch(`/api/search-metadata?q=${encodeURIComponent(query)}`);
         const res = await resp.json();
 
         if (requestId !== searchRequestSeq) return;
@@ -242,7 +242,7 @@ function renderGrid() {
                     <div class="flex min-w-0 items-center gap-1.5">
                         <span class="shrink-0 whitespace-nowrap rounded-md border border-slate-400/20 bg-black/55 px-2 py-1 text-[10px] text-slate-300 backdrop-blur-md">${escapeHtml(movie.tag || currentTag)}</span>
                     </div>
-                    <a href="${escapeHtml(movie.url || '#')}" target="_blank" rel="noopener noreferrer" class="douban-poster-btn shrink-0" aria-label="打开豆瓣详情">豆瓣 <i class="fa-solid fa-arrow-up-right-from-square"></i></a>
+                    <a href="${escapeHtml(movie.url || '#')}" target="_blank" rel="noopener noreferrer" class="douban-poster-btn shrink-0" aria-label="打开${escapeHtml(movie.provider_name || '影视详情')}">${escapeHtml(movie.provider_name || '详情')} <i class="fa-solid fa-arrow-up-right-from-square"></i></a>
                 </div>
             </div>
             <div class="p-3">

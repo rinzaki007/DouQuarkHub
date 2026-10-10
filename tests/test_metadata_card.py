@@ -16,8 +16,12 @@ def test_douban_metadata_card_uses_standard_interface():
     assert isinstance(card, MetadataProviderCard)
     assert card.card_id == "douban"
     assert "metadata.list" in card.capabilities
-    assert card.list_movies("电影", "U") == [{"title": "电影", "sort": "U"}]
-    assert card.search("测试") == [{"title": "测试"}]
+    assert card.list_movies("电影", "U") == [
+        {"title": "电影", "sort": "U", "provider_id": "douban", "provider_name": "豆瓣"}
+    ]
+    assert card.search("测试") == [
+        {"title": "测试", "provider_id": "douban", "provider_name": "豆瓣"}
+    ]
     assert card.get_detail("123") is None
 
 
@@ -266,3 +270,35 @@ def test_metadata_plugin_factory_closes_card_when_registration_fails(monkeypatch
     assert manager.load_plugins() == []
     assert candidate.closed is True
     assert registry.get("duplicate-provider") is not candidate
+
+
+
+def test_metadata_image_policy_uses_card_manifest_hosts_not_provider_ids():
+    from types import SimpleNamespace
+
+    from moviesync.web.routes import _metadata_image_policy
+
+    card = SimpleNamespace(
+        manifest=SimpleNamespace(
+            image_hosts=("example-cdn.test",),
+            image_referer="https://metadata.example.test/",
+        )
+    )
+
+    assert _metadata_image_policy("https://img.example-cdn.test/poster.jpg", [card]) == {
+        "referer": "https://metadata.example.test/"
+    }
+    assert _metadata_image_policy("http://img.example-cdn.test/poster.jpg", [card]) is None
+    assert _metadata_image_policy("https://example-cdn.test:8443/poster.jpg", [card]) is None
+    assert _metadata_image_policy("https://evil.test/poster.jpg", [card]) is None
+
+
+
+def test_metadata_search_exposes_generic_route_and_keeps_legacy_alias(tmp_path):
+    from moviesync.app import create_app
+
+    app = create_app({"MOVIESYNC_DATA_DIR": str(tmp_path)}, start_scheduler=False)
+    routes = {rule.rule for rule in app.url_map.iter_rules()}
+
+    assert "/api/search-metadata" in routes
+    assert "/api/search-douban" in routes

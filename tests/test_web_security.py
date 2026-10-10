@@ -105,5 +105,5 @@ def test_get_movies_does_not_expose_upstream_exception(tmp_path, monkeypatch):
     assert response.status_code == 200
     assert body["success"] is False
     assert body["movies"] == []
-    assert body["message"] == "获取影片数据失败，请稍后重试"
+    assert body["message"] == "获取影视数据失败，请稍后重试"
     assert "SECRET_COOKIE_VALUE" not in response.get_data(as_text=True)
