@@ -1134,7 +1134,7 @@
                 capabilities.map(cap => '<span class="resource-chip">' + escapeHtml(cap) + "</span>").join("") + "</div>" +
                 (card.description ? '<div class="mt-3 text-[11px] leading-5 text-slate-500">' + escapeHtml(card.description) + "</div>" : "") +
                 '<div class="mt-3 text-[10px] text-blue-300"><i class="fa-solid fa-arrow-right mr-1"></i>' +
-                    (card.id === "quark" ? "点击配置 Quark" : (card.id === "telegram" ? "点击管理 Telegram 频道" : "点击查看卡片详情")) +
+                    "点击查看卡片配置与能力详情" +
                     "</div>" +
                 "</button>";
         }
@@ -1173,15 +1173,7 @@
         }
 
         function openCardFromRegistry(cardId) {
-            // Telegram has a dedicated channel editor; do not route it to the raw JSON form.
-            if (cardId === "telegram") {
-                openTelegramCard();
-                return;
-            }
-            if (cardId === "quark") {
-                openQuarkCard();
-                return;
-            }
+            // 所有卡片都使用 Manifest 驱动的统一配置界面，避免平台按卡片 ID 分支。
             openGenericCard(cardId);
         }
 

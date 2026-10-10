@@ -105,6 +105,14 @@ class QuarkStorageCard(StorageTargetCard):
     def _client(self) -> QuarkClient:
         return QuarkClient(self.config_store.get_cookie())
 
+    def is_configured(self, config: dict[str, Any]) -> bool:
+        # Cookie is the credential that determines whether this target can be used;
+        # default FIDs alone must not make an unconfigured target appear ready.
+        cookie = config.get("cookie") if isinstance(config, dict) else ""
+        if not cookie and self.config_store is not None:
+            cookie = self.config_store.get_cookie()
+        return bool(str(cookie or "").strip())
+
     def check(self, config: dict | None = None) -> dict[str, Any]:
         cookie = self.config_store.get_cookie()
         if not cookie:

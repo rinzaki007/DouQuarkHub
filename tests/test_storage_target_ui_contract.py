@@ -5,16 +5,17 @@ def test_storage_destination_contract():
     assert destination["category"]
 
 
-def test_quark_card_uses_dedicated_editor_with_dynamic_directory_fields():
+def test_card_management_uses_manifest_driven_editor_without_card_id_routing():
     from pathlib import Path
 
-    template = (Path(__file__).resolve().parents[1] / "templates" / "admin.html").read_text(encoding="utf-8")
+    root = Path(__file__).resolve().parents[1]
+    template = (root / "templates" / "admin.html").read_text(encoding="utf-8")
+    quark_card = (root / "card_templates" / "quark.py").read_text(encoding="utf-8")
 
-    assert 'if (cardId === "quark")' in template
-    assert 'openQuarkCard();' in template
-    assert 'id="quark-card-category-fids"' in template
-    assert "renderQuarkCategoryFids(cfg.category_fids || {})" in template
-    assert 'document.querySelectorAll("#quark-card-category-fids [data-quark-category]")' in template
-    assert 'type="password" autocomplete="new-password"' in template
-    assert "quark-card-fid-movie" not in template
-    assert "quark-card-fid-tv" not in template
+    assert "function openCardFromRegistry(cardId)" in template
+    assert "openGenericCard(cardId);" in template
+    assert 'if (cardId === "quark")' not in template
+    assert 'if (cardId === "telegram")' not in template
+    assert "renderGenericCardFields(currentGenericCard.fields" in template
+    assert '"key": "category_fids"' in quark_card
+    assert '"key": "cookie"' in quark_card
