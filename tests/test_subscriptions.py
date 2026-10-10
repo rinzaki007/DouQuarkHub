@@ -126,6 +126,37 @@ def test_subscription_tracks_new_files_from_selected_source(tmp_path):
     assert "ep3" in saved["tracked_file_keys"]
 
 
+def test_legacy_subscription_uses_selected_source_episode_rule(tmp_path):
+    class CustomEpisodeResourceSources(FakeResourceSources):
+        def parse_tv_episode(self, source_id, file_name):
+            assert source_id == "custom-source"
+            if file_name == "Show - Part 05.mkv":
+                return 1, 5
+            return None, None
+
+    storage = DynamicStorageTargets()
+    storage.files = [{"fid": "custom5", "file_name": "Show - Part 05.mkv"}]
+    manager = SubscriptionManager(
+        tmp_path / "subscriptions.json",
+        storage,
+        CustomEpisodeResourceSources(),
+        FakeLogger(),
+    )
+    sub = manager.add_subscription(
+        title="Show",
+        pwd_id="share123",
+        storage_target_id="demo-storage",
+        source_id="custom-source",
+    )
+
+    ok, message = manager.check_subscription_now(sub["id"])
+
+    assert ok is True
+    assert "成功追更 1 项" in message
+    assert storage.transfers == [["custom5"]]
+    assert manager.get_subscriptions()[0]["saved_episodes"] == [5]
+
+
 class ChannelStorageTargets:
     def __init__(self):
         self.shares = {

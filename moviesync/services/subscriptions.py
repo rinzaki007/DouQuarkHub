@@ -594,6 +594,27 @@ class SubscriptionManager:
                 current["last_error"] = ""
             self.store.write(subscriptions)
 
+    def _parse_episode_for_subscription(self, sub: dict, file_name: str) -> int | None:
+        """优先使用订阅所属资源卡片的集数规则，避免忽略卡片独立配置。"""
+        source_id = str(sub.get("source_id") or "").strip()
+        parser = getattr(self.resource_sources, "parse_tv_episode", None)
+        if source_id and callable(parser):
+            try:
+                parsed = parser(source_id, file_name)
+                if isinstance(parsed, (tuple, list)) and len(parsed) == 2:
+                    episode = parsed[1]
+                    if episode is None or (
+                        isinstance(episode, int) and not isinstance(episode, bool)
+                    ):
+                        return episode
+            except Exception:
+                if self.logger is not None:
+                    self.logger.exception(
+                        "资源卡片 %s 的集数解析失败，改用通用规则",
+                        source_id,
+                    )
+        return _parse_tv_episode(file_name)[1]
+
     def _check(
         self,
         sub: dict,
@@ -660,9 +681,9 @@ class SubscriptionManager:
             start_ep = int(sub.get("start_ep", 0) or 0)
             for item in files:
                 fid = str(item.get("fid") or "").strip()
-                ep_num, _ = _clean_tv_filename(
+                ep_num = self._parse_episode_for_subscription(
+                    sub,
                     str(item.get("file_name", "")),
-                    str(sub.get("title", "")),
                 )
                 if (
                     fid
