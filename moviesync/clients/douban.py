@@ -176,8 +176,10 @@ class DoubanClient:
 
     @staticmethod
     def _normalize_cover_url(value: object) -> str:
-        """Normalize legacy/protocol-relative Douban poster URLs for the HTTPS proxy."""
-        cover = str(value or "").strip()
+        """Normalize string-shaped legacy/protocol-relative Douban poster URLs."""
+        if not isinstance(value, str):
+            return ""
+        cover = value.strip()
         if cover.startswith("//"):
             return f"https:{cover}"
         if cover.lower().startswith("http://"):
@@ -191,6 +193,30 @@ class DoubanClient:
             ):
                 return "https://" + cover[7:]
         return cover
+
+    @staticmethod
+    def _extract_cover_url(value: object, depth: int = 0) -> str:
+        """Extract a usable poster URL from the varied nested shapes used by Douban APIs."""
+        if depth > 5:
+            return ""
+        if isinstance(value, str):
+            return DoubanClient._normalize_cover_url(value)
+        if isinstance(value, dict):
+            # API versions have returned strings, {url: ...}, and nested
+            # {normal: {url: ...}} / {large: {url: ...}} poster structures.
+            for key in (
+                "url", "normal", "large", "src", "image_url", "image",
+                "cover", "original", "medium", "small",
+            ):
+                candidate = DoubanClient._extract_cover_url(value.get(key), depth + 1)
+                if candidate:
+                    return candidate
+        elif isinstance(value, (list, tuple)):
+            for item in value:
+                candidate = DoubanClient._extract_cover_url(item, depth + 1)
+                if candidate:
+                    return candidate
+        return ""
 
     def search(self, query: str) -> list[dict]:
         query = str(query or "").strip()
@@ -212,7 +238,7 @@ class DoubanClient:
         return [
             {
                 "title": item.get("title"),
-                "cover": self._normalize_cover_url(item.get("img", "")),
+                "cover": self._extract_cover_url(item.get("img", "")),
                 "rate": item.get("rate") or item.get("rating") or "暂无",
                 "year": item.get("year", ""),
                 "url": (
@@ -271,24 +297,31 @@ class DoubanClient:
         target_cover_value = target.get("cover")
         target_cover = target_cover_value if isinstance(target_cover_value, dict) else {}
 
-        cover = (
-            pic.get("normal")
-            or pic.get("large")
-            or pic.get("url")
-            or target_pic.get("normal")
-            or target_pic.get("large")
-            or target_pic.get("url")
-            or cover_data.get("url")
-            or (cover_value if isinstance(cover_value, str) else "")
-            or target_cover.get("url")
-            or (target_cover_value if isinstance(target_cover_value, str) else "")
-            or (pic_value if isinstance(pic_value, str) else "")
-            or (target_pic_value if isinstance(target_pic_value, str) else "")
-            or item.get("cover_url")
-            or target.get("cover_url")
-            or item.get("img")
-            or target.get("img")
-            or ""
+        cover_candidates = (
+            pic.get("normal"),
+            pic.get("large"),
+            pic.get("url"),
+            target_pic.get("normal"),
+            target_pic.get("large"),
+            target_pic.get("url"),
+            cover_data,
+            cover_value,
+            target_cover,
+            target_cover_value,
+            pic_value,
+            target_pic_value,
+            item.get("cover_url"),
+            target.get("cover_url"),
+            item.get("img"),
+            target.get("img"),
+        )
+        cover = next(
+            (
+                candidate
+                for value in cover_candidates
+                if (candidate := DoubanClient._extract_cover_url(value))
+            ),
+            "",
         )
 
         summary = (
