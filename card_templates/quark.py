@@ -149,7 +149,7 @@ class QuarkStorageCard(StorageTargetCard):
     def resolve_resource(self, resource: object) -> dict[str, Any]:
         if not isinstance(resource, dict):
             return {"files": [], "token": None, "error": "资源参数无效"}
-        pwd_id = sanitize_pwd_id(resource.get("pwd_id"))
+        pwd_id = sanitize_pwd_id(resource.get("resource_id") or resource.get("pwd_id"))
         if not pwd_id:
             return {"files": [], "token": None, "error": "分享资源 ID 无效"}
         files, stoken, error = self._client().get_share_files(
