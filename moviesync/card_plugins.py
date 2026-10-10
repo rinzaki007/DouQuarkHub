@@ -41,7 +41,9 @@ class CardFilePluginManager:
         self.plugin_dir.mkdir(parents=True, exist_ok=True)
         self._seed_bundled_cards(Path(bundled_dir).resolve() if bundled_dir else None)
         self._lock = RLock()
-        # Keep the exact instance so stale file bookkeeping can never remove a\n        # different card that later registers under the same ID.\n        self._loaded: dict[str, tuple[str, str, Card]] = {}
+        # Keep the exact instance so stale file bookkeeping can never remove a
+        # different card that later registers under the same ID.
+        self._loaded: dict[str, tuple[str, str, Card]] = {}
         self._errors: dict[str, str] = {}
         self._context: dict[str, Any] = {}
 
@@ -111,8 +113,13 @@ class CardFilePluginManager:
             raise ValueError("卡片文件不存在")
         with self._lock:
             current = self._loaded.get(name)
-            if current and self.registry.get(current[0]) is not None:
+            if current and self.registry.get(current[0]) is current[2]:
                 raise ValueError("该卡片文件已经加载")
+            if current:
+                # The instance was removed/replaced outside this manager. Forget
+                # stale bookkeeping, but never unregister the replacement.
+                self._loaded.pop(name, None)
+                sys.modules.pop(current[1], None)
             module_name = "moviesync_file_card_" + name[:-3]
             spec = importlib.util.spec_from_file_location(module_name, path)
             if spec is None or spec.loader is None:
