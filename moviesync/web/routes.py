@@ -1469,16 +1469,22 @@ def resolve_pending_subscription():
 
 def _metadata_image_policy(target: str, metadata_cards) -> dict[str, str] | None:
     """Resolve image hosts from loaded metadata-card manifests, not provider IDs."""
-    parsed = urlparse(target)
-    if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password:
-        return None
     try:
-        if parsed.port not in (None, 443):
-            return None
+        parsed = urlparse(target)
+        host = parsed.hostname
+        port = parsed.port
     except ValueError:
         return None
+    if (
+        parsed.scheme != "https"
+        or not host
+        or parsed.username
+        or parsed.password
+        or port not in (None, 443)
+    ):
+        return None
 
-    host = parsed.hostname.lower()
+    host = host.lower()
     for card in metadata_cards:
         manifest = getattr(card, "manifest", None)
         for allowed_suffix in getattr(manifest, "image_hosts", ()):
