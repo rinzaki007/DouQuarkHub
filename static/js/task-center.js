@@ -71,6 +71,15 @@ async function loadTaskCategories() {
         for (const target of targets) {
             targetSelect.add(new Option(target.name || target.id, target.id));
         }
+        if (result.default_target_id && !targets.some(target => target.id === result.default_target_id)) {
+            targetSelect.add(new Option('默认转存位置不可用', ''));
+            targetSelect.disabled = true;
+            destinationSelect.replaceChildren(new Option('请检查默认转存卡片', ''));
+            destinationSelect.disabled = true;
+            document.getElementById('task-form-status').textContent = '当前默认转存位置不可用。请在全局设置中修复默认位置，或先清除无效的默认设置；系统不会自动改存到其他网盘。';
+            refreshTaskSubmitState();
+            return;
+        }
         const preferred = targets.find(target => target.id === result.default_target_id) || targets[0];
         targetSelect.disabled = false;
         targetSelect.value = preferred.id;
@@ -553,15 +562,18 @@ async function searchTaskCandidates() {
                 document.querySelectorAll('.candidate-select').forEach(b => { b.className='candidate-select shrink-0 rounded-xl border border-slate-700 bg-slate-900 px-4 py-2.5 text-[11px] text-slate-400'; b.textContent='选择此源'; });
                 this.className='candidate-select shrink-0 rounded-xl bg-emerald-600 px-4 py-2.5 text-[11px] font-medium text-white';
                 this.textContent='已选择';
-                document.getElementById('task-submit').disabled=false;
-                document.getElementById('task-submit').classList.remove('opacity-40');
-                document.getElementById('task-form-status').textContent='已选择 ' + selectedFids.size + ' 集；后续有新集时，系统会继续检查并自动转存。';
+                refreshTaskSubmitState();
+                document.getElementById('task-form-status').textContent = selectedFids.size
+                    ? '已选择 ' + selectedFids.size + ' 集；后续有新集时，系统会继续检查并自动转存。'
+                    : '至少选择 1 集作为首次处理基线。';
             };
             box.appendChild(row);
         });
 
     } catch (err) {
-        box.innerHTML = '<div class="rounded-xl border border-rose-900/50 bg-rose-950/20 p-5 text-xs text-rose-300">搜索失败：' + escapeTask(err.message) + '</div>';
+        if (requestId === candidateSearchSequence) {
+            box.innerHTML = '<div class="rounded-xl border border-rose-900/50 bg-rose-950/20 p-5 text-xs text-rose-300">搜索失败：' + escapeTask(err.message) + '</div>';
+        }
     }
 }
 
