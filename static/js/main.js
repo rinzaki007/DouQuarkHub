@@ -165,6 +165,10 @@ async function loadCategoryDestinations(targetId, requestId = ++categoryOptionsR
         window.defaultStorageTargetId = '';
         return;
     }
+    selects.forEach(selectEl => {
+        selectEl.replaceChildren(new Option('正在读取保存目录…', ''));
+        selectEl.disabled = true;
+    });
     try {
         const destResp = await apiFetch('/api/storage-targets/' + encodeURIComponent(targetId) + '/destinations');
         const destData = await destResp.json();
