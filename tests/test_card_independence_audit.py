@@ -1,6 +1,8 @@
 """Architecture regression tests for built-in single-file card independence."""
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from moviesync.app import create_app
@@ -47,8 +49,13 @@ def test_uninstalling_one_builtin_card_does_not_break_other_cards_or_platform(
                 f"removing {card_id} must not unregister {other_id}"
             )
 
-    # A missing optional card must not prevent core card discovery or platform APIs.
-    response = app.test_client().get("/api/cards")
+    # The admin card API must continue to work when any optional card is missing.
+    client = app.test_client()
+    setup = client.post(
+        "/api/setup", json={"username": "admin", "password": "password123"}
+    )
+    assert setup.status_code in {200, 201}
+    response = client.get("/api/cards")
     assert response.status_code == 200
     listed_ids = {item["id"] for item in response.get_json()["cards"]}
     assert card_id not in listed_ids
@@ -57,10 +64,12 @@ def test_uninstalling_one_builtin_card_does_not_break_other_cards_or_platform(
 
 def test_all_bundled_card_implementations_are_single_file_factories():
     """Bundled implementations must expose the loader contract in their own file."""
-    from pathlib import Path
-
     template_dir = Path(__file__).resolve().parents[1] / "card_templates"
-    files = {path.stem: path for path in template_dir.glob("*.py") if path.name != "__init__.py"}
+    files = {
+        path.stem: path
+        for path in template_dir.glob("*.py")
+        if path.name != "__init__.py"
+    }
 
     assert set(BUILTIN_CARD_IDS) <= set(files)
     for card_id in BUILTIN_CARD_IDS:
