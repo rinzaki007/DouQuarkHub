@@ -15,6 +15,20 @@ def test_config_preserves_secret_when_not_replaced(tmp_path):
     assert public["cards"]["quark"]["config"]["has_cookie"] is True
 
 
+def test_redacted_quark_cookie_import_does_not_clear_existing_cookie(tmp_path):
+    store = ConfigStore(tmp_path / "config.json", tmp_path / "legacy")
+    store.save_quark_config({"cookie": "keep-this-quark-cookie"})
+
+    # The public/exported representation redacts the cookie to an empty string.
+    exported = store.public()
+    assert exported["cards"]["quark"]["config"]["cookie"] == ""
+    assert exported["cards"]["quark"]["config"]["has_cookie"] is True
+
+    store.save(exported)
+
+    assert store.get_cookie() == "keep-this-quark-cookie"
+
+
 def test_channels_are_normalized_and_deduplicated(tmp_path):
     store = ConfigStore(tmp_path / "config.json", tmp_path / "legacy")
     channels = store.save_channels([
