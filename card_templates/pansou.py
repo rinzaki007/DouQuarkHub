@@ -218,6 +218,11 @@ class PanSouResourceSource(ResourceSourceCard):
         match = re.match(r"^/s/([A-Za-z0-9_-]{1,128})(?:/|$)", parsed.path)
         return match.group(1) if match else ""
 
+    @staticmethod
+    def _quark_share_id(url: object) -> str:
+        """兼容旧测试及第三方调用；新代码统一使用按网盘类型解析的 _share_id。"""
+        return PanSouResourceSource._share_id(url, "quark")
+
     @classmethod
     def _normalize_link(
         cls,
