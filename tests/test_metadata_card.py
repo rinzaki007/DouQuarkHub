@@ -298,7 +298,7 @@ def test_metadata_image_policy_uses_card_manifest_hosts_not_provider_ids():
         "referer": "https://movie.douban.com/"
     }
     assert _metadata_image_policy("https://img3.douban.com/poster.jpg", [douban_card]) == {
-        "referer": "https://movie.douban.com/explore"
+        "referer": "https://movie.douban.com/"
     }
     assert _metadata_image_policy("http://img.example-cdn.test/poster.jpg", [card]) is None
     assert _metadata_image_policy("https://example-cdn.test:8443/poster.jpg", [card]) is None
