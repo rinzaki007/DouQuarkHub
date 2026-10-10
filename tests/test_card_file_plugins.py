@@ -267,12 +267,12 @@ def test_legacy_persistent_douban_card_factory_is_migrated_safely(tmp_path):
     (marker_dir / "douban.py.seeded").touch()
     plugin_path = plugin_dir / "douban.py"
     plugin_path.write_text(
-        'from moviesync.clients.douban import DoubanClient\\n'
-        'from card_templates.douban import DoubanMetadataCard\\n'
-        '\\n'
-        '# Keep this local note when migrating the built-in factory.\\n'
-        'def create_card(context):\\n'
-        '    return DoubanMetadataCard(context["douban"])\\n',
+        'from moviesync.clients.douban import DoubanClient\n'
+        'from card_templates.douban import DoubanMetadataCard\n'
+        '\n'
+        '# Keep this local note when migrating the built-in factory.\n'
+        'def create_card(context):\n'
+        '    return DoubanMetadataCard(context["douban"])\n',
         encoding="utf-8",
     )
 
