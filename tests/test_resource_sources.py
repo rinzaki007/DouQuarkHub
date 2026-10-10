@@ -1,6 +1,7 @@
 import pytest
 
 from moviesync.cards import Card, CardManifest, ResourceSourceCard
+from card_templates.telegram import TelegramResourceSource
 from moviesync.services import resource_sources as resource_sources_module
 from moviesync.services.resource_sources import ResourceSourceManager
 
@@ -54,7 +55,7 @@ def test_resource_source_uses_telegram_card_config():
                 "health": {},
             }]
 
-    manager = ResourceSourceManager(FakeTelegramClient(), Store(), FakeLogger())
+    manager = ResourceSourceManager(Store(), FakeLogger())
     results = manager.search(
         {"title": "测试电影"},
         Store().load(),
@@ -122,7 +123,7 @@ def test_resource_source_health_uses_telegram_card_config():
             return []
 
     store = Store()
-    manager = ResourceSourceManager(FakeTelegramClient(), store, FakeLogger())
+    manager = ResourceSourceManager(store, FakeLogger())
     results = manager.check_all()
 
     assert results[0]["id"] == "telegram"
@@ -151,7 +152,7 @@ def test_channel_search_scans_recent_messages_without_telegram_title_query():
             return []
 
     client = FakeTelegramClient()
-    manager = ResourceSourceManager(client, Store(), FakeLogger())
+    manager = ResourceSourceManager(Store(), FakeLogger())
 
     results = manager.search_channel(
         "telegram",
@@ -196,7 +197,7 @@ def test_manager_registers_direct_resource_source_card():
             return {"status": "healthy", "message": "sample ok"}
 
     manager = ResourceSourceManager(
-        FakeTelegramClient(), Store(), FakeLogger(),
+        Store(), FakeLogger(),
         resource_cards=[DirectCard()],
     )
     results = manager.search({"title": "Film"}, Store().load())
@@ -212,7 +213,7 @@ def test_manager_rejects_non_resource_card_registration():
     class OtherCard(Card):
         pass
 
-    manager = ResourceSourceManager(FakeTelegramClient(), object(), FakeLogger())
+    manager = ResourceSourceManager(object(), FakeLogger())
     with pytest.raises(TypeError):
         manager.register(OtherCard())
 
@@ -269,7 +270,6 @@ def test_resource_source_health_does_not_expose_plugin_exception():
             raise RuntimeError("upstream cookie=SECRET_COOKIE_VALUE")
 
     manager = ResourceSourceManager(
-        FakeTelegramClient(),
         Store(),
         FakeLogger(),
         resource_cards=[BrokenCard()],
@@ -319,7 +319,6 @@ def test_resource_health_result_cannot_override_card_identity():
             }
 
     manager = ResourceSourceManager(
-        FakeTelegramClient(),
         Store(),
         FakeLogger(),
         resource_cards=[IdentitySpoofCard()],
@@ -447,7 +446,7 @@ def test_resource_plugin_factory_closes_card_when_registration_fails(monkeypatch
     registry = __import__("moviesync.cards", fromlist=["CardRegistry"]).CardRegistry()
     registry.register(ExistingCard())
     manager = ResourceSourceManager(
-        FakeTelegramClient(), object(), FakeLogger(), registry=registry
+        object(), FakeLogger(), registry=registry
     )
 
     assert manager.load_plugins() == []
@@ -468,7 +467,7 @@ def test_resource_manager_lists_only_resource_source_manifests():
 
     registry = CardRegistry()
     manager = ResourceSourceManager(
-        FakeTelegramClient(), object(), FakeLogger(), registry=registry
+        object(), FakeLogger(), registry=registry
     )
     registry.register(OtherCard())
 
@@ -506,7 +505,6 @@ def test_health_persistence_failure_does_not_stop_other_resource_checks():
             raise RuntimeError("health persistence unavailable")
 
     manager = ResourceSourceManager(
-        FakeTelegramClient(),
         Store(),
         FakeLogger(),
         resource_cards=[HealthyCard("health-one"), HealthyCard("health-two")],
