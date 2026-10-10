@@ -2,6 +2,8 @@
 
 覆盖：敏感 Cookie 保留、公共配置脱敏、频道规范化/去重以及非法频道拒绝。
 """
+import pytest
+
 from moviesync.config_store import ConfigStore, ConfigValidationError
 
 
@@ -13,6 +15,18 @@ def test_config_preserves_secret_when_not_replaced(tmp_path):
     public = store.public()
     assert "quark_cookie" not in public
     assert public["cards"]["quark"]["config"]["has_cookie"] is True
+
+
+def test_telegram_rejects_nested_unbounded_regex_without_overwriting_config(tmp_path):
+    store = ConfigStore(tmp_path / "config.json", tmp_path / "legacy")
+    original = store.get_telegram_config()["magic_regex"]
+
+    with pytest.raises(ConfigValidationError, match="高风险的嵌套无限量词"):
+        store.save_telegram_config({
+            "magic_regex": {"pattern": r"(.+)+$", "replace": r"\1"},
+        })
+
+    assert store.get_telegram_config()["magic_regex"] == original
 
 
 def test_redacted_quark_cookie_import_does_not_clear_existing_cookie(tmp_path):
