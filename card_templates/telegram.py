@@ -69,7 +69,10 @@ class TelegramResourceSource(ResourceSourceCard):
                     {"key": "name", "label": "显示名称", "placeholder": "可留空，默认使用频道用户名"},
                 ),
                 "default": [],
-                "description": "点击“添加频道”，每行填写一个公开频道用户名，不需要输入 @。频道列表留空时不会搜索 Telegram 资源。",
+                "description": (
+                    "点击“添加频道”，每行填写一个公开频道用户名，不需要输入 @。"
+                    "频道列表留空时不会搜索 Telegram 资源。"
+                ),
             },
             {
                 "key": "magic_regex",
@@ -81,7 +84,10 @@ class TelegramResourceSource(ResourceSourceCard):
                     {"key": "replace", "label": "替换规则", "placeholder": "例如：Episode \\1"},
                 ),
                 "default": {},
-                "description": "用于特殊文件名的高级识别。一般不需要修改；不清楚正则表达式时请留空。",
+                "description": (
+                    "用于特殊文件名的高级识别。一般不需要修改；"
+                    "不清楚正则表达式时请留空。"
+                ),
             },
         ),
     )
