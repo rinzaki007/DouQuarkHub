@@ -6,8 +6,8 @@ import logging
 
 import pytest
 
-from moviesync.cards import CardRegistry
 from moviesync.card_plugins import CardFilePluginManager
+from moviesync.cards import CardRegistry
 
 
 def _plugin_source(card_id: str = "upload-demo") -> bytes:
