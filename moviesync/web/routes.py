@@ -618,13 +618,84 @@ def cards():
                 "message": "尚未检查，请手动检查连接",
             }
         cards.append(item)
+    plugin_manager = _services().get("file_card_plugins")
     return jsonify(
         {
             "success": True,
             "cards": cards,
-            "dynamic_install_enabled": False,
+            "dynamic_install_enabled": plugin_manager is not None,
+            "file_plugins": plugin_manager.list_plugins() if plugin_manager else [],
         }
     )
+
+
+@api.post("/cards/plugins")
+@require_csrf
+def install_card_plugin():
+    """Install one trusted Python card file and load it immediately."""
+    plugin_manager = _services().get("file_card_plugins")
+    if plugin_manager is None:
+        return _json_error("单文件卡片管理未启用", 503)
+    uploaded = request.files.get("file")
+    if uploaded is None:
+        return _json_error("请选择一个 .py 卡片文件")
+    try:
+        filename = plugin_manager.validate_filename(uploaded.filename or "")
+        content = uploaded.read(256 * 1024 + 1)
+        card = plugin_manager.install(filename, content)
+    except FileNotFoundError as exc:
+        return _json_error(str(exc), 404)
+    except (ValueError, TypeError) as exc:
+        return _json_error(str(exc))
+    except Exception:
+        _services()["logger"].exception("安装单文件卡片失败")
+        return _json_error("卡片加载失败，请检查文件格式并查看服务日志", 400)
+    return jsonify({
+        "success": True,
+        "card_id": card.card_id,
+        "manifest": card.manifest.to_dict(),
+        "message": "卡片已安装并加载",
+    })
+
+
+@api.post("/cards/plugins/<filename>/load")
+@require_csrf
+def load_card_plugin(filename):
+    plugin_manager = _services().get("file_card_plugins")
+    if plugin_manager is None:
+        return _json_error("单文件卡片管理未启用", 503)
+    try:
+        card = plugin_manager.load_file(filename)
+    except FileNotFoundError as exc:
+        return _json_error(str(exc), 404)
+    except (ValueError, TypeError) as exc:
+        return _json_error(str(exc))
+    except Exception:
+        _services()["logger"].exception("加载单文件卡片 %s 失败", filename)
+        return _json_error("卡片加载失败，请检查文件格式并查看服务日志", 400)
+    return jsonify({"success": True, "card_id": card.card_id, "message": "卡片已加载"})
+
+
+@api.delete("/cards/plugins/<filename>")
+@require_csrf
+def uninstall_card_plugin(filename):
+    plugin_manager = _services().get("file_card_plugins")
+    if plugin_manager is None:
+        return _json_error("单文件卡片管理未启用", 503)
+    try:
+        removed = plugin_manager.uninstall(filename)
+    except FileNotFoundError as exc:
+        return _json_error(str(exc), 404)
+    except ValueError as exc:
+        return _json_error(str(exc))
+    except Exception:
+        _services()["logger"].exception("卸载单文件卡片 %s 失败", filename)
+        return _json_error("卸载卡片失败，请查看服务日志", 500)
+    return jsonify({
+        "success": True,
+        **removed,
+        "message": "卡片文件已删除，卡片已卸载；历史配置会保留",
+    })
 
 
 def _has_config_value(value):
