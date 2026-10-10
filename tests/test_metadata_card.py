@@ -16,8 +16,12 @@ def test_douban_metadata_card_uses_standard_interface():
     assert isinstance(card, MetadataProviderCard)
     assert card.card_id == "douban"
     assert "metadata.list" in card.capabilities
-    assert card.list_movies("电影", "U") == [{"title": "电影", "sort": "U"}]
-    assert card.search("测试") == [{"title": "测试"}]
+    assert card.list_movies("电影", "U") == [
+        {"title": "电影", "sort": "U", "provider_id": "douban", "provider_name": "豆瓣"}
+    ]
+    assert card.search("测试") == [
+        {"title": "测试", "provider_id": "douban", "provider_name": "豆瓣"}
+    ]
     assert card.get_detail("123") is None
 
 
