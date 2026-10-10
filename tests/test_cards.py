@@ -2,9 +2,6 @@
 
 import pytest
 
-from card_templates.douban import DoubanMetadataCard
-from card_templates.quark import QuarkStorageCard
-from card_templates.telegram import TelegramResourceSource
 from moviesync.cards import Card, CardManifest, CardRegistry
 
 
