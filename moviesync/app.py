@@ -1,6 +1,6 @@
 """MovieSync 应用组装层。
 
-用途：加载设置、初始化认证/配置/豆瓣/Telegram/夸克/订阅等组件，组装 Flask 应用并注册 Web 路由。
+用途：加载设置、初始化平台服务与卡片注册表，组装 Flask 应用并注册 Web 路由。
 维护说明：这里主要负责依赖注入和应用生命周期，不建议在此直接堆业务逻辑。
 """
 from __future__ import annotations
@@ -15,7 +15,6 @@ from .auth import AuthStore
 from .card_plugins import CardFilePluginManager
 from .cards import CardRegistry
 from .clients.http import HttpClient
-from .clients.telegram import TelegramClient
 from .config_store import ConfigStore
 from .logging_setup import configure_logging, recent_logs
 from .services.metadata import MetadataProviderManager
@@ -68,7 +67,6 @@ def create_app(
         PROJECT_ROOT,
     )
 
-    telegram = TelegramClient()
     card_registry = CardRegistry()
     file_card_plugins = CardFilePluginManager(
         settings.data_dir / "cards",
@@ -77,7 +75,6 @@ def create_app(
         PROJECT_ROOT / "card_templates",
     )
     file_card_plugins.load_all({
-        "telegram": telegram,
         "config_store": config_store,
         "logger": logger,
     })
@@ -87,7 +84,6 @@ def create_app(
         registry=card_registry,
     )
     resource_sources.load_plugins({
-        "telegram": telegram,
         "config_store": config_store,
         "logger": logger,
     })
@@ -158,7 +154,6 @@ def create_app(
         "config": config_store,
         "metadata": metadata,
         "notifications": notifications,
-        "telegram": telegram,
         "resource_sources": resource_sources,
         "card_registry": card_registry,
         "file_card_plugins": file_card_plugins,
