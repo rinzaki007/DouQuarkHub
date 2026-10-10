@@ -461,29 +461,6 @@ class QuarkStorageCard(StorageTargetCard):
         )
 
 
-class NotificationCard(Card):
-    """通知通道卡片接口。
-
-    核心只提交标准化事件和负载；具体通知平台、鉴权和投递方式由卡片实现。
-    """
-
-    manifest = CardManifest(
-        id="unknown.notification",
-        name="未命名通知通道",
-        type="notification",
-        capabilities=("notification.send",),
-    )
-
-    def send(
-        self,
-        event: str,
-        payload: dict[str, Any],
-        config: dict[str, Any],
-    ) -> bool:
-        """发送一条通知；返回 True 表示卡片确认已接受该通知。"""
-        raise NotImplementedError
-
-
 class MetadataProviderCard(Card):
     """影视/媒体元数据卡片接口。"""
 
