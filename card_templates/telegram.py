@@ -155,6 +155,14 @@ class TelegramResourceSource(ResourceSourceCard):
         return self.client.search_channel(channel, title, scan_all=True)
 
 
+    def close(self) -> None:
+        """Release the HTTP session owned by this card."""
+        http = getattr(self.client, "http", None)
+        session = getattr(http, "session", None)
+        close = getattr(session, "close", None)
+        if callable(close):
+            close()
+
     def is_configured(self, config: dict[str, Any]) -> bool:
         return bool(config.get("channels")) if isinstance(config, dict) else False
 
