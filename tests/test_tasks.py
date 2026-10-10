@@ -482,7 +482,7 @@ def test_task_recovery_survives_malformed_counts_and_event_history(tmp_path):
         assert all(isinstance(event, dict) for event in running["events"])
         assert "检查目标网盘" in running["message"]
     finally:
-        manager.stop_scheduler()
+        manager.shutdown()
 
 
 def test_transfer_task_fingerprint_is_namespaced_by_resource_provider():
