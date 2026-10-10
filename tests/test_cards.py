@@ -399,6 +399,7 @@ def test_bundled_telegram_card_owns_its_client(monkeypatch):
 
     assert card.client is created[0]
     assert card.client is not injected_legacy_client
+    assert callable(card.close)
 
 
 def test_legacy_telegram_adapter_constructs_client_only_on_demand(monkeypatch):
