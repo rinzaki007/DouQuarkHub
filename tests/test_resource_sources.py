@@ -91,7 +91,7 @@ def test_resource_source_parses_episode_using_card_magic_regex():
         def get_resource_sources(self):
             return []
 
-    manager = ResourceSourceManager(Store(), FakeLogger())
+    manager = ResourceSourceManager(Store(), FakeLogger(), resource_cards=[TelegramResourceSource(FakeTelegramClient())])
     assert manager.parse_tv_episode(
         "telegram",
         "Stranger.Things.S04E01.2022.NF.WEB-DL.2160p.HEVC.HDR.DDP.mkv",
