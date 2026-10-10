@@ -125,6 +125,24 @@ def create_app(
         logger,
     )
 
+    shutdown_state = {"closed": False}
+
+    def shutdown() -> None:
+        """停止后台调度器并释放卡片资源；重复调用是安全的。"""
+        if shutdown_state["closed"]:
+            return
+        shutdown_state["closed"] = True
+
+        try:
+            subscriptions.stop_scheduler()
+        except Exception:
+            logger.exception("停止自动追剧调度器失败")
+
+        try:
+            card_registry.close_all()
+        except Exception:
+            logger.exception("关闭卡片注册表失败")
+
     services = {
         "logger": logger,
         "logs": recent_logs,
@@ -144,6 +162,7 @@ def create_app(
         "csrf": lambda: secrets.token_urlsafe(32),
         "login_limiter": LoginRateLimiter(),
         "scheduler_enabled": bool(start_scheduler),
+        "shutdown": shutdown,
     }
 
     app = Flask(
