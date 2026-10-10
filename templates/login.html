@@ -49,7 +49,7 @@
                 <i class="fa-solid fa-film"></i>
             </div>
             <h1 class="text-2xl font-bold text-white tracking-wide">MovieSync</h1>
-            <p class="text-xs text-slate-300/75">{{ '请创建管理员账号以初始化系统' if is_setup else '登录后继续管理你的影视资源' }}</p>
+            <p class="text-xs text-slate-300/75">{{ '首次使用，请创建管理员账号' if is_setup else '登录后即可管理影视资源' }}</p>
         </div>
 
         <form id="auth-form" onsubmit="handleAuth(event)" class="mt-7 space-y-4">
@@ -67,7 +67,7 @@
                 {{ '立即初始化并登录' if is_setup else '登 录' }}
             </button>
         </form>
-        <div class="mt-5 text-center text-[10px] text-slate-400/60 tracking-wider">影视资源管理 · MovieSync</div>
+        <div class="mt-5 text-center text-[10px] text-slate-400/60 tracking-wider">影视资源管理工具 · MovieSync</div>
     </main>
     <script>
         const isSetup = {{ 'true' if is_setup else 'false' }};
