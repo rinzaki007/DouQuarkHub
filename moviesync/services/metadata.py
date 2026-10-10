@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from importlib.metadata import entry_points
 from typing import Any, TypeVar
 
 from ..cards import CardRegistry, MetadataProviderCard
@@ -18,6 +19,38 @@ class MetadataProviderManager:
         self.registry = registry
         self.logger = logger
         self.config_store = config_store
+
+    def load_plugins(self, context: dict[str, Any] | None = None) -> list[str]:
+        """Load installed metadata provider cards from trusted Python packages.
+
+        Plugins expose a factory through the moviesync.metadata_providers entry
+        point group. A broken plugin is logged and skipped without blocking the
+        built-in Douban provider or other installed providers.
+        """
+        loaded: list[str] = []
+        plugin_context = dict(context or {})
+        try:
+            candidates = entry_points(group="moviesync.metadata_providers")
+        except Exception:
+            self.logger.exception("读取元数据卡片插件入口失败")
+            return loaded
+
+        for entry_point in candidates:
+            try:
+                factory = entry_point.load()
+                if not callable(factory):
+                    raise TypeError("插件入口必须指向可调用的工厂函数")
+                card = factory(plugin_context)
+                if not isinstance(card, MetadataProviderCard):
+                    raise TypeError("元数据卡片插件工厂必须返回 MetadataProviderCard 实例")
+                if card.card_type != "metadata_provider":
+                    raise ValueError("卡片类型必须是 metadata_provider")
+                registered = self.registry.register(card)
+                loaded.append(registered.card_id)
+                self.logger.info("已加载元数据卡片插件: %s", registered.card_id)
+            except Exception:
+                self.logger.exception("元数据卡片插件 %s 加载失败", entry_point.name)
+        return loaded
 
     def _is_enabled(self, card: MetadataProviderCard) -> bool:
         if self.config_store is None:

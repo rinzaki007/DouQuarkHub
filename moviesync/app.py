@@ -85,6 +85,10 @@ def create_app(
     card_registry.register(QuarkStorageCard(config_store))
     card_registry.register(DoubanMetadataCard(douban))
     metadata = MetadataProviderManager(card_registry, logger, config_store=config_store)
+    metadata.load_plugins({
+        "config_store": config_store,
+        "logger": logger,
+    })
     storage_targets = StorageTargetManager(
         card_registry,
         config_store,
