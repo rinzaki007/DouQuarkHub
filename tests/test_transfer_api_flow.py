@@ -85,3 +85,44 @@ def test_search_to_transfer_task_center_flow(tmp_path, monkeypatch):
     finally:
         services["tasks"].shutdown()
         services["subscriptions"].stop_scheduler()
+
+def test_transfer_rejects_empty_or_malformed_file_selection(tmp_path):
+    app = create_app({"MOVIESYNC_DATA_DIR": str(tmp_path)}, start_scheduler=False)
+    services = app.extensions["moviesync"]
+    client = app.test_client()
+    try:
+        setup = client.post(
+            "/api/setup",
+            json={"username": "admin", "password": "password123"},
+        )
+        assert setup.status_code == 200
+        with client.session_transaction() as session:
+            headers = {"X-CSRF-Token": session["csrf_token"]}
+
+        invalid_files = [
+            [],
+            ["not-a-file-object"],
+            [{"file_name": "episode.mkv"}],
+            [None],
+        ]
+        for files in invalid_files:
+            response = client.post(
+                "/api/transfer-selected",
+                json={
+                    "movie": {"title": "Validation Test"},
+                    "candidate": {
+                        "source_id": "test-source",
+                        "pwd_id": "share123",
+                        "files": files,
+                    },
+                    "target_fid": "0",
+                },
+                headers=headers,
+            )
+            assert response.status_code == 400
+            assert response.get_json()["success"] is False
+
+        assert services["tasks"].list_tasks() == []
+    finally:
+        services["tasks"].shutdown()
+        services["subscriptions"].stop_scheduler()
