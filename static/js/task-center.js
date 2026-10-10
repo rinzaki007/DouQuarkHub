@@ -378,7 +378,7 @@ async function searchTaskCandidates() {
     if (!title) return taskToast('请输入剧名');
     const box = document.getElementById('task-candidate-list');
     document.getElementById('task-candidates').classList.remove('hidden');
-    box.innerHTML = '<div class="rounded-xl border border-slate-800 bg-slate-950 p-6 text-center text-xs text-slate-500"><i class="fa-solid fa-spinner fa-spin mr-1"></i>正在并发检索频道…</div>';
+    box.innerHTML = '<div class="rounded-xl border border-slate-800 bg-slate-950 p-6 text-center text-xs text-slate-500"><i class="fa-solid fa-spinner fa-spin mr-1"></i>正在同时搜索多个资源来源…</div>';
     selectedCandidate = null;
     document.getElementById('task-submit').disabled = true;
     document.getElementById('task-submit').classList.add('opacity-40');
