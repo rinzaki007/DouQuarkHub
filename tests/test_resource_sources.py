@@ -365,3 +365,47 @@ def test_resource_search_result_cannot_spoof_source_identity():
 
     assert item["source_id"] == "identity-source"
     assert item["source_name"] == "Trusted Source Name"
+
+
+
+def test_resource_source_manager_reflects_registry_unregister():
+    from moviesync.cards import CardRegistry
+
+    class Store:
+        def load(self):
+            return {"cards": {"removable-source": {"enabled": True, "config": {}}}}
+
+        def update_resource_source_health(self, *args, **kwargs):
+            pass
+
+        def get_resource_sources(self):
+            return []
+
+    class RemovableSource(ResourceSourceCard):
+        manifest = CardManifest(
+            id="removable-source",
+            name="Removable Source",
+            type="resource_source",
+            capabilities=("resource.search", "resource.health_check"),
+        )
+
+        def search(self, movie, config):
+            return [{"title": "should not appear"}]
+
+        def check(self, config):
+            return {"status": "healthy"}
+
+    registry = CardRegistry()
+    manager = ResourceSourceManager(
+        FakeTelegramClient(),
+        Store(),
+        FakeLogger(),
+        registry=registry,
+    )
+    manager.register(RemovableSource())
+
+    assert "removable-source" in manager.sources
+    registry.unregister("removable-source")
+
+    assert "removable-source" not in manager.sources
+    assert manager.search({"title": "test"}, Store().load()) == []
