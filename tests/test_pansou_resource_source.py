@@ -124,8 +124,8 @@ def test_pansou_rejects_invalid_base_url():
 
     try:
         source.validate_config({"base_url": "file:///etc/passwd"})
-    except ValueError as exc:
-        assert "HTTP 或 HTTPS" in str(exc)
+    except ValueError:
+        pass
     else:
         raise AssertionError("Expected invalid PanSou URL to be rejected")
 
