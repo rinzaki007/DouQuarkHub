@@ -1074,7 +1074,7 @@ def search_candidates():
         capability.startswith("storage.accepts.")
         and capability != "storage.accepts.*"
         for capability in target_capabilities
-    ) and "storage.accepts.*" not in target_capabilities:
+    ):
         return _json_error("所选存储卡片没有声明支持的分享类型，暂时无法按该网盘搜索", 400)
 
     service = services["search"]
