@@ -82,8 +82,8 @@ class NotificationManager:
             try:
                 result = card.send(
                     event.strip(),
-                    dict(payload),
-                    self._card_config(config, card.card_id),
+                    payload=dict(payload),
+                    config=self._card_config(config, card.card_id),
                 )
                 if not isinstance(result, bool):
                     raise TypeError("通知卡片 send 必须返回 bool")
