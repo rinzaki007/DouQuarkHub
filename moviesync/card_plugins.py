@@ -261,6 +261,16 @@ class CardFilePluginManager:
         finally:
             sys.modules.pop(module_name, None)
 
+    def _is_unmodified_bundled_file(self, filename: str, path: Path) -> bool:
+        """仅对未修改的内置卡片隐藏旧版共享 Telegram 客户端入口。"""
+        if self.bundled_dir is None:
+            return False
+        bundled = self.bundled_dir / filename
+        try:
+            return bundled.is_file() and path.read_bytes() == bundled.read_bytes()
+        except OSError:
+            return False
+
     def load_file(self, filename: str, context: dict[str, Any] | None = None) -> Card:
         name = self.validate_filename(filename)
         path = (self.plugin_dir / name).resolve()
@@ -286,7 +296,12 @@ class CardFilePluginManager:
                 factory = getattr(module, "create_card", None)
                 if not callable(factory):
                     raise ValueError("卡片文件必须提供 create_card(context) 工厂函数")
-                card = factory(dict(context if context is not None else self._context))
+                factory_context = dict(context if context is not None else self._context)
+                if self._is_unmodified_bundled_file(name, path):
+                    # Built-in cards own their clients. Keep the legacy adapter
+                    # available only to custom/edited files that may still use it.
+                    factory_context.pop("telegram", None)
+                card = factory(factory_context)
                 self._validate_card(card, name)
                 self._overlay_bundled_config_ui(card, name)
                 self.registry.register(card)
