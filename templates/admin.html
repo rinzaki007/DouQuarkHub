@@ -1,5 +1,5 @@
 <!-- MovieSync 管理后台
-     用途：管理夸克 Cookie、FID、OpenList、Telegram 频道、日志和管理员账号安全。
+     用途：管理通用卡片、OpenList、日志和管理员账号安全。
      维护说明：账号修改成功后服务端会清理 Session，用户需要重新登录；本页包含账户安全输入框的深色兼容样式。 -->
 <!DOCTYPE html>
 <html lang="zh-CN">
@@ -794,25 +794,7 @@
         </div>
     </div>
 
-    <div id="quark-card-modal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm p-4">
-        <div class="max-w-2xl mx-auto mt-8 max-h-[90vh] overflow-y-auto glass-panel rounded-2xl border border-slate-700 shadow-2xl">
-            <div class="flex items-center justify-between p-5 border-b border-slate-800">
-                <div><h3 class="text-base font-bold text-white flex items-center gap-2"><i class="fa-solid fa-hard-drive text-blue-400"></i>Quark 网盘</h3><p class="text-[10px] text-slate-500 mt-1">StorageTarget · v1.0.0</p></div>
-                <button type="button" onclick="closeQuarkCard()" class="text-slate-400 hover:text-white text-xl">×</button>
-            </div>
-            <div class="p-5 space-y-5">
-                <label class="flex items-center gap-2 text-xs text-slate-300"><input id="quark-card-enabled" type="checkbox" class="accent-blue-500">启用 Quark 卡片</label>
-                <div class="space-y-2"><label for="quark-card-cookie" class="text-xs text-slate-400">夸克 Cookie</label><input id="quark-card-cookie" type="password" autocomplete="new-password" class="glass-input w-full border border-slate-800 rounded px-3 py-2 text-xs font-mono text-slate-200 focus:outline-none focus:border-blue-500" placeholder="请粘贴夸克网盘 Cookie…"><div id="quark-card-cookie-status" class="text-[10px] text-slate-500">Cookie 不会回显；留空保存时会保留现有值。</div></div>
-                <div class="space-y-2"><label class="text-xs text-slate-400">默认目录 FID</label><input id="quark-card-default-fid" class="glass-input w-full border border-slate-800 rounded px-3 py-2 text-xs text-slate-200" value="0"></div>
-                <div><div class="text-xs text-slate-400 mb-2">分类目录 FID</div><div id="quark-card-category-fids" class="grid grid-cols-1 md:grid-cols-2 gap-3"></div><p class="mt-2 text-[10px] text-slate-500">分类项由当前版本支持的分类动态生成，不需要编辑 JSON。</p></div>
-                <div class="flex justify-end gap-2 pt-2">
-                    <button type="button" id="quark-card-check" onclick="checkQuarkCard()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-4 py-2 rounded">检查连接</button>
-                    <button type="button" onclick="closeQuarkCard()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-4 py-2 rounded">取消</button>
-                    <button type="button" onclick="saveQuarkCardConfig()" class="bg-blue-600 hover:bg-blue-500 text-white text-xs px-5 py-2 rounded font-semibold">保存配置</button>
-                </div>
-            </div>
-        </div>
-    </div>
+    
 
     <!-- ==========================================================
          JavaScript
@@ -820,7 +802,6 @@
 
     <script>
 
-        let tgChannels = [];
         let logPollTimer = null;
 
 
@@ -960,21 +941,6 @@
                     ).value =
                         cfg.openlist_url || '';
 
-
-                    const telegramConfig =
-                        cfg.cards &&
-                        cfg.cards.telegram &&
-                        cfg.cards.telegram.config
-                            ? cfg.cards.telegram.config
-                            : {};
-
-                    tgChannels =
-                        Array.isArray(telegramConfig.channels)
-                            ? telegramConfig.channels
-                            : [];
-
-                    renderTGChannels();
-                    renderTelegramChannels();
 
                 }
 
@@ -1434,180 +1400,9 @@
             } finally { button.disabled = false; }
         }
 
-        async function openQuarkCard() {
-            document.getElementById("quark-card-modal").classList.remove("hidden");
-            await loadQuarkCardConfig();
-        }
+        /* Card-specific configuration is driven by the generic Manifest editor. */
 
-        function closeQuarkCard() { document.getElementById("quark-card-modal").classList.add("hidden"); }
-
-        async function loadQuarkCardConfig() {
-            try {
-                const result = await (await apiFetch("/api/cards/quark/config")).json();
-                if (!result.success) throw new Error(result.message || "读取 Quark 配置失败");
-                const cfg = result.config || {};
-                document.getElementById("quark-card-enabled").checked = result.enabled !== false;
-                document.getElementById("quark-card-cookie").value = "";
-                document.getElementById("quark-card-cookie").placeholder = cfg.has_cookie ? "已保存 Cookie；输入新值即可更新" : "请粘贴夸克网盘 Cookie…";
-                document.getElementById("quark-card-cookie-status").textContent = cfg.has_cookie ? "Cookie 已保存且不会回显；输入新 Cookie 可替换，留空则保持不变。" : "尚未配置 Cookie。保存后会安全存储，不会在页面回显。";
-                document.getElementById("quark-card-default-fid").value = cfg.default_fid || "0";
-                renderQuarkCategoryFids(cfg.category_fids || {});
-            } catch (error) { alert(error.message || "读取 Quark 配置失败"); }
-        }
-
-        function renderQuarkCategoryFids(categoryFids) {
-            const container = document.getElementById("quark-card-category-fids");
-            if (!container) return;
-            const entries = Object.entries(categoryFids || {});
-            container.innerHTML = entries.map(([category, fid]) =>
-                '<label class="block min-w-0 text-xs text-slate-400">' + escapeHtml(category) +
-                '<input data-quark-category="' + escapeHtml(category) + '" value="' + escapeHtml(fid || '') +
-                '" class="glass-input mt-1 w-full border border-slate-800 rounded px-3 py-2 text-xs text-slate-200" placeholder="' +
-                escapeHtml(category + '目录 FID（可留空）') + '"></label>'
-            ).join("");
-            if (!entries.length) {
-                container.innerHTML = '<div class="text-xs text-slate-500">当前没有可配置的分类目录。</div>';
-            }
-        }
-
-        async function saveQuarkCardConfig() {
-            const categoryFids = {};
-            document.querySelectorAll("#quark-card-category-fids [data-quark-category]").forEach(input => {
-                categoryFids[input.dataset.quarkCategory] = input.value.trim();
-            });
-            const payload = {
-                enabled: document.getElementById("quark-card-enabled").checked,
-                default_fid: document.getElementById("quark-card-default-fid").value.trim(),
-                category_fids: categoryFids
-            };
-            const cookie = document.getElementById("quark-card-cookie").value.trim();
-            if (cookie) payload.cookie = cookie;
-            try {
-                const result = await (await apiFetch("/api/cards/quark/config", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(payload)})).json();
-                if (!result.success) throw new Error(result.message || "保存失败");
-                closeQuarkCard();
-                await loadCards();
-                alert("Quark 卡片配置已保存");
-            } catch (error) { alert(error.message || "保存 Quark 配置失败"); }
-        }
-
-        async function checkQuarkCard() {
-            const button = document.getElementById("quark-card-check");
-            button.disabled = true;
-            try {
-                const result = await (await apiFetch("/api/cards/quark/check", {method: "POST"})).json();
-                alert(result.message || "检查完成");
-            } catch (error) { alert(error.message || "检查失败"); }
-            finally { button.disabled = false; }
-        }
-
-                /* ==========================================================
-           Telegram 卡片
-           ========================================================== */
-
-        function openTelegramCard() {
-            document.getElementById("telegram-card-modal").classList.remove("hidden");
-            loadTelegramCard();
-        }
-        function closeTelegramCard() {
-            document.getElementById("telegram-card-modal").classList.add("hidden");
-        }
-        function renderTelegramChannels() {
-            const box = document.getElementById("telegram-card-channels");
-            if (!box) return;
-            box.innerHTML = tgChannels.length ? tgChannels.map((ch, i) =>
-                '<div class="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 flex flex-wrap items-center gap-2 text-xs text-slate-200">' +
-                '<span class="flex-1 min-w-0"><strong>' + escapeHtml(ch.name || ch.id) + '</strong><span class="ml-1 text-slate-500">(' + escapeHtml(ch.id) + ')</span></span>' +
-                '<button type="button" onclick="editTelegramChannel(' + i + ')" class="text-blue-300 hover:text-blue-200">编辑</button>' +
-                '<button type="button" onclick="removeTelegramChannel(' + i + ')" class="text-slate-400 hover:text-rose-400 font-bold">删除</button></div>'
-            ).join("") : '<div class="w-full py-4 text-center text-xs text-slate-500">暂未配置 Telegram 频道</div>';
-        }
-        function renderTelegramHealth(result) {
-            const source = (result.resource_sources || []).find(x => x.id === "telegram");
-            const box = document.getElementById("telegram-card-health");
-            if (!box || !source) return;
-            const meta = {healthy:["正常","text-emerald-300","fa-circle-check"],degraded:["部分可用","text-amber-300","fa-triangle-exclamation"],unavailable:["不可用","text-rose-300","fa-circle-xmark"],idle:["未配置","text-slate-400","fa-circle-question"]}[source.status] || ["未检查","text-slate-400","fa-circle-question"];
-            box.innerHTML = '<div class="glass-panel rounded-xl p-3 border border-slate-800"><div class="flex justify-between text-xs"><span class="text-slate-400">来源状态</span><span class="' + meta[1] + '"><i class="fa-solid ' + meta[2] + ' mr-1"></i>' + meta[0] + '</span></div><div class="mt-2 text-[10px] text-slate-500">' + escapeHtml(source.message || "尚未检查") + '</div></div>' +
-                (source.channels || []).map(ch => '<div class="glass-panel rounded-xl p-3 border border-slate-800"><div class="text-xs text-slate-200">' + escapeHtml(ch.name || ch.id) + '</div><div class="mt-1 text-[10px] ' + (ch.status === "healthy" ? "text-emerald-300" : "text-rose-300") + '">' + escapeHtml(ch.message || "无检测信息") + '</div></div>').join("");
-            document.getElementById("telegram-card-summary").textContent = (source.message || "尚未检查") + (source.last_checked_at ? " · " + new Date(source.last_checked_at * 1000).toLocaleString() : "");
-        }
-        async function loadTelegramCard() {
-            try {
-                const [cardResp, healthResp] = await Promise.all([
-                    apiFetch("/api/cards/telegram/config"),
-                    apiFetch("/api/resource-sources")
-                ]);
-                const result = await cardResp.json();
-                const healthResult = await healthResp.json();
-                if (!result.success) throw new Error(result.message || "读取 Telegram 配置失败");
-                tgChannels = Array.isArray(result.config?.channels) ? result.config.channels : [];
-                document.getElementById("telegram-card-enabled").checked = result.enabled !== false;
-                const magicRegex = result.config?.magic_regex || {};
-                document.getElementById("telegram-magic-regex-pattern").value = magicRegex.pattern || "";
-                document.getElementById("telegram-magic-regex-replace").value = magicRegex.replace || "";
-                renderTelegramChannels();
-                const source = (healthResult.resource_sources || []).find(x => x.id === "telegram");
-                if (source) renderTelegramHealth({resource_sources:[source]});
-                else document.getElementById("telegram-card-summary").textContent = "已配置 " + tgChannels.length + " 个频道";
-            } catch (e) { document.getElementById("telegram-card-summary").textContent = e.message || "读取失败"; }
-        }
-        async function checkTelegramCard() {
-            const button = document.getElementById("telegram-card-check");
-            button.disabled = true;
-            try {
-                const result = await (await apiFetch("/api/check-channels")).json();
-                if (!result.success) throw new Error(result.message || "检查失败");
-                renderTelegramHealth(result);
-            } catch (e) {
-                document.getElementById("telegram-card-health").innerHTML = '<div class="glass-panel rounded-xl p-3 text-xs text-rose-300">检查失败：' + escapeHtml(e.message || e) + '</div>';
-            } finally { button.disabled = false; }
-        }
-        function normalizeTelegramChannelId(value) {
-            const raw = String(value || "").trim();
-            const urlMatch = raw.match(/^(?:https?:\/\/)?(?:www\.)?t\.me\/(?:s\/)?([A-Za-z0-9_]+)(?:[/?#].*)?$/i);
-            return (urlMatch ? urlMatch[1] : raw.replace(/^@+/, "")).trim();
-        }
-        function addTelegramChannel() {
-            const name = document.getElementById("telegram-new-channel-name").value.trim();
-            const id = normalizeTelegramChannelId(document.getElementById("telegram-new-channel-id").value);
-            if (!name || !id) return alert("请填写频道名称和频道 ID、@频道名或 t.me 链接");
-            if (tgChannels.some(x => String(x.id).toLowerCase() === id.toLowerCase())) return alert("该频道已存在");
-            tgChannels.push({name, id});
-            document.getElementById("telegram-new-channel-name").value = "";
-            document.getElementById("telegram-new-channel-id").value = "";
-            renderTelegramChannels();
-        }
-        function editTelegramChannel(index) {
-            const channel = tgChannels[index];
-            if (!channel) return;
-            const name = prompt("修改频道名称：", channel.name || channel.id);
-            if (name === null) return;
-            const idInput = prompt("修改频道 ID、@频道名或 t.me 链接：", channel.id);
-            if (idInput === null) return;
-            const id = normalizeTelegramChannelId(idInput);
-            const normalizedName = name.trim();
-            if (!normalizedName || !id) return alert("频道名称和频道 ID 不能为空");
-            if (tgChannels.some((item, itemIndex) => itemIndex !== index && String(item.id).toLowerCase() === id.toLowerCase())) {
-                return alert("另一个频道已经使用这个 ID");
-            }
-            tgChannels[index] = {name: normalizedName, id};
-            renderTelegramChannels();
-        }
-        function removeTelegramChannel(index) {
-            tgChannels.splice(index, 1);
-            renderTelegramChannels();
-        }
-        async function saveTelegramCard() {
-            try {
-                const result = await (await apiFetch("/api/cards/telegram/config", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({enabled:document.getElementById("telegram-card-enabled").checked, channels:tgChannels, magic_regex:{pattern:document.getElementById("telegram-magic-regex-pattern").value, replace:document.getElementById("telegram-magic-regex-replace").value}})})).json();
-                if (!result.success) throw new Error(result.message || "保存失败");
-                tgChannels = result.config?.channels || tgChannels;
-                renderTelegramChannels();
-                alert("Telegram 频道配置已保存");
-            } catch (e) { alert(e.message || "保存 Telegram 配置失败"); }
-        }
-
-/* ==========================================================
+        /* ==========================================================
            日志
            ========================================================== */
 
@@ -2178,38 +1973,6 @@
     </script>
 
 </body>
-</html>     <div id="telegram-card-modal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm p-4">
-         <div class="max-w-3xl mx-auto mt-8 max-h-[90vh] overflow-y-auto glass-panel rounded-2xl border border-slate-700 shadow-2xl">
-             <div class="flex items-center justify-between p-5 border-b border-slate-800">
-                 <div><h3 class="text-base font-bold text-white flex items-center gap-2"><i class="fa-brands fa-telegram text-sky-400"></i>Telegram 资源来源</h3><p class="text-[10px] text-slate-500 mt-1">ResourceSource · v1.0.0</p></div>
-                 <button type="button" onclick="closeTelegramCard()" class="text-slate-400 hover:text-white text-xl">×</button>
-             </div>
-             <div class="p-5 space-y-5">
-                 <div class="flex flex-wrap items-center justify-between gap-3">
-                     <div><div class="text-xs font-semibold text-slate-200">频道资源来源</div><div id="telegram-card-summary" class="mt-1 text-[10px] text-slate-500">正在读取频道配置…</div></div>
-                     <div class="flex items-center gap-3">
-                         <label class="flex items-center gap-2 text-xs text-slate-300"><input id="telegram-card-enabled" type="checkbox" checked class="h-4 w-4 accent-blue-500">启用卡片</label>
-                         <button type="button" id="telegram-card-check" onclick="checkTelegramCard()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-4 py-2 rounded"><i class="fa-solid fa-heart-pulse mr-1"></i>检查频道</button>
-                     </div>
-                 </div>
-                 <div id="telegram-card-health" class="grid gap-2 sm:grid-cols-2"></div>
-                 <div><div class="text-xs font-semibold text-slate-300 mb-2">已配置频道</div><div id="telegram-card-channels" class="flex flex-wrap gap-2 p-3 glass-panel rounded-xl border border-slate-800 min-h-[60px]"></div></div>
-                 <div><div class="text-xs font-semibold text-slate-300 mb-2">添加频道</div><div class="flex flex-wrap gap-2 p-3 bg-slate-900/40 rounded-xl border border-slate-800/80">
-                     <input type="text" id="telegram-new-channel-name" placeholder="频道名称，例如：夸克电影" class="glass-input flex-1 min-w-[150px] border border-slate-800 rounded px-3 py-2 text-xs text-slate-200">
-                     <input type="text" id="telegram-new-channel-id" placeholder="@频道名、频道 ID 或 https://t.me/频道名" class="glass-input flex-1 min-w-[150px] border border-slate-800 rounded px-3 py-2 text-xs text-slate-200">
-                     <button type="button" onclick="addTelegramChannel()" class="bg-blue-600 hover:bg-blue-500 text-white text-xs px-4 py-2 rounded">添加</button>
-                 </div></div>
-                 <div class="space-y-3 rounded-xl border border-slate-800 bg-slate-900/40 p-3">
-                     <div><div class="text-xs font-semibold text-slate-300">文件名识别增强</div><div class="mt-1 text-[10px] text-slate-500">仅在常见命名无法识别时作为补充规则；标准 S01E08 等格式会自动识别。</div></div>
-                     <label class="block text-[11px] text-slate-400">匹配表达式（pattern）<textarea id="telegram-magic-regex-pattern" rows="2" class="glass-input mt-1 w-full rounded border border-slate-800 px-3 py-2 text-xs text-slate-200 font-mono"></textarea></label>
-                     <label class="block text-[11px] text-slate-400">替换模板（replace）<textarea id="telegram-magic-regex-replace" rows="1" class="glass-input mt-1 w-full rounded border border-slate-800 px-3 py-2 text-xs text-slate-200 font-mono"></textarea></label>
-                 </div>
-                 <div class="flex justify-end gap-2 pt-2">
-                     <button type="button" onclick="closeTelegramCard()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-4 py-2 rounded">关闭</button>
-                     <button type="button" onclick="saveTelegramCard()" class="bg-blue-600 hover:bg-blue-500 text-white text-xs px-5 py-2 rounded font-semibold">保存卡片配置</button>
-                 </div>
-             </div>
-         </div>
-     </div>
+</html>     
 
 

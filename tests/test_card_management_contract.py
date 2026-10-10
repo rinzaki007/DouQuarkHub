@@ -108,7 +108,7 @@ def test_generic_builtin_card_config_rejects_invalid_values_without_writing(tmp_
 
     response = client.post(
         "/api/cards/quark/config",
-        json={"default_fid": "../invalid"},
+        json={"config": {"default_fid": "../invalid"}},
         headers=headers,
     )
     assert response.status_code == 400
@@ -116,7 +116,7 @@ def test_generic_builtin_card_config_rejects_invalid_values_without_writing(tmp_
 
     response = client.post(
         "/api/cards/quark/config",
-        json={"category_fids": []},
+        json={"config": {"category_fids": []}},
         headers=headers,
     )
     assert response.status_code == 400
@@ -124,7 +124,7 @@ def test_generic_builtin_card_config_rejects_invalid_values_without_writing(tmp_
 
     response = client.post(
         "/api/cards/telegram/config",
-        json={"channels": [{"id": "bad id"}]},
+        json={"config": {"channels": [{"id": "bad id"}]}},
         headers=headers,
     )
     assert response.status_code == 400
@@ -132,7 +132,7 @@ def test_generic_builtin_card_config_rejects_invalid_values_without_writing(tmp_
 
     response = client.post(
         "/api/cards/telegram/config",
-        json={"magic_regex": {"pattern": "(", "replace": "\\1"}},
+        json={"config": {"magic_regex": {"pattern": "(", "replace": "\\1"}}},
         headers=headers,
     )
     assert response.status_code == 400
@@ -589,3 +589,16 @@ def test_private_key_config_empty_submission_preserves_saved_secret(tmp_path):
     assert response.status_code == 200
     assert services["config"].load()["cards"]["private-key-source"]["config"]["private_key"] == "KEEP_ME"
     assert "KEEP_ME" not in response.get_data(as_text=True)
+
+
+
+def test_card_config_routes_are_generic_and_do_not_register_builtin_card_endpoints(tmp_path):
+    from moviesync.app import create_app
+
+    app = create_app({"MOVIESYNC_DATA_DIR": str(tmp_path)}, start_scheduler=False)
+    rules = {rule.rule for rule in app.url_map.iter_rules()}
+
+    assert "/api/cards/<card_id>/config" in rules
+    assert "/api/cards/<card_id>/check" in rules
+    assert "/api/cards/quark/config" not in rules
+    assert "/api/cards/telegram/config" not in rules
