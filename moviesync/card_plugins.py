@@ -40,6 +40,8 @@ _LEGACY_BUNDLED_CARD_BLOBS = {
 
 def _git_blob_sha(content: bytes) -> str:
     """Return the Git blob object ID for exact-byte version comparisons."""
+    import hashlib
+
     header = f"blob {len(content)}\0".encode("ascii")
     return hashlib.sha1(header + content).hexdigest()
 
