@@ -43,6 +43,8 @@ class CardManifest:
     capabilities: tuple[str, ...] = ()
     config_version: int = 1
     config_fields: tuple[dict[str, Any], ...] = ()
+    image_hosts: tuple[str, ...] = ()
+    image_referer: str = ""
 
     def __post_init__(self) -> None:
         if not CARD_ID_RE.fullmatch(self.id):
@@ -51,6 +53,17 @@ class CardManifest:
             raise ValueError("卡片 config_version 必须是正整数")
         if self.type not in CARD_TYPES:
             raise ValueError(f"卡片类型无效: {self.type}")
+        for host in self.image_hosts:
+            if (
+                not isinstance(host, str)
+                or not host
+                or host != host.lower()
+                or any(char in host for char in "/:@?#")
+                or "." not in host
+            ):
+                raise ValueError("卡片 image_hosts 必须是小写域名列表")
+        if self.image_referer and not self.image_referer.startswith("https://"):
+            raise ValueError("卡片 image_referer 必须使用 HTTPS")
         keys = [str(field.get("key") or "") for field in self.config_fields]
         if any(not key for key in keys) or len(keys) != len(set(keys)):
             raise ValueError("卡片配置字段必须具有唯一且非空的 key")
@@ -106,6 +119,8 @@ class CardManifest:
             "capabilities": list(self.capabilities),
             "config_version": self.config_version,
             "config_fields": deepcopy(list(self.config_fields)),
+            "image_hosts": list(self.image_hosts),
+            "image_referer": self.image_referer,
         }
 
 
