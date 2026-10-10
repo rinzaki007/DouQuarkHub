@@ -170,6 +170,37 @@ class StorageTargetManager:
         cards = self._enabled_cards()
         return cards[0] if cards else None
 
+    def select_target_id(self, resource: object) -> str:
+        """根据资源类型与存储卡能力选择目标；显式目标永不被替换。"""
+        resource_dict = resource if isinstance(resource, dict) else {}
+        explicit_id = str(
+            resource_dict.get("storage_target_id") or resource_dict.get("target_id") or ""
+        ).strip()
+        if explicit_id:
+            return explicit_id
+
+        resource_type = str(resource_dict.get("resource_type") or "").strip()
+        if resource_type:
+            required_capability = f"storage.accepts.{resource_type}"
+            compatible = [
+                card
+                for card in self._enabled_cards()
+                if required_capability in card.capabilities
+                or "storage.accepts.*" in card.capabilities
+            ]
+            if not compatible:
+                return ""
+            default_id, available = self._default_target_id()
+            if available and default_id:
+                if any(card.card_id == default_id for card in compatible):
+                    return default_id
+            # A single compatible target is unambiguous. If there are multiple,
+            # require an explicit/default compatible choice rather than guessing.
+            return compatible[0].card_id if len(compatible) == 1 else ""
+
+        default = self.get()
+        return default.card_id if default else ""
+
     def list_targets(self) -> list[dict[str, Any]]:
         config, available = self._load_card_config()
         card_configs = config.get("cards") if isinstance(config, dict) else {}
@@ -214,10 +245,20 @@ class StorageTargetManager:
     ) -> dict[str, Any]:
         resource_dict = dict(resource) if isinstance(resource, dict) else {}
         selected_id = (
-            target_id
-            or resource_dict.get("storage_target_id")
-            or resource_dict.get("target_id")
+            str(target_id).strip()
+            if target_id
+            else self.select_target_id(resource_dict)
         )
+        if not selected_id and resource_dict.get("resource_type"):
+            return {
+                "target_id": "",
+                "files": [],
+                "token": None,
+                "error": (
+                    "没有已启用的存储卡片支持此资源类型，"
+                    "请安装或启用兼容的存储卡片后重试"
+                ),
+            }
         card = self.get(str(selected_id) if selected_id else None)
         if not card:
             return {
