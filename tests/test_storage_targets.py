@@ -490,3 +490,20 @@ def test_default_target_lookup_failure_is_isolated_without_fallback():
     result = manager.resolve_resource({"pwd_id": "abc"})
     assert result["files"] == []
     assert "无法读取默认存储目标配置" in result["error"]
+
+
+def test_transfer_rejects_resource_type_not_supported_by_target():
+    registry = CardRegistry()
+    registry.register(DemoStorage())
+    manager = StorageTargetManager(registry, FakeStore(default_target_id="demo-storage"), FakeLogger())
+
+    ok, message = manager.transfer(
+        {"resource_id": "share-123", "resource_type": "cloud_b_share"},
+        [{"fid": "file-1"}],
+        "folder-1",
+        "demo-storage",
+        "fresh-token",
+    )
+
+    assert ok is False
+    assert "不支持此资源类型" in message
