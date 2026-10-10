@@ -259,21 +259,17 @@ class DoubanClient:
             or "暂无"
         )
 
-        pic = item.get("pic")
-        if not isinstance(pic, dict):
-            pic = {}
+        pic_value = item.get("pic")
+        pic = pic_value if isinstance(pic_value, dict) else {}
 
-        target_pic = target.get("pic")
-        if not isinstance(target_pic, dict):
-            target_pic = {}
+        target_pic_value = target.get("pic")
+        target_pic = target_pic_value if isinstance(target_pic_value, dict) else {}
 
-        cover_data = item.get("cover")
-        if not isinstance(cover_data, dict):
-            cover_data = {}
+        cover_value = item.get("cover")
+        cover_data = cover_value if isinstance(cover_value, dict) else {}
 
-        target_cover = target.get("cover")
-        if not isinstance(target_cover, dict):
-            target_cover = {}
+        target_cover_value = target.get("cover")
+        target_cover = target_cover_value if isinstance(target_cover_value, dict) else {}
 
         cover = (
             pic.get("normal")
@@ -283,7 +279,11 @@ class DoubanClient:
             or target_pic.get("large")
             or target_pic.get("url")
             or cover_data.get("url")
+            or (cover_value if isinstance(cover_value, str) else "")
             or target_cover.get("url")
+            or (target_cover_value if isinstance(target_cover_value, str) else "")
+            or (pic_value if isinstance(pic_value, str) else "")
+            or (target_pic_value if isinstance(target_pic_value, str) else "")
             or item.get("cover_url")
             or target.get("cover_url")
             or item.get("img")
