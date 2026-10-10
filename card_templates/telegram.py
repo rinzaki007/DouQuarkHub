@@ -74,21 +74,6 @@ class TelegramResourceSource(ResourceSourceCard):
                     "频道列表留空时不会搜索 Telegram 资源。"
                 ),
             },
-            {
-                "key": "magic_regex",
-                "label": "文件名识别增强（高级）",
-                "type": "json",
-                "editor": "object_fields",
-                "item_fields": (
-                    {"key": "pattern", "label": "匹配规则", "placeholder": "例如：第(\\d+)集"},
-                    {"key": "replace", "label": "替换规则", "placeholder": "例如：Episode \\1"},
-                ),
-                "default": {},
-                "description": (
-                    "用于特殊文件名的高级识别。一般不需要修改；"
-                    "不清楚正则表达式时请留空。"
-                ),
-            },
         ),
     )
 

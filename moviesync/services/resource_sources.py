@@ -173,11 +173,31 @@ class ResourceSourceManager:
         return results
 
     def parse_tv_episode(self, source_id: str, file_name: str) -> tuple[int | None, int | None]:
-        """通过对应资源卡片的配置解析集数，核心订阅逻辑不绑定具体正则。"""
+        """优先使用全局文件名识别规则，兼容旧资源卡片的专属规则。"""
         config = self.config_store.load()
+        cards = config.get("cards") if isinstance(config, dict) else {}
+        global_card = cards.get("filename_recognition") if isinstance(cards, dict) else {}
+        global_card = global_card if isinstance(global_card, dict) else {}
+        global_enabled = bool(global_card.get("enabled", True))
+        global_config = global_card.get("config", {})
+        global_config = global_config if isinstance(global_config, dict) else {}
+        global_magic = global_config.get("magic_regex")
+
+        if global_enabled and isinstance(global_magic, dict):
+            parsed = parse_tv_episode(file_name, global_magic)
+            if parsed[1] is not None:
+                return parsed
+
+        # 旧版本将增强规则存放在资源来源卡片内。全局规则没有识别出集数时，
+        # 继续尝试旧规则，避免升级后已有订阅的特殊命名突然失效。
         source = self.sources.get(str(source_id))
         card_config = self._card_config(config, source.card_id) if source else {}
-        return parse_tv_episode(file_name, card_config.get("magic_regex"))
+        legacy_magic = card_config.get("magic_regex")
+        if isinstance(legacy_magic, dict):
+            parsed = parse_tv_episode(file_name, legacy_magic)
+            if parsed[1] is not None:
+                return parsed
+        return parse_tv_episode(file_name)
 
     def search_channel(self, source_id: str, channel: object, title: str) -> list[dict[str, Any]]:
         config = self.config_store.load()
