@@ -7,9 +7,10 @@ continue to use their existing config.json format.
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from copy import deepcopy
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from .settings import DEFAULT_CATEGORY_FIDS
 
