@@ -14,8 +14,8 @@ from flask import Flask, session
 from .auth import AuthStore
 from .card_plugins import CardFilePluginManager
 from .cards import CardRegistry
-from .clients.http import HttpClient
 from .clients.compat import LazyTelegramClient
+from .clients.http import HttpClient
 from .config_store import ConfigStore
 from .logging_setup import configure_logging, recent_logs
 from .services.metadata import MetadataProviderManager
