@@ -41,5 +41,5 @@ class DoubanMetadataCard(MetadataProviderCard):
 
 
 def create_card(context):
-    """Create the metadata card using the shared Douban client."""
-    return DoubanMetadataCard(context["douban"])
+    """Create an independent Douban provider; the platform injects no provider client."""
+    return DoubanMetadataCard(DoubanClient())
