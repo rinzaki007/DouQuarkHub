@@ -173,8 +173,21 @@ class ResourceSourceManager:
         return results
 
     def parse_tv_episode(self, source_id: str, file_name: str) -> tuple[int | None, int | None]:
-        """通过对应资源卡片的配置解析集数，核心订阅逻辑不绑定具体正则。"""
+        """优先使用全局文件名识别规则，兼容旧资源卡片的专属规则。"""
         config = self.config_store.load()
+        cards = config.get("cards") if isinstance(config, dict) else {}
+        global_card = cards.get("filename_recognition") if isinstance(cards, dict) else {}
+        global_card = global_card if isinstance(global_card, dict) else {}
+        global_enabled = bool(global_card.get("enabled", True))
+        global_config = global_card.get("config", {})
+        global_config = global_config if isinstance(global_config, dict) else {}
+        global_magic = global_config.get("magic_regex")
+
+        if global_enabled and isinstance(global_magic, dict):
+            return parse_tv_episode(file_name, global_magic)
+
+        # 旧版本将增强规则存放在资源来源卡片内。仅在全局规则未启用或未配置时回退，
+        # 避免升级后原有订阅的集数识别突然失效。
         source = self.sources.get(str(source_id))
         card_config = self._card_config(config, source.card_id) if source else {}
         return parse_tv_episode(file_name, card_config.get("magic_regex"))
