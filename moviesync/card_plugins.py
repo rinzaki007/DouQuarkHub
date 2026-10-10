@@ -9,6 +9,7 @@ import hashlib
 import importlib.util
 import re
 import sys
+from dataclasses import replace
 from pathlib import Path
 from threading import RLock
 from typing import Any
@@ -61,8 +62,9 @@ class CardFilePluginManager:
         self.plugin_dir = Path(plugin_dir).resolve()
         self.registry = registry
         self.logger = logger
+        self.bundled_dir = Path(bundled_dir).resolve() if bundled_dir else None
         self.plugin_dir.mkdir(parents=True, exist_ok=True)
-        self._seed_bundled_cards(Path(bundled_dir).resolve() if bundled_dir else None)
+        self._seed_bundled_cards(self.bundled_dir)
         self._lock = RLock()
         # Keep the exact instance so stale file bookkeeping can never remove a
         # different card that later registers under the same ID.
@@ -195,6 +197,69 @@ class CardFilePluginManager:
                 self._errors[item["filename"]] = str(exc)[:300]
         return loaded
 
+    def _overlay_bundled_config_ui(self, card: Card, filename: str) -> None:
+        """Reuse bundled form metadata for older customized copies of a built-in card.
+
+        The implementation file is never replaced here. Only UI hints are overlaid,
+        and only when a field key and type still match the bundled schema.
+        """
+        if self.bundled_dir is None:
+            return
+        bundled_path = self.bundled_dir / filename
+        if not bundled_path.is_file():
+            return
+
+        module_name = "moviesync_bundled_card_schema_" + filename[:-3]
+        spec = importlib.util.spec_from_file_location(module_name, bundled_path)
+        if spec is None or spec.loader is None:
+            return
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[module_name] = module
+        try:
+            spec.loader.exec_module(module)
+            canonical_manifest = None
+            for candidate in vars(module).values():
+                if not isinstance(candidate, type) or candidate.__module__ != module_name:
+                    continue
+                try:
+                    if not issubclass(candidate, Card) or candidate is Card:
+                        continue
+                except TypeError:
+                    continue
+                manifest = getattr(candidate, "manifest", None)
+                if getattr(manifest, "id", None) == card.card_id:
+                    canonical_manifest = manifest
+                    break
+            if canonical_manifest is None:
+                return
+
+            canonical_fields = {
+                str(field.get("key")): field
+                for field in canonical_manifest.config_fields
+                if isinstance(field, dict) and field.get("key")
+            }
+            merged_fields = []
+            changed = False
+            for declared in card.manifest.config_fields:
+                field = dict(declared)
+                canonical = canonical_fields.get(str(field.get("key") or ""))
+                if canonical and canonical.get("type", "string") == field.get("type", "string"):
+                    for key in ("editor", "item_fields", "placeholder", "description", "label"):
+                        if key in canonical and field.get(key) != canonical[key]:
+                            field[key] = canonical[key]
+                            changed = True
+                merged_fields.append(field)
+            if changed:
+                card.manifest = replace(card.manifest, config_fields=tuple(merged_fields))
+                self.logger.info(
+                    "卡片 %s 使用新版内置配置表单定义；保留现有卡片代码",
+                    card.card_id,
+                )
+        except Exception:
+            self.logger.exception("更新卡片 %s 的配置表单定义失败", card.card_id)
+        finally:
+            sys.modules.pop(module_name, None)
+
     def load_file(self, filename: str, context: dict[str, Any] | None = None) -> Card:
         name = self.validate_filename(filename)
         path = (self.plugin_dir / name).resolve()
@@ -222,6 +287,7 @@ class CardFilePluginManager:
                     raise ValueError("卡片文件必须提供 create_card(context) 工厂函数")
                 card = factory(dict(context if context is not None else self._context))
                 self._validate_card(card, name)
+                self._overlay_bundled_config_ui(card, name)
                 self.registry.register(card)
             except Exception as exc:
                 self._errors[name] = str(exc)[:300]
