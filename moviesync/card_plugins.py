@@ -113,7 +113,7 @@ class CardFilePluginManager:
             current = self._loaded.get(name)
             if current and self.registry.get(current[0]) is not None:
                 raise ValueError("该卡片文件已经加载")
-            module_name = "moviesync_file_card_" + name[:-3].replace("-", "_")
+            module_name = "moviesync_file_card_" + name[:-3]
             spec = importlib.util.spec_from_file_location(module_name, path)
             if spec is None or spec.loader is None:
                 raise ValueError("无法读取卡片 Python 文件")
@@ -200,6 +200,13 @@ class CardFilePluginManager:
             if module_name:
                 sys.modules.pop(module_name, None)
             path.unlink()
+            try:
+                Path(importlib.util.cache_from_source(str(path))).unlink(missing_ok=True)
+                cache_dir = self.plugin_dir / "__pycache__"
+                if cache_dir.is_dir() and not any(cache_dir.iterdir()):
+                    cache_dir.rmdir()
+            except (OSError, NotImplementedError):
+                self.logger.debug("清理卡片 %s 的字节码缓存失败", name, exc_info=True)
             self._errors.pop(name, None)
             self.logger.info("已卸载单文件卡片 %s（%s）", card_id or name, name)
             return {"filename": name, "card_id": card_id}
