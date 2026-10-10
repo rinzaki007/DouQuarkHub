@@ -14,7 +14,6 @@ from flask import Flask, session
 from .auth import AuthStore
 from .card_plugins import CardFilePluginManager
 from .cards import CardRegistry
-from .clients.douban import DoubanClient
 from .clients.http import HttpClient
 from .clients.telegram import TelegramClient
 from .config_store import ConfigStore
@@ -69,7 +68,6 @@ def create_app(
         PROJECT_ROOT,
     )
 
-    douban = DoubanClient()
     telegram = TelegramClient()
     card_registry = CardRegistry()
     file_card_plugins = CardFilePluginManager(
@@ -80,7 +78,6 @@ def create_app(
     )
     file_card_plugins.load_all({
         "telegram": telegram,
-        "douban": douban,
         "config_store": config_store,
         "logger": logger,
     })
