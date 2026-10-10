@@ -27,8 +27,8 @@ class DemoNotification(NotificationCard):
         self.error = error
         self.calls = []
 
-    def send(self, event, payload, config):
-        self.calls.append((event, payload, config))
+    def send(self, message, **kwargs):
+        self.calls.append((message, kwargs["payload"], kwargs["config"]))
         if self.error:
             raise self.error
         return self.result
