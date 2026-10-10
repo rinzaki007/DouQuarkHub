@@ -157,3 +157,32 @@ def test_notification_manager_loads_installed_plugins_and_skips_broken_ones(monk
     assert manager.load_plugins(context) == ["demo.notification"]
     assert registry.get("demo.notification") is card
     assert received == context
+
+
+def test_notification_plugin_factory_closes_card_when_registration_fails(monkeypatch):
+    from moviesync.services import notifications as module
+
+    class CandidateNotification(DemoNotification):
+        def __init__(self):
+            super().__init__()
+            self.closed = False
+
+        def close(self):
+            self.closed = True
+
+    candidate = CandidateNotification()
+
+    class EntryPoint:
+        name = "duplicate-notification"
+
+        def load(self):
+            return lambda context: candidate
+
+    monkeypatch.setattr(module, "entry_points", lambda group: [EntryPoint()])
+    registry = CardRegistry()
+    registry.register(DemoNotification())
+    manager = NotificationManager(registry, logging.getLogger("test.notifications.cleanup"))
+
+    assert manager.load_plugins() == []
+    assert candidate.closed is True
+    assert registry.get("demo.notification") is not candidate
