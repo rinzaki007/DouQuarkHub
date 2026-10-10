@@ -183,6 +183,10 @@ def admin():
         "admin.html"
     )
 
+@pages.get("/about")
+def about():
+    return render_template("about.html")
+
 
 @pages.get("/setup")
 def setup_page():
