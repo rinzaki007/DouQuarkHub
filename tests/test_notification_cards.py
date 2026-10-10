@@ -68,14 +68,15 @@ def test_notification_manager_skips_disabled_cards():
 
 
 def test_notification_manager_isolates_card_errors_and_invalid_results():
-    broken = DemoNotification(error=RuntimeError("transport error"))
-    malformed = DemoNotification(result="sent")
-    healthy = DemoNotification()
     registry = CardRegistry()
-    registry.register(broken)
-    registry.register(malformed)
-    # IDs must be unique, so use subclasses with separate manifests for this test.
-    registry.unregister("demo.notification")
+
+    class BrokenNotification(DemoNotification):
+        manifest = CardManifest(
+            id="broken.notification",
+            name="Broken",
+            type="notification",
+            capabilities=("notification.send",),
+        )
 
     class MalformedNotification(DemoNotification):
         manifest = CardManifest(
@@ -93,12 +94,14 @@ def test_notification_manager_isolates_card_errors_and_invalid_results():
             capabilities=("notification.send",),
         )
 
+    registry.register(BrokenNotification(error=RuntimeError("transport error")))
     registry.register(MalformedNotification(result="sent"))
     registry.register(HealthyNotification())
     manager = NotificationManager(registry, logging.getLogger("test.notifications"))
 
     results = manager.send("task.failed", {"task_id": "123"})
     assert results == {
+        "broken.notification": False,
         "malformed.notification": False,
         "healthy.notification": True,
     }
