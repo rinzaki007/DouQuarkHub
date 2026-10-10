@@ -162,3 +162,42 @@ def test_uninstall_keeps_card_registered_by_another_owner(tmp_path):
     assert manager.list_plugins()[0]["loaded"] is False
     manager.uninstall("sample-plugin.py")
     assert registry.get("sample-plugin") is other
+
+
+@pytest.mark.parametrize(
+    ("reference_field", "card_id"),
+    [("source_id", "telegram"), ("storage_target_id", "quark")],
+)
+def test_uninstall_rejects_cards_referenced_by_subscriptions(
+    tmp_path, reference_field, card_id
+):
+    from moviesync.app import create_app
+
+    app = create_app({"MOVIESYNC_DATA_DIR": str(tmp_path)}, start_scheduler=False)
+    services = app.extensions["moviesync"]
+    if reference_field == "storage_target_id":
+        # Exercise the subscription-reference guard rather than the separate
+        # safeguard for the currently selected default storage target.
+        services["config"].set_default_storage_target_id("")
+    services["subscriptions"].add_subscription(
+        title="Referenced show",
+        pwd_id="share123",
+        source_id=card_id if reference_field == "source_id" else "",
+        channel="movies" if reference_field == "source_id" else "",
+        storage_target_id=card_id if reference_field == "storage_target_id" else "",
+    )
+
+    client = app.test_client()
+    client.post("/api/setup", json={"username": "admin", "password": "password123"})
+    with client.session_transaction() as session:
+        csrf = session["csrf_token"]
+
+    response = client.delete(
+        f"/api/cards/plugins/{card_id}.py",
+        headers={"X-CSRF-Token": csrf},
+    )
+
+    assert response.status_code == 409
+    assert "自动追剧订阅" in response.get_json()["message"]
+    assert (tmp_path / "cards" / f"{card_id}.py").is_file()
+    assert services["card_registry"].get(card_id) is not None
