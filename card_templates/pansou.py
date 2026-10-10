@@ -8,10 +8,10 @@ from __future__ import annotations
 import re
 import threading
 from typing import Any
-from urllib.parse import urlparse
 
 from moviesync.cards import CardManifest, ResourceSourceCard
 from moviesync.config_store import ConfigValidationError
+
 
 class PanSouResourceSource(ResourceSourceCard):
     """PanSou Web 搜索适配器。
