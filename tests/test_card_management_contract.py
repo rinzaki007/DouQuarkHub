@@ -602,3 +602,21 @@ def test_card_config_routes_are_generic_and_do_not_register_builtin_card_endpoin
     assert "/api/cards/<card_id>/check" in rules
     assert "/api/cards/quark/config" not in rules
     assert "/api/cards/telegram/config" not in rules
+
+
+
+def test_get_card_config_reads_arbitrary_card_without_card_specific_accessors(tmp_path):
+    from moviesync.config_store import ConfigStore
+
+    store = ConfigStore(tmp_path / "config.json", tmp_path / "legacy")
+    store.save_card_config(
+        "tmdb",
+        {"api_key": "test-key", "language": "zh-CN"},
+        enabled=True,
+    )
+
+    assert store.get_card_config("tmdb") == {
+        "api_key": "test-key",
+        "language": "zh-CN",
+    }
+    assert store.get_card_config("not-installed") == {}

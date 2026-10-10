@@ -10,6 +10,7 @@ from copy import deepcopy
 from pathlib import Path
 from urllib.parse import urlparse
 
+from .errors import ConfigValidationError
 from .regex_safety import has_nested_unbounded_quantifier
 from .settings import DEFAULT_CATEGORY_FIDS, DEFAULT_OPENLIST_URL
 from .storage import JsonStore
@@ -19,10 +20,6 @@ FID_RE = re.compile(r"^[A-Za-z0-9_-]{1,128}$")
 
 MAX_CHANNELS = 100
 CONFIG_SCHEMA_VERSION = 5
-
-
-class ConfigValidationError(ValueError):
-    pass
 
 
 class ConfigStore:
@@ -330,6 +327,17 @@ class ConfigStore:
         current["schema_version"] = CONFIG_SCHEMA_VERSION
         self.store.write(current)
         return deepcopy(saved)
+
+    def get_card_config(self, card_id: str) -> dict:
+        """Return a card's saved config by ID without knowing its implementation."""
+        card_id = str(card_id or "").strip()
+        if not re.fullmatch(r"[a-z0-9][a-z0-9._-]{0,63}", card_id):
+            raise ConfigValidationError("卡片 ID 无效")
+        config = self.load()
+        cards = config.get("cards", {}) if isinstance(config, dict) else {}
+        saved = cards.get(card_id, {}) if isinstance(cards, dict) else {}
+        card_config = saved.get("config", {}) if isinstance(saved, dict) else {}
+        return deepcopy(card_config) if isinstance(card_config, dict) else {}
 
     def get_quark_config(self) -> dict:
         return deepcopy(self.load()["cards"]["quark"]["config"])

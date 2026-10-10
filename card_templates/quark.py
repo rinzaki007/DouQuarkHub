@@ -6,7 +6,7 @@ from typing import Any
 
 from moviesync.cards import CardManifest, StorageTargetCard
 from moviesync.clients.quark import QuarkClient, sanitize_pwd_id
-from moviesync.config_store import ConfigValidationError
+from moviesync.errors import ConfigValidationError
 
 _FID_RE = re.compile(r"^[A-Za-z0-9_-]{1,128}$")
 _CATEGORY_FID_KEYS = ("电影", "电视剧", "综艺", "动漫")
@@ -97,8 +97,15 @@ class QuarkStorageCard(StorageTargetCard):
         }
         return normalized
 
+    def _config(self) -> dict[str, Any]:
+        getter = getattr(self.config_store, "get_card_config", None)
+        if not callable(getter):
+            return {}
+        config = getter(self.card_id)
+        return config if isinstance(config, dict) else {}
+
     def destination_options(self) -> list[dict[str, Any]]:
-        config = self.config_store.get_quark_config()
+        config = self._config()
         options = []
         default_fid = str(config.get("default_fid") or "0")
         options.append({"id": default_fid, "name": "默认目录", "is_default": True})
@@ -116,18 +123,17 @@ class QuarkStorageCard(StorageTargetCard):
 
 
     def _client(self) -> QuarkClient:
-        return QuarkClient(self.config_store.get_cookie())
+        return QuarkClient(str(self._config().get("cookie") or "").strip())
 
     def is_configured(self, config: dict[str, Any]) -> bool:
         # Cookie is the credential that determines whether this target can be used;
         # default FIDs alone must not make an unconfigured target appear ready.
         cookie = config.get("cookie") if isinstance(config, dict) else ""
-        if not cookie and self.config_store is not None:
-            cookie = self.config_store.get_cookie()
         return bool(str(cookie or "").strip())
 
     def check(self, config: dict | None = None) -> dict[str, Any]:
-        cookie = self.config_store.get_cookie()
+        saved_config = config if isinstance(config, dict) else self._config()
+        cookie = str(saved_config.get("cookie") or "").strip()
         if not cookie:
             return {
                 "status": "unconfigured",

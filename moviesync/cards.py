@@ -16,7 +16,7 @@ from threading import RLock
 from typing import Any
 from urllib.parse import urlparse
 
-from .config_store import ConfigValidationError
+from .errors import ConfigValidationError
 from .regex_safety import has_nested_unbounded_quantifier
 
 CARD_ID_RE = re.compile(r"^[a-z0-9][a-z0-9._-]{0,63}$")
