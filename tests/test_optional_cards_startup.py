@@ -17,6 +17,9 @@ def test_app_starts_and_core_pages_render_without_any_cards(tmp_path, monkeypatc
     app = _create_test_app(tmp_path, monkeypatch)
     app.testing = True
     client = app.test_client()
+    assert client.post(
+        "/api/setup", json={"username": "admin", "password": "password123"}
+    ).status_code == 200
 
     try:
         assert client.get("/").status_code == 200
@@ -53,7 +56,11 @@ def test_broken_card_does_not_prevent_a_valid_card_from_loading(tmp_path, monkey
         assert plugins["healthy.py"]["loaded"] is True
         assert plugins["broken.py"]["loaded"] is False
         assert plugins["broken.py"]["error"]
-        assert app.test_client().get("/").status_code == 200
+        client = app.test_client()
+        assert client.post(
+            "/api/setup", json={"username": "admin", "password": "password123"}
+        ).status_code == 200
+        assert client.get("/").status_code == 200
     finally:
         services["shutdown"]()
 
@@ -61,8 +68,12 @@ def test_broken_card_does_not_prevent_a_valid_card_from_loading(tmp_path, monkey
 def test_about_link_is_only_in_the_homepage_footer(tmp_path, monkeypatch):
     app = _create_test_app(tmp_path, monkeypatch)
     app.testing = True
+    client = app.test_client()
+    assert client.post(
+        "/api/setup", json={"username": "admin", "password": "password123"}
+    ).status_code == 200
     try:
-        html = app.test_client().get("/").get_data(as_text=True)
+        html = client.get("/").get_data(as_text=True)
         assert 'href="/about"' in html
         assert html.index("</main>") < html.index('href="/about"')
         assert 'href="/admin"' in html
