@@ -134,6 +134,8 @@ class SubscriptionManager:
 
             item["schema_version"] = SUBSCRIPTION_SCHEMA_VERSION
             item.setdefault("storage_target_id", "")
+            item.setdefault("resource_id", item.get("pwd_id", ""))
+            item.setdefault("resource_type", "")
             item.setdefault("cover", "")
             item.setdefault("source_id", "")
             item.setdefault("initial_file_keys", [])
@@ -273,7 +275,9 @@ class SubscriptionManager:
         self,
         *,
         title: str,
-        pwd_id: str,
+        pwd_id: str = "",
+        resource_id: str = "",
+        resource_type: str = "",
         target_fid: str = "0",
         interval_hours: int = 6,
         start_ep: int = 0,
@@ -293,9 +297,11 @@ class SubscriptionManager:
                 "追剧名称长度必须在 1-200 个字符之间"
             )
 
-        pwd_id = _normalize_resource_id(pwd_id)
-        if not pwd_id:
-            raise ValueError("分享资源 ID 无效")
+        legacy_pwd_id = _normalize_resource_id(pwd_id)
+        resource_id = _normalize_resource_id(resource_id or legacy_pwd_id)
+        resource_type = str(resource_type or "").strip().lower()
+        if not resource_id:
+            raise ValueError("资源 ID 无效")
 
         target_fid = _normalize_fid(
             target_fid
@@ -365,7 +371,11 @@ class SubscriptionManager:
                     if season_num is not None:
                         selected_season_episodes.append((season_num, ep_num))
                 elif source_id and channel:
-                    initial_tracked_keys.append(f"{pwd_id}:{fid}")
+                    initial_tracked_keys.append(
+                        f"{resource_type}:{resource_id}:{fid}"
+                        if resource_type and resource_type != "quark_share"
+                        else f"{resource_id}:{fid}"
+                    )
 
         selected_baseline = max(selected_season_episodes, default=(0, 0))
         baseline_episode = (
@@ -377,7 +387,9 @@ class SubscriptionManager:
         subscription = {
             "id": uuid.uuid4().hex,
             "title": title,
-            "pwd_id": pwd_id,
+            "pwd_id": legacy_pwd_id,
+            "resource_id": resource_id,
+            "resource_type": resource_type,
             "target_fid": target_fid,
             "storage_target_id": str(storage_target_id or "").strip(),
             "interval_hours": interval_hours,
@@ -624,6 +636,8 @@ class SubscriptionManager:
 
         resource = {
             "pwd_id": str(sub.get("pwd_id") or "").strip(),
+            "resource_id": str(sub.get("resource_id") or sub.get("pwd_id") or "").strip(),
+            "resource_type": str(sub.get("resource_type") or "").strip().lower(),
             "storage_target_id": str(sub.get("storage_target_id") or "").strip(),
         }
         resolved = self.storage_targets.resolve_resource(
@@ -762,17 +776,19 @@ class SubscriptionManager:
 
         # 标题搜索可能因频道帖子使用英文名、旧消息超出扫描范围等原因返回空列表。
         # 用户创建订阅时选中的分享是可靠的起点，至少先检查该分享中的后续集数。
-        selected_pwd_id = str(sub.get("pwd_id") or "").strip()
+        selected_pwd_id = str(sub.get("resource_id") or sub.get("pwd_id") or "").strip()
         selected_target_id = str(sub.get("storage_target_id") or "").strip()
         if selected_pwd_id and not any(
-            str(item.get("pwd_id") or "").strip() == selected_pwd_id
+            str(item.get("resource_id") or item.get("share_id") or item.get("pwd_id") or "").strip() == selected_pwd_id
             and str(item.get("storage_target_id") or selected_target_id).strip() == selected_target_id
             for item in sources
             if isinstance(item, dict)
         ):
             sources = [
                 {
-                    "pwd_id": selected_pwd_id,
+                    "pwd_id": str(sub.get("pwd_id") or "").strip(),
+                    "resource_id": selected_pwd_id,
+                    "resource_type": str(sub.get("resource_type") or "").strip().lower(),
                     "channel": channel,
                     "channel_name": str(sub.get("channel_name") or channel),
                     "source_id": source_id,
@@ -788,10 +804,11 @@ class SubscriptionManager:
         for item in sources:
             if not isinstance(item, dict):
                 continue
-            item_pwd_id = str(item.get("pwd_id") or "").strip()
+            item_resource_id = str(item.get("resource_id") or item.get("share_id") or item.get("pwd_id") or "").strip()
+            item_resource_type = str(item.get("resource_type") or "").strip().lower()
             item_target_id = str(item.get("storage_target_id") or selected_target_id).strip()
-            source_key = (item_pwd_id, item_target_id)
-            if not item_pwd_id or source_key in seen_source_keys:
+            source_key = (item_resource_type, item_resource_id, item_target_id)
+            if not item_resource_id or source_key in seen_source_keys:
                 continue
             seen_source_keys.add(source_key)
             unique_sources.append(item)
@@ -822,10 +839,10 @@ class SubscriptionManager:
             for fid in (sub.get("initial_file_keys", []) or [])
             if str(fid).strip()
         }
-        selected_pwd_id = str(sub.get("pwd_id") or "").strip()
+        selected_pwd_id = str(sub.get("resource_id") or sub.get("pwd_id") or "").strip()
         baseline_episode = int(sub.get("start_ep", 0) or 0)
         baseline_season = int(sub.get("start_season", 0) or 0)
-        grouped: dict[tuple[str, str], dict] = {}
+        grouped: dict[tuple[str, str, str], dict] = {}
         # A file can legitimately be copied to multiple storage targets. Queue
         # identity therefore includes the destination, while persisted legacy
         # keys remain compatible for the subscription's originally selected target.
@@ -834,12 +851,14 @@ class SubscriptionManager:
 
         for source in sources:
             self._set_status(sub, "running", "resolve", "正在解析发现的资源…")
-            pwd_id = str(source.get("pwd_id") or "").strip()
-            if not pwd_id:
+            resource_id = str(source.get("resource_id") or source.get("share_id") or source.get("pwd_id") or "").strip()
+            resource_type = str(source.get("resource_type") or "").strip().lower()
+            if not resource_id:
                 continue
             resource = {
                 **source,
-                "pwd_id": pwd_id,
+                "resource_id": resource_id,
+                "resource_type": resource_type,
                 "storage_target_id": str(
                     source.get("storage_target_id")
                     or sub.get("storage_target_id")
@@ -859,22 +878,28 @@ class SubscriptionManager:
             ).strip()
             if resolved.get("error") or not files or not token:
                 reason = str(resolved.get("error") or "未获取到文件列表或分享令牌").strip()
-                self.logger.warning("自动追剧资源解析失败，分享 ID=%s，原因=%s", pwd_id, reason)
-                resolution_errors.append(f"{pwd_id}: 解析失败")
+                self.logger.warning("自动追剧资源解析失败，资源 ID=%s，原因=%s", resource_id, reason)
+                resolution_errors.append(f"{resource_id}: 解析失败")
                 continue
 
             for item in files:
                 fid = str(item.get("fid") or "").strip()
                 if not fid:
                     continue
-                legacy_key = f"{pwd_id}:{fid}"
-                key = (
-                    legacy_key
-                    if target_id == selected_target_id
-                    else f"{target_id}:{legacy_key}" if target_id else legacy_key
+                legacy_key = f"{resource_id}:{fid}"
+                provider_key = (
+                    f"{resource_type}:{legacy_key}"
+                    if resource_type and resource_type != "quark_share"
+                    else legacy_key
                 )
-                queue_key = (pwd_id, target_id, fid)
-                if key in tracked or queue_key in queued_keys:
+                key_base = provider_key
+                key = (
+                    key_base
+                    if target_id == selected_target_id
+                    else f"{target_id}:{key_base}" if target_id else key_base
+                )
+                queue_key = (resource_type, resource_id, target_id, fid)
+                if (key in tracked or legacy_key in tracked) or queue_key in queued_keys:
                     continue
                 file_name = str(item.get("file_name") or "")
                 if not file_name.lower().endswith(VIDEO_EXTENSIONS):
@@ -888,7 +913,7 @@ class SubscriptionManager:
                 if episode is None:
                     continue
                 is_selected_initial = (
-                    pwd_id == selected_pwd_id and fid in initial_file_keys
+                    resource_id == selected_pwd_id and fid in initial_file_keys
                 )
                 if not is_selected_initial:
                     if season is not None and baseline_season > 0:
@@ -897,14 +922,15 @@ class SubscriptionManager:
                     elif episode <= baseline_episode:
                         # 只过滤未选中的基准集及更早集数；选中集需首次转存。
                         continue
-                grouped.setdefault((pwd_id, target_id), {
+                group_key = (resource_type, resource_id, target_id)
+                grouped.setdefault(group_key, {
                     "resource": resource,
                     "token": token,
                     "target_id": target_id,
                     "files": [],
                     "keys": [],
                 })["files"].append({"fid": fid})
-                grouped[(pwd_id, target_id)]["keys"].append(key)
+                grouped[group_key]["keys"].append(key)
                 queued_keys.add(queue_key)
 
         if not grouped:
