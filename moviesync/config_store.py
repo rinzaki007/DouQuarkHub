@@ -1,7 +1,7 @@
 """MovieSync 持久化配置管理。
 
-用途：管理夸克 Cookie、默认/分类 FID、OpenList 地址和 Telegram 频道，并校验外部输入。
-维护说明：统一配置写入 data/config.json；对外 public() 会主动隐藏夸克 Cookie。
+通用卡片配置和平台级设置统一保存在 data/config.json。历史 Quark/Telegram
+字段的默认值与迁移逻辑位于 legacy_card_config 兼容模块；public() 会脱敏敏感值。
 """
 from __future__ import annotations
 
