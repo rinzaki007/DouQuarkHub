@@ -200,9 +200,11 @@ class CardFilePluginManager:
             loaded = self._loaded.pop(name, None)
             card_id = loaded[0] if loaded else ""
             module_name = loaded[1] if loaded else ""
-            if card_id:
-                card = self.registry.get(card_id)
-                if card is not None:
+            loaded_card = loaded[2] if loaded else None
+            if card_id and loaded_card is not None:
+                # A stale plugin entry must not uninstall a different card that
+                # happens to reuse this ID after the original was unloaded.
+                if self.registry.get(card_id) is loaded_card:
                     self.registry.unregister(card_id)
             if module_name:
                 sys.modules.pop(module_name, None)
