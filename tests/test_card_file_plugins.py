@@ -6,7 +6,7 @@ import logging
 
 import pytest
 
-from moviesync.cards import Card, CardManifest, CardRegistry
+from moviesync.cards import CardRegistry
 from moviesync.card_plugins import CardFilePluginManager
 
 
@@ -20,7 +20,7 @@ class DemoCard(Card):
 
 def create_card(context):
     return DemoCard()
-'''.encode("utf-8")
+'''.encode()
 
 
 def test_file_plugin_loads_and_uninstall_removes_only_plugin_file(tmp_path):
