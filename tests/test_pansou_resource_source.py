@@ -58,7 +58,8 @@ def test_pansou_search_normalizes_quark_links_and_skips_other_drives():
 
     assert len(results) == 1
     assert results[0]["pwd_id"] == "share123"
-    assert results[0]["storage_target_id"] == "quark"
+    assert results[0]["resource_type"] == "quark_share"
+    assert "storage_target_id" not in results[0]
     assert results[0]["password"] == "abcd"
     assert results[0]["url"] == "https://pan.quark.cn/s/share123"
     method, url, timeout, kwargs = http.calls[0]
