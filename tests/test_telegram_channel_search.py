@@ -1,4 +1,4 @@
-from moviesync.services.resource_sources import TelegramResourceSource
+from card_templates.telegram import TelegramResourceSource
 
 
 class FakeTelegramClient:
