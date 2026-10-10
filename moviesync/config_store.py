@@ -11,6 +11,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from .errors import ConfigValidationError
+from .legacy_card_config import legacy_card_defaults, migrate_legacy_files, normalize_legacy_card_config
 from .regex_safety import has_nested_unbounded_quantifier
 from .settings import DEFAULT_CATEGORY_FIDS, DEFAULT_OPENLIST_URL
 from .storage import JsonStore
@@ -31,83 +32,14 @@ class ConfigStore:
     @staticmethod
     def _defaults() -> dict:
         return {
-            "cards": {
-                "quark": {
-                    "enabled": True,
-                    "config": {
-                        "cookie": "",
-                        "default_fid": "0",
-                        "category_fids": deepcopy(DEFAULT_CATEGORY_FIDS),
-                    },
-                },
-                "telegram": {
-                    "enabled": True,
-                    "config": {
-                        "channels": [],
-                        "magic_regex": {
-                            "pattern": ".*?(?<!\\d)([Ss]\\d{1,2})?([Ee]?[Pp]?[Xx]?\\d{1,3})(?!\\d).*?\\.(mp4|mkv)",
-                            "replace": "\\1\\2.\\3",
-                        },
-                        "health": {
-                            "status": "unknown",
-                            "message": "尚未检查",
-                            "last_checked_at": None,
-                            "last_success_at": None,
-                            "failure_count": 0,
-                            "channels": [],
-                        },
-                    },
-                },
-            },
+            **legacy_card_defaults(),
             "openlist_url": DEFAULT_OPENLIST_URL,
             "default_storage_target_id": "",
             "schema_version": CONFIG_SCHEMA_VERSION,
         }
 
     def _migrate_legacy(self) -> None:
-        current = self.store.read()
-        legacy_config = self.legacy_root / "config.json"
-        legacy_channels = [
-            self.legacy_root / "channels.json",
-            self.store.path.parent / "channels.json",
-        ]
-
-        if self.store.path.exists():
-            return
-
-        if legacy_config.exists():
-            try:
-                import json
-
-                incoming = json.loads(
-                    legacy_config.read_text(encoding="utf-8")
-                )
-
-                if isinstance(incoming, dict):
-                    current.update(incoming)
-            except (OSError, ValueError):
-                pass
-
-        if not current.get("channels"):
-            for channel_path in legacy_channels:
-                if not channel_path.exists():
-                    continue
-
-                try:
-                    import json
-
-                    channels = json.loads(
-                        channel_path.read_text(encoding="utf-8")
-                    )
-
-                    if isinstance(channels, list):
-                        current["channels"] = channels
-
-                    break
-                except (OSError, ValueError):
-                    continue
-
-        self.store.write(current)
+        migrate_legacy_files(self.store, self.legacy_root)
 
     @staticmethod
     def _normalize_fid(
@@ -211,78 +143,18 @@ class ConfigStore:
         if isinstance(data, dict):
             defaults.update(data)
 
-        cards = defaults.get("cards") if isinstance(defaults.get("cards"), dict) else {}
-        quark = cards.get("quark") if isinstance(cards.get("quark"), dict) else {}
-        quark_config = quark.get("config") if isinstance(quark.get("config"), dict) else {}
-        if "quark_cookie" in defaults:
-            quark_config["cookie"] = str(defaults.get("quark_cookie") or "")
-        if "default_fid" in defaults:
-            quark_config["default_fid"] = defaults.get("default_fid") or "0"
-        if "category_fids" in defaults:
-            quark_config["category_fids"] = deepcopy(
-                defaults.get("category_fids") or DEFAULT_CATEGORY_FIDS
-            )
-        quark["enabled"] = bool(quark.get("enabled", True))
-        quark["config"] = quark_config
-        cards["quark"] = quark
-
-        telegram = cards.get("telegram") if isinstance(cards.get("telegram"), dict) else {}
-        telegram_config = telegram.get("config") if isinstance(telegram.get("config"), dict) else {}
-        if not isinstance(telegram_config.get("magic_regex"), dict):
-            telegram_config["magic_regex"] = deepcopy(
-                self._defaults()["cards"]["telegram"]["config"]["magic_regex"]
-            )
-        if "channels" in defaults and not telegram_config.get("channels"):
-            telegram_config["channels"] = defaults.get("channels") or []
-        old_sources = defaults.get("resource_sources")
-        source = next(
-            (item for item in old_sources if isinstance(item, dict) and item.get("id") == "telegram"),
-            None,
-        ) if isinstance(old_sources, list) else None
-        if source:
-            telegram["enabled"] = bool(source.get("enabled", telegram.get("enabled", True)))
-            if source.get("health"):
-                telegram_config["health"] = dict(source["health"])
-        telegram["enabled"] = bool(telegram.get("enabled", True))
-        telegram_config["channels"] = self._normalize_channels(
-            telegram_config.get("channels", [])
+        normalized = normalize_legacy_card_config(
+            defaults,
+            normalize_fid=self._normalize_fid,
+            normalize_channels=self._normalize_channels,
+            default_category_fids=DEFAULT_CATEGORY_FIDS,
+            schema_version=CONFIG_SCHEMA_VERSION,
         )
-        health = dict(self._defaults()["cards"]["telegram"]["config"]["health"])
-        health.update(telegram_config.get("health") or {})
-        telegram_config["health"] = health
-        telegram["config"] = telegram_config
-        cards["telegram"] = telegram
-
-        defaults["cards"] = cards
-        for key in ("quark_cookie", "default_fid", "category_fids", "channels", "resource_sources"):
-            defaults.pop(key, None)
-
-        try:
-            schema_version = int(defaults.get("schema_version", 1))
-        except (TypeError, ValueError):
-            schema_version = 1
-        defaults["schema_version"] = max(schema_version, CONFIG_SCHEMA_VERSION)
-
-        quark_config = defaults["cards"]["quark"].setdefault("config", {})
-        quark_config["default_fid"] = self._normalize_fid(
-            quark_config.get("default_fid", "0"),
-            "cards.quark.config.default_fid",
-        )
-        incoming_category_fids = quark_config.get("category_fids") or {}
-        quark_config["category_fids"] = {
-            key: self._normalize_fid(
-                incoming_category_fids.get(key, ""),
-                f"cards.quark.config.category_fids.{key}",
-                allow_empty=True,
-            )
-            for key in DEFAULT_CATEGORY_FIDS
-        }
         # Persist normalized legacy data and the current schema version once.
-        # Compare against a deep copy because the normalization above mutates nested dicts.
-        if defaults != original_data:
-            self.store.write(defaults)
+        if normalized != original_data:
+            self.store.write(normalized)
 
-        return defaults
+        return normalized
 
     def save_card_config(
         self,
