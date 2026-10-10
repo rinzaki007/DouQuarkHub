@@ -302,3 +302,39 @@ def test_metadata_search_exposes_generic_route_and_keeps_legacy_alias(tmp_path):
 
     assert "/api/search-metadata" in routes
     assert "/api/search-douban" in routes
+
+
+def test_metadata_routes_forward_explicit_provider_selection(tmp_path):
+    from moviesync.app import create_app
+
+    class RecordingMetadata:
+        def __init__(self):
+            self.calls = []
+
+        def search(self, query, provider_id=None):
+            self.calls.append(("search", query, provider_id))
+            return [{"title": query, "provider_id": provider_id}]
+
+        def list_movies(self, tag, sort_type, provider_id=None):
+            self.calls.append(("list", tag, sort_type, provider_id))
+            return [{"title": tag, "provider_id": provider_id}]
+
+    app = create_app({"MOVIESYNC_DATA_DIR": str(tmp_path)}, start_scheduler=False)
+    metadata = RecordingMetadata()
+    app.extensions["moviesync"]["metadata"] = metadata
+    client = app.test_client()
+    with client.session_transaction() as session:
+        session["logged_in"] = True
+        session["csrf_token"] = "test-csrf"
+
+    search = client.get("/api/search-metadata?q=Arrival&provider_id=tmdb")
+    listing = client.get("/api/get-movies?tag=电影&sort=U&provider_id=douban")
+
+    assert search.status_code == 200
+    assert search.get_json()["movies"] == [{"title": "Arrival", "provider_id": "tmdb"}]
+    assert listing.status_code == 200
+    assert listing.get_json()["movies"] == [{"title": "电影", "provider_id": "douban"}]
+    assert metadata.calls == [
+        ("search", "Arrival", "tmdb"),
+        ("list", "电影", "U", "douban"),
+    ]
