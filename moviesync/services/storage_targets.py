@@ -270,6 +270,22 @@ class StorageTargetManager:
                 "token": None,
                 "error": self._unavailable_message(str(selected_id) if selected_id else None),
             }
+        resource_type = str(resource_dict.get("resource_type") or "").strip()
+        if resource_type:
+            required_capability = f"storage.accepts.{resource_type}"
+            if (
+                required_capability not in card.capabilities
+                and "storage.accepts.*" not in card.capabilities
+            ):
+                return {
+                    "target_id": card.card_id,
+                    "files": [],
+                    "token": None,
+                    "error": (
+                        f"存储目标卡片「{card.manifest.name}」不支持此资源类型，"
+                        "请重新选择兼容的存储目标"
+                    ),
+                }
         try:
             result = card.resolve_resource(resource_dict)
             if not isinstance(result, dict):
