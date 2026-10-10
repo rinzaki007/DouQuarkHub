@@ -576,41 +576,67 @@ def set_default_storage_target():
 
 @api.get("/cards")
 def cards():
-    """返回当前进程已加载的卡片 Manifest。动态安装暂未开放。"""
-    registry = _services()["card_registry"]
-    config_store = _services()["config"]
+    """返回已加载卡片列表；单张卡片出错时只显示提示，不影响其他卡片。"""
+    services = _services()
+    registry = services["card_registry"]
+    config_store = services["config"]
+    logger = services["logger"]
     config = config_store.load()
     card_configs = config.get("cards") if isinstance(config, dict) else {}
     cards = []
-    for card in registry.list():
-        saved = card_configs.get(card.card_id) if isinstance(card_configs, dict) else {}
-        saved = saved if isinstance(saved, dict) else {}
-        item = card.manifest.to_dict()
-        item["enabled"] = bool(saved.get("enabled", True))
-        card_config = saved.get("config", {})
-        card_config = card_config if isinstance(card_config, dict) else {}
+    warnings = []
 
-        # 状态由卡片接口自身提供；平台只调用通用方法，不识别 Telegram/Quark 等 ID。
-        item["configured"] = bool(card.is_configured(card_config))
-        health = card_config.get("health")
-        if isinstance(health, dict) and health:
-            item["health"] = health
-        else:
-            # Listing never performs network checks; unknown health remains idle.
-            item["health"] = {
-                "status": "idle",
-                "message": "尚未检查，请手动检查连接",
-            }
-        cards.append(item)
-    plugin_manager = _services().get("file_card_plugins")
-    return jsonify(
-        {
-            "success": True,
-            "cards": cards,
-            "dynamic_install_enabled": plugin_manager is not None,
-            "file_plugins": plugin_manager.list_plugins() if plugin_manager else [],
-        }
-    )
+    for card in registry.list():
+        card_id = "unknown"
+        try:
+            manifest = card.manifest.to_dict()
+            card_id = str(manifest.get("id") or getattr(card, "card_id", "unknown"))
+            saved = card_configs.get(card_id) if isinstance(card_configs, dict) else {}
+            saved = saved if isinstance(saved, dict) else {}
+            item = manifest
+            item["enabled"] = bool(saved.get("enabled", True))
+            card_config = saved.get("config", {})
+            card_config = card_config if isinstance(card_config, dict) else {}
+
+            try:
+                item["configured"] = bool(card.is_configured(card_config))
+            except Exception:
+                logger.exception("读取卡片 %s 的配置状态失败", card_id)
+                item["configured"] = False
+                item["health"] = {
+                    "status": "error",
+                    "message": "卡片状态读取失败，请检查这张卡片的日志。",
+                }
+                warnings.append(f"「{item.get('name') or card_id}」状态读取失败，其他卡片仍可使用。")
+            else:
+                health = card_config.get("health")
+                if isinstance(health, dict) and health:
+                    item["health"] = health
+                else:
+                    item["health"] = {
+                        "status": "idle",
+                        "message": "还没有检查连接，可以点开卡片后手动检查。",
+                    }
+            cards.append(item)
+        except Exception:
+            logger.exception("读取卡片 %s 的信息失败", card_id)
+            warnings.append("有一张卡片的信息读取失败，已跳过；其他卡片仍可使用。")
+
+    plugin_manager = services.get("file_card_plugins")
+    try:
+        file_plugins = plugin_manager.list_plugins() if plugin_manager else []
+    except Exception:
+        logger.exception("读取卡片文件列表失败")
+        file_plugins = []
+        warnings.append("卡片文件列表暂时无法读取，已加载的功能不受影响。")
+
+    return jsonify({
+        "success": True,
+        "cards": cards,
+        "warnings": warnings,
+        "dynamic_install_enabled": plugin_manager is not None,
+        "file_plugins": file_plugins,
+    })
 
 
 @api.post("/cards/plugins")
