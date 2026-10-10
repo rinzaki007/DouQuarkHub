@@ -1,5 +1,5 @@
-from moviesync.cards import MetadataProviderCard
 from card_templates.douban import DoubanMetadataCard
+from moviesync.cards import MetadataProviderCard
 
 
 class FakeDouban:
