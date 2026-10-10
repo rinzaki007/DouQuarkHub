@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 
 import pytest
 
@@ -65,6 +64,8 @@ def test_uninstalling_one_builtin_card_does_not_break_other_cards_or_platform(
 
 def test_all_bundled_card_implementations_are_single_file_factories():
     """Bundled implementations must expose the loader contract in their own file."""
+    from pathlib import Path
+
     template_dir = Path(__file__).resolve().parents[1] / "card_templates"
     files = {
         path.stem: path
