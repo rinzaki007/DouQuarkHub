@@ -380,3 +380,17 @@ def test_card_registry_does_not_downgrade_newer_saved_config():
 def test_card_manifest_requires_positive_config_version():
     with pytest.raises(ValueError, match="config_version"):
         CardManifest(id="bad-version", name="Bad Version", config_version=0)
+
+
+
+def test_telegram_card_factory_owns_client_creation(monkeypatch):
+    import card_templates.telegram as telegram_module
+
+    class FakeTelegramClient:
+        pass
+
+    monkeypatch.setattr(telegram_module, "TelegramClient", FakeTelegramClient)
+    card = telegram_module.create_card({})
+
+    assert isinstance(card.client, FakeTelegramClient)
+    assert card.card_id == "telegram"
