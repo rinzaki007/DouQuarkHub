@@ -135,6 +135,21 @@ class TelegramResourceSource(ResourceSourceCard):
         return results
 
     def search_channel(self, channel: object, title: str, config: dict) -> list[dict[str, Any]]:
+        """仅搜索当前 Telegram 卡片配置中启用的频道。
+
+        订阅记录可能早于频道配置变更；每次执行时重新校验，避免已移除的
+        频道继续被旧订阅扫描。频道配置属于本卡片，不从全局配置或其他卡片读取。
+        """
+        channels = _normalize_channels(config.get("channels", []))
+        channel_id = (
+            str(channel.get("id") or "").strip().lstrip("@")
+            if isinstance(channel, dict)
+            else str(channel or "").strip().lstrip("@")
+        )
+        configured_ids = {item["id"].casefold() for item in channels}
+        if not channel_id or channel_id.casefold() not in configured_ids:
+            return []
+
         # 自动追剧要扫描频道最近的消息，而不是只依赖 Telegram 的标题查询结果；
         # 后续仍由客户端做标题匹配并受页数上限保护。
         return self.client.search_channel(channel, title, scan_all=True)
