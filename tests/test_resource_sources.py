@@ -468,6 +468,7 @@ def test_resource_manager_lists_only_resource_source_manifests():
     manager = ResourceSourceManager(
         object(), FakeLogger(), registry=registry
     )
+    registry.register(TelegramResourceSource(FakeTelegramClient()))
     registry.register(OtherCard())
 
     manifests = manager.get_cards()
