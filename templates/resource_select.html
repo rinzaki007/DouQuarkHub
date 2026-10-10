@@ -15,8 +15,8 @@
         <div class="flex min-w-0 items-center gap-3">
             <a href="/" class="glass-control rounded-xl px-3 py-2 text-xs text-slate-300 hover:text-white"><i class="fa-solid fa-arrow-left mr-1"></i>返回</a>
             <div class="min-w-0">
-                <div class="text-[10px] uppercase tracking-widest text-blue-400">RESOURCE SELECTOR</div>
-                <h1 id="page-title" class="truncate text-sm font-semibold text-white">选择要转存的资源</h1>
+                <div class="text-[10px] uppercase tracking-widest text-blue-400">选择资源</div>
+                <h1 id="page-title" class="truncate text-sm font-semibold text-white">选择要保存的资源</h1>
             </div>
         </div>
         <a href="/tasks" class="glass-control shrink-0 rounded-xl px-3 py-2 text-xs text-slate-300 hover:text-white"><i class="fa-solid fa-list-check mr-1"></i>任务中心</a>
@@ -33,16 +33,16 @@
                     <span id="movie-tag" class="rounded-lg border border-blue-500/20 bg-blue-500/10 px-2 py-1 text-[10px] text-blue-300"></span>
                     <span id="movie-rate" class="rounded-lg border border-amber-500/20 bg-amber-500/10 px-2 py-1 text-[10px] text-amber-300"></span>
                 </div>
-                <p class="mt-2 text-xs leading-5 text-slate-500">先选择资源版本，再选择需要转存的文件。所有文件默认不勾选。</p>
+                <p class="mt-2 text-xs leading-5 text-slate-500">先选择资源版本，再勾选要保存的文件。默认不会勾选任何文件。</p>
                 <a id="movie-douban" href="#" target="_blank" rel="noopener noreferrer" class="douban-detail-btn mt-3 inline-flex items-center gap-2 rounded-xl px-3 py-2 text-[11px] font-medium"><i class="fa-solid fa-arrow-up-right-from-square"></i>打开豆瓣详情</a>
             </div>
             <div class="w-full shrink-0 sm:w-80 space-y-2">
                 <div>
-                    <label class="mb-1 block text-[10px] font-medium text-slate-500">存储目标</label>
+                    <label class="mb-1 block text-[10px] font-medium text-slate-500">保存位置</label>
                     <select id="storage-target" class="glass-control w-full rounded-xl px-3 py-2.5 text-xs text-slate-200"></select>
                 </div>
                 <div>
-                    <label class="mb-1 block text-[10px] font-medium text-slate-500">目标存储目录</label>
+                    <label class="mb-1 block text-[10px] font-medium text-slate-500">保存目录</label>
                     <select id="target-fid" class="glass-control w-full rounded-xl px-3 py-2.5 text-xs text-slate-200"></select>
                 </div>
             </div>
@@ -51,13 +51,13 @@
 
     <div id="loading" class="py-20 text-center text-slate-400">
         <i class="fa-solid fa-spinner fa-spin mb-3 text-3xl text-blue-500"></i>
-        <p class="text-sm">正在检索可用资源…</p>
+        <p class="text-sm">正在查找可用资源…</p>
     </div>
     <div id="error-state" class="hidden rounded-2xl border border-rose-900/50 bg-rose-950/20 p-6 text-center text-sm text-rose-300"></div>
     <section id="resource-area" class="hidden">
         <div class="mb-4 flex items-end justify-between gap-3">
             <div>
-                <div class="text-xs font-semibold text-slate-200">可用资源版本</div>
+                <div class="text-xs font-semibold text-slate-200">找到的资源版本</div>
                 <div id="resource-summary" class="mt-1 text-[11px] text-slate-500"></div>
             </div>
         </div>
