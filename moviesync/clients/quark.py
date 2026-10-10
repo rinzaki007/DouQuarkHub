@@ -137,7 +137,11 @@ class QuarkClient:
         token_url = "https://drive.quark.cn/1/clouddrive/share/sharepage/token"
         try:
             response, data = self.http.request_json(
-                "POST", token_url, timeout=8, retries=1, json={"pwd_id": pwd_id, "passcode": str(passcode or "").strip()}
+                "POST",
+                token_url,
+                timeout=8,
+                retries=1,
+                json={"pwd_id": pwd_id, "passcode": str(passcode or "").strip()},
             )
             if response.status_code == 404:
                 return None, None, "分享链接已失效或已被删除"
