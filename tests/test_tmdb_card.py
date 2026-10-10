@@ -111,7 +111,7 @@ def test_tmdb_list_maps_categories_and_rating_sort():
     assert result[0]["title"] == "测试电影"
     assert http.calls[0][1] == "https://api.themoviedb.org/3/discover/movie"
     assert http.calls[0][2]["params"]["sort_by"] == "vote_average.desc"
-    assert http.calls[0][2]["params"]["vote_count.gte"] == 100
+    assert http.calls[0][2]["params"]["vote_count.gte"] == "100"
 
 
 def test_tmdb_details_return_external_ids_and_health_check_never_exposes_token():
