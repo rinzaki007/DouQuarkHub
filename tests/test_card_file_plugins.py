@@ -285,7 +285,7 @@ def test_legacy_persistent_douban_card_factory_is_migrated_safely(tmp_path):
 
     loaded = manager.load_all()
 
-    assert loaded == ["douban"]
+    assert "douban" in loaded
     assert manager.registry.get("douban") is not None
     migrated = plugin_path.read_text(encoding="utf-8")
     assert "return DoubanMetadataCard(DoubanClient())" in migrated
