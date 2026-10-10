@@ -3,6 +3,9 @@
 import pytest
 
 from moviesync.cards import Card, CardManifest, CardRegistry
+from card_templates.douban import DoubanMetadataCard
+from card_templates.quark import QuarkStorageCard
+from card_templates.telegram import TelegramResourceSource
 
 
 class DemoCard(Card):
@@ -58,7 +61,7 @@ def test_card_manifest_rejects_invalid_id():
 
 
 def test_telegram_resource_source_uses_card_interface():
-    from moviesync.services.resource_sources import TelegramResourceSource
+    from card_templates.telegram import TelegramResourceSource
 
     class FakeTelegramClient:
         pass
@@ -74,7 +77,8 @@ def test_telegram_resource_source_uses_card_interface():
 
 
 def test_quark_storage_card_uses_storage_target_interface():
-    from moviesync.cards import QuarkStorageCard, StorageTargetCard
+    from card_templates.quark import QuarkStorageCard
+    from moviesync.cards import StorageTargetCard
 
     class FakeConfigStore:
         def get_cookie(self):
@@ -90,7 +94,7 @@ def test_quark_storage_card_uses_storage_target_interface():
 
 
 def test_registry_contains_unified_card_manifest_contract():
-    from moviesync.cards_metadata import DoubanMetadataCard
+    from card_templates.douban import DoubanMetadataCard
     from moviesync.services.resource_sources import TelegramResourceSource
 
     assert DoubanMetadataCard.manifest.type == "metadata_provider"
