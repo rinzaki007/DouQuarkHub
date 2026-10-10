@@ -1356,10 +1356,15 @@
             });
         }
 
+        let genericCardRequestSequence = 0;
+
         async function openGenericCard(cardId) {
+            const requestId = ++genericCardRequestSequence;
             try {
-                const result = await (await apiFetch("/api/cards/" + encodeURIComponent(cardId) + "/config")).json();
-                if (!result.success) throw new Error(result.message || "读取卡片配置失败");
+                const response = await apiFetch("/api/cards/" + encodeURIComponent(cardId) + "/config");
+                const result = await response.json();
+                if (requestId !== genericCardRequestSequence) return;
+                if (!response.ok || !result.success) throw new Error(result.message || "读取卡片配置失败");
                 const card = (window.moviesyncCards || []).find(item => item.id === cardId) || {id: cardId};
                 currentGenericCard = {id: cardId, fields: result.fields || [], enabled: result.enabled !== false, type: card.type};
                 document.getElementById("generic-card-disable-warning").classList.toggle("hidden", card.type !== "storage_target");
@@ -1372,11 +1377,12 @@
                 document.getElementById("generic-card-health").classList.add("hidden");
                 document.getElementById("generic-card-modal").classList.remove("hidden");
             } catch (error) {
-                alert(error.message || "读取卡片配置失败");
+                if (requestId === genericCardRequestSequence) alert(error.message || "读取卡片配置失败");
             }
         }
 
         function closeGenericCard() {
+            genericCardRequestSequence++;
             document.getElementById("generic-card-modal").classList.add("hidden");
             currentGenericCard = null;
         }
