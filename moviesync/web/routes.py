@@ -683,7 +683,11 @@ def uninstall_card_plugin(filename):
     if plugin_manager is None:
         return _json_error("单文件卡片管理未启用", 503)
     try:
-        removed = plugin_manager.uninstall(filename)
+        safe_filename = plugin_manager.validate_filename(filename)
+        default_target = _services()["config"].get_default_storage_target_id()
+        if default_target and str(default_target) == safe_filename[:-3]:
+            return _json_error("该卡片是当前默认存储目标，请先切换默认目标后再卸载")
+        removed = plugin_manager.uninstall(safe_filename)
     except FileNotFoundError as exc:
         return _json_error(str(exc), 404)
     except ValueError as exc:
