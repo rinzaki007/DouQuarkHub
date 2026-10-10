@@ -592,10 +592,10 @@ def test_private_key_config_empty_submission_preserves_saved_secret(tmp_path):
 
 
 
-def test_card_config_routes_are_generic_and_do_not_register_builtin_card_endpoints():
+def test_card_config_routes_are_generic_and_do_not_register_builtin_card_endpoints(tmp_path):
     from moviesync.app import create_app
 
-    app = create_app({"MOVIESYNC_DATA_DIR": "/tmp/moviesync-generic-card-routes"}, start_scheduler=False)
+    app = create_app({"MOVIESYNC_DATA_DIR": str(tmp_path)}, start_scheduler=False)
     rules = {rule.rule for rule in app.url_map.iter_rules()}
 
     assert "/api/cards/<card_id>/config" in rules
