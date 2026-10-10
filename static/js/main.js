@@ -113,7 +113,7 @@ async function loadCategoryOptions() {
             if (matched) selectEl.value = matched.id;
         });
     } catch (err) {
-        console.error("加载存储目标目录失败:", err);
+        console.error("读取保存目录失败:", err);
     }
 }
 
@@ -369,7 +369,7 @@ function movieDetailChase() {
 }
 
 async function searchAndOpenCandidates(selectedMovies) {
-    showToast('正在检索资源，请稍候…', 'info');
+    showToast('正在搜索资源，请稍候…', 'info');
     try {
         const requestOptions = {
             method: 'POST',
