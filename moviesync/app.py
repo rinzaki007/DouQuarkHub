@@ -21,7 +21,7 @@ from .config_store import ConfigStore
 from .logging_setup import configure_logging, recent_logs
 from .services.metadata import MetadataProviderManager
 from .services.notifications import NotificationManager
-from .services.resource_sources import ResourceSourceManager
+from .services.resource_sources import PanSouResourceSource, ResourceSourceManager
 from .services.search import SearchService
 from .services.storage_targets import StorageTargetManager
 from .services.subscriptions import SubscriptionManager
@@ -77,6 +77,7 @@ def create_app(
         config_store,
         logger,
         registry=card_registry,
+        resource_cards=[PanSouResourceSource()],
     )
     resource_sources.load_plugins({
         "telegram": telegram,
