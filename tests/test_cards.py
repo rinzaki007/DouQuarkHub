@@ -137,3 +137,27 @@ def test_card_manifest_rejects_unsafe_or_oversized_regex_patterns():
                 {"key": "value", "type": "string", "pattern": "a" * 501},
             ),
         )
+
+
+def test_card_config_regex_input_is_bounded_without_manifest_max_length():
+    from moviesync.cards import ResourceSourceCard
+    from moviesync.config_store import ConfigValidationError
+
+    class PatternCard(ResourceSourceCard):
+        manifest = CardManifest(
+            id="pattern-input-card",
+            name="Pattern Input",
+            type="resource_source",
+            config_fields=(
+                {"key": "value", "type": "string", "pattern": "^[a-z]+$"},
+            ),
+        )
+
+        def search(self, movie, config):
+            return []
+
+        def check(self, config):
+            return {"status": "healthy"}
+
+    with pytest.raises(ConfigValidationError, match="不能超过 4096"):
+        PatternCard().validate_config({"value": "a" * 4097})
