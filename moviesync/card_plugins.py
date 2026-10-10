@@ -17,6 +17,7 @@ from typing import Any
 from .cards import (
     Card,
     CardRegistry,
+    FilenameProcessorCard,
     MetadataProviderCard,
     NotificationCard,
     ResourceSourceCard,
@@ -312,6 +313,7 @@ class CardFilePluginManager:
             "storage_target": StorageTargetCard,
             "metadata_provider": MetadataProviderCard,
             "notification": NotificationCard,
+            "filename_processor": FilenameProcessorCard,
         }
         base = expected_types.get(card.card_type)
         if base is not None and not isinstance(card, base):
