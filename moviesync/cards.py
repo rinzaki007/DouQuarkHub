@@ -17,6 +17,7 @@ from urllib.parse import urlparse
 
 from .clients.quark import QuarkClient, sanitize_pwd_id
 from .config_store import ConfigStore, ConfigValidationError
+from .regex_safety import has_nested_unbounded_quantifier
 from .settings import DEFAULT_CATEGORY_FIDS
 
 CARD_ID_RE = re.compile(r"^[a-z0-9][a-z0-9._-]{0,63}$")
@@ -75,6 +76,15 @@ class CardManifest:
             if pattern is not None:
                 if field_type not in text_field_types or not isinstance(pattern, str):
                     raise ValueError("pattern 只能用于文本字段，且必须是字符串")
+                if len(pattern) > 500:
+                    label = field.get("label") or field.get("key")
+                    raise ValueError(
+                        f"配置字段「{label}」的正则规则不能超过 500 个字符"
+                    )
+                if has_nested_unbounded_quantifier(pattern):
+                    raise ValueError(
+                        f"配置字段「{field.get('label') or field.get('key')}」的正则规则包含不安全的嵌套重复"
+                    )
                 try:
                     re.compile(pattern)
                 except re.error as exc:
@@ -152,6 +162,16 @@ class Card:
 
                 pattern = field.get("pattern")
                 if pattern:
+                    # Python's re engine has no match timeout. Keep generic card
+                    # fields bounded even when a plugin omitted max_length.
+                    if len(value) > 4096:
+                        raise ConfigValidationError(
+                            f"配置字段「{label}」用于正则校验的内容不能超过 4096 个字符"
+                        )
+                    if has_nested_unbounded_quantifier(str(pattern)):
+                        raise ConfigValidationError(
+                            f"配置字段「{label}」的正则规则包含不安全的嵌套重复"
+                        )
                     try:
                         matches = re.fullmatch(str(pattern), value) is not None
                     except re.error as exc:
