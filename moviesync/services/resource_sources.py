@@ -213,17 +213,22 @@ class ResourceSourceManager:
         self.logger = logger
         self.config_store = config_store
         self.registry = registry or CardRegistry()
-        self.sources: dict[str, ResourceSourceCard] = {}
         self.lock = RLock()
 
         # 默认资源源仅在未注册时加载；允许应用装配层预先注册卡片。
         if self.registry.get("telegram") is None:
             self.registry.register(TelegramResourceSource(telegram))
-        for card in self.registry.find_by_type("resource_source"):
-            if isinstance(card, ResourceSourceCard):
-                self.sources[card.card_id] = card
         for card in resource_cards or ():
             self.register(card)
+
+    @property
+    def sources(self) -> dict[str, ResourceSourceCard]:
+        """返回注册表中的当前资源源快照，避免保留已注销卡片的旧引用。"""
+        return {
+            card.card_id: card
+            for card in self.registry.find_by_type("resource_source")
+            if isinstance(card, ResourceSourceCard)
+        }
 
     def register(self, card: ResourceSourceCard, *, replace: bool = False) -> ResourceSourceCard:
         """注册资源来源卡片。第三方实现应由应用启动时的可信代码显式装配。"""
@@ -231,9 +236,7 @@ class ResourceSourceManager:
             raise TypeError("资源来源卡片必须继承 ResourceSourceCard")
         if card.card_type != "resource_source":
             raise ValueError("卡片类型必须是 resource_source")
-        registered = self.registry.register(card, replace=replace)
-        self.sources[registered.card_id] = registered
-        return registered
+        return self.registry.register(card, replace=replace)
 
     @staticmethod
     def _source_name(source: ResourceSourceCard) -> str:
