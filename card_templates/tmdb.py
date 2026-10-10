@@ -102,7 +102,7 @@ class TMDBMetadataCard(MetadataProviderCard):
         cache_key = (
             path,
             query.get("language", "zh-CN"),
-            hashlib.sha256(f"{credential_type}:{credential}".encode("utf-8")).hexdigest(),
+            hashlib.sha256(f"{credential_type}:{credential}".encode()).hexdigest(),
             tuple(sorted(cache_params.items())),
         )
         now = time.monotonic()
