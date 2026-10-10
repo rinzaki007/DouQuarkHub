@@ -5,6 +5,7 @@
 """
 from __future__ import annotations
 
+import math
 import secrets
 from functools import wraps
 from urllib.parse import urlparse
@@ -62,6 +63,16 @@ def _normalize_fid(
         )
 
     return fid
+
+
+def _task_sort_timestamp(item: dict) -> float:
+    """Sort task history safely when persisted timestamps are malformed."""
+    value = item.get("updated_at") or item.get("created_at") or 0
+    try:
+        timestamp = float(value)
+    except (TypeError, ValueError, OverflowError):
+        return 0.0
+    return timestamp if math.isfinite(timestamp) else 0.0
 
 
 def _subscription_task_state(sub: dict) -> dict:
@@ -1139,7 +1150,7 @@ def get_tasks():
             "phase_label": task_state["phase_label"],
         })
 
-    items.sort(key=lambda item: float(item.get("updated_at") or item.get("created_at") or 0), reverse=True)
+    items.sort(key=_task_sort_timestamp, reverse=True)
     return jsonify({"success": True, "tasks": items})
 
 
