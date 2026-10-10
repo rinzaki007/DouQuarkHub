@@ -94,6 +94,7 @@ async function loadTaskCategories() {
             destinationSelect.replaceChildren(new Option('请先选择转存位置', ''));
             destinationSelect.disabled = true;
         }
+        if (selectedCandidate) filterStorageTargetsForCandidate(selectedCandidate.candidate);
     } catch (error) {
         if (requestId !== taskCategorySequence) return;
         targetSelect.replaceChildren(new Option('读取转存位置失败', ''));
