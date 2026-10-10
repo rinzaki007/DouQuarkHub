@@ -2,10 +2,10 @@
 
 import pytest
 
-from moviesync.cards import Card, CardManifest, CardRegistry
 from card_templates.douban import DoubanMetadataCard
 from card_templates.quark import QuarkStorageCard
 from card_templates.telegram import TelegramResourceSource
+from moviesync.cards import Card, CardManifest, CardRegistry
 
 
 class DemoCard(Card):
@@ -95,7 +95,7 @@ def test_quark_storage_card_uses_storage_target_interface():
 
 def test_registry_contains_unified_card_manifest_contract():
     from card_templates.douban import DoubanMetadataCard
-    from moviesync.services.resource_sources import TelegramResourceSource
+    from card_templates.telegram import TelegramResourceSource
 
     assert DoubanMetadataCard.manifest.type == "metadata_provider"
     assert TelegramResourceSource.manifest.type == "resource_source"
