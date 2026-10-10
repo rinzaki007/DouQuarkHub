@@ -156,7 +156,6 @@ def create_app(
         "logs": recent_logs,
         "auth": auth,
         "config": config_store,
-        "douban": douban,
         "metadata": metadata,
         "notifications": notifications,
         "telegram": telegram,
