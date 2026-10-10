@@ -217,3 +217,52 @@ def test_metadata_manager_loads_installed_card_plugins_and_isolates_failures(mon
     assert registry.get("plugin-metadata").card_id == "plugin-metadata"
     assert received_context == context
     assert manager.list_movies() == [{"title": "plugin"}]
+
+
+def test_metadata_plugin_factory_closes_card_when_registration_fails(monkeypatch):
+    import logging
+
+    from moviesync.cards import CardManifest, CardRegistry, MetadataProviderCard
+    from moviesync.services import metadata as module
+    from moviesync.services.metadata import MetadataProviderManager
+
+    class ExistingProvider(MetadataProviderCard):
+        manifest = CardManifest(
+            id="duplicate-provider",
+            name="Existing",
+            type="metadata_provider",
+            capabilities=("metadata.list", "metadata.search", "metadata.detail"),
+        )
+
+        def list_movies(self, tag, sort_type):
+            return []
+
+        def search(self, query):
+            return []
+
+        def get_detail(self, item_id):
+            return None
+
+    class CandidateProvider(ExistingProvider):
+        def __init__(self):
+            self.closed = False
+
+        def close(self):
+            self.closed = True
+
+    candidate = CandidateProvider()
+
+    class EntryPoint:
+        name = "duplicate-provider-plugin"
+
+        def load(self):
+            return lambda context: candidate
+
+    monkeypatch.setattr(module, "entry_points", lambda group: [EntryPoint()])
+    registry = CardRegistry()
+    registry.register(ExistingProvider())
+    manager = MetadataProviderManager(registry, logging.getLogger("test.metadata.cleanup"))
+
+    assert manager.load_plugins() == []
+    assert candidate.closed is True
+    assert registry.get("duplicate-provider") is not candidate
