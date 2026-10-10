@@ -471,10 +471,9 @@ function movieDetailChase() {
 async function searchAndOpenCandidates(selectedMovies, requestedTargetId = null, keepModalOpen = false) {
     const requestId = ++candidateSearchRequestSeq;
     const storageTargetId = String(
-        requestedTargetId
-        ?? document.getElementById('batch-storage-target')?.value
-        ?? window.defaultStorageTargetId
-        ?? ''
+        requestedTargetId !== null
+            ? requestedTargetId
+            : (document.getElementById('batch-storage-target')?.value || window.defaultStorageTargetId || '')
     ).trim();
     if (!storageTargetId) {
         showToast('请先选择已启用的存储卡片，再搜索对应网盘资源', 'error');
