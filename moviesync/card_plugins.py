@@ -89,6 +89,10 @@ class CardFilePluginManager:
             source_blob = _git_blob_sha(source_content)
 
             if not destination.exists():
+                # A marker with no file means an administrator intentionally
+                # uninstalled this card. Only seed files on first installation.
+                if marker.exists():
+                    continue
                 try:
                     destination.write_bytes(source_content)
                     marker.write_text(source_blob, encoding="ascii")
