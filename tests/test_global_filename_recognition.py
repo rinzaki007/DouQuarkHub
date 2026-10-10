@@ -1,6 +1,6 @@
 """Tests for global filename recognition shared across resource sources."""
-from moviesync.cards import CardManifest, CardRegistry, FilenameProcessorCard
 from card_templates.filename_recognition import FilenameRecognitionCard
+from moviesync.cards import CardManifest, CardRegistry, FilenameProcessorCard
 from moviesync.services.filename_rules import parse_tv_episode
 from moviesync.services.resource_sources import ResourceSourceManager
 
@@ -59,7 +59,7 @@ def test_filename_processor_is_discovered_by_type_not_fixed_card_id():
                         "config": {
                             "magic_regex": {
                                 "pattern": "^Custom-Episode-([0-9]+)[.]mkv$",
-                                "replace": r"Show.S01E\\1.mkv",
+                                "replace": r"Show.S01E\1.mkv",
                             }
                         },
                     }
@@ -77,7 +77,6 @@ def test_filename_processor_is_discovered_by_type_not_fixed_card_id():
 def test_global_filename_card_rejects_invalid_regex():
     import pytest
 
-    from card_templates.filename_recognition import FilenameRecognitionCard
     from moviesync.errors import ConfigValidationError
 
     card = FilenameRecognitionCard()
