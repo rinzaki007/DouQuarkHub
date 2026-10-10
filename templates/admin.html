@@ -335,7 +335,7 @@
                         class="grid grid-cols-1 lg:grid-cols-2 gap-3"
                     >
                         <div class="glass-panel rounded-xl p-4 text-xs text-slate-500">
-                            正在正在读取卡片列表…
+                            正在读取卡片列表…
                         </div>
                     </div>
                 </div>
@@ -1163,21 +1163,27 @@
             document.getElementById("card-info-modal").classList.add("hidden");
         }
 
+        let cardsLoadSequence = 0;
+
         async function loadCards() {
+            const requestId = ++cardsLoadSequence;
             try {
                 const resp = await apiFetch("/api/cards");
                 const result = await resp.json();
-                if (!result.success) throw new Error(result.message || "读取卡片列表失败");
-                window.moviesyncCards = result.cards || [];
+                if (requestId !== cardsLoadSequence) return;
+                if (!resp.ok || !result.success) throw new Error(result.message || "读取卡片列表失败");
+                window.moviesyncCards = Array.isArray(result.cards) ? result.cards : [];
                 renderCards(window.moviesyncCards);
-                renderFileCardPlugins(result.file_plugins || []);
-                document.getElementById("cards-summary").classList.remove("text-amber-300");
+                renderFileCardPlugins(Array.isArray(result.file_plugins) ? result.file_plugins : []);
+                const summary = document.getElementById("cards-summary");
+                summary.classList.remove("text-amber-300");
+                summary.textContent = "已加载 " + window.moviesyncCards.length + " 张卡片";
                 if (Array.isArray(result.warnings) && result.warnings.length) {
-                    const summary = document.getElementById("cards-summary");
                     summary.textContent += " · " + result.warnings.join(" ");
                     summary.classList.add("text-amber-300");
                 }
             } catch (error) {
+                if (requestId !== cardsLoadSequence) return;
                 document.getElementById("cards-summary").textContent = "读取卡片列表失败";
                 document.getElementById("cards-list").innerHTML = '<div class="glass-panel rounded-xl p-4 text-xs text-rose-300 lg:col-span-2">' + escapeHtml(error.message || "读取卡片列表失败") + "</div>";
             }
@@ -1350,10 +1356,15 @@
             });
         }
 
+        let genericCardRequestSequence = 0;
+
         async function openGenericCard(cardId) {
+            const requestId = ++genericCardRequestSequence;
             try {
-                const result = await (await apiFetch("/api/cards/" + encodeURIComponent(cardId) + "/config")).json();
-                if (!result.success) throw new Error(result.message || "读取卡片配置失败");
+                const response = await apiFetch("/api/cards/" + encodeURIComponent(cardId) + "/config");
+                const result = await response.json();
+                if (requestId !== genericCardRequestSequence) return;
+                if (!response.ok || !result.success) throw new Error(result.message || "读取卡片配置失败");
                 const card = (window.moviesyncCards || []).find(item => item.id === cardId) || {id: cardId};
                 currentGenericCard = {id: cardId, fields: result.fields || [], enabled: result.enabled !== false, type: card.type};
                 document.getElementById("generic-card-disable-warning").classList.toggle("hidden", card.type !== "storage_target");
@@ -1366,11 +1377,12 @@
                 document.getElementById("generic-card-health").classList.add("hidden");
                 document.getElementById("generic-card-modal").classList.remove("hidden");
             } catch (error) {
-                alert(error.message || "读取卡片配置失败");
+                if (requestId === genericCardRequestSequence) alert(error.message || "读取卡片配置失败");
             }
         }
 
         function closeGenericCard() {
+            genericCardRequestSequence++;
             document.getElementById("generic-card-modal").classList.add("hidden");
             currentGenericCard = null;
         }
