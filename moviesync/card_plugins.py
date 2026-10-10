@@ -28,15 +28,44 @@ _MAX_PLUGIN_BYTES = 256 * 1024
 class CardFilePluginManager:
     """Manage one trusted card factory per Python file under the data directory."""
 
-    def __init__(self, plugin_dir: Path, registry: CardRegistry, logger):
+    def __init__(
+        self,
+        plugin_dir: Path,
+        registry: CardRegistry,
+        logger,
+        bundled_dir: Path | None = None,
+    ):
         self.plugin_dir = Path(plugin_dir).resolve()
         self.registry = registry
         self.logger = logger
         self.plugin_dir.mkdir(parents=True, exist_ok=True)
+        self._seed_bundled_cards(Path(bundled_dir).resolve() if bundled_dir else None)
         self._lock = RLock()
         self._loaded: dict[str, tuple[str, str]] = {}
         self._errors: dict[str, str] = {}
         self._context: dict[str, Any] = {}
+
+    def _seed_bundled_cards(self, bundled_dir: Path | None) -> None:
+        """Copy bundled examples once into persistent storage; deletions stay deleted."""
+        if bundled_dir is None or not bundled_dir.is_dir():
+            return
+        marker_dir = self.plugin_dir / ".seeded"
+        marker_dir.mkdir(parents=True, exist_ok=True)
+        for source in sorted(bundled_dir.glob("*.py")):
+            try:
+                filename = self.validate_filename(source.name)
+            except ValueError:
+                continue
+            marker = marker_dir / f"{filename}.seeded"
+            if marker.exists():
+                continue
+            destination = self.plugin_dir / filename
+            try:
+                if not destination.exists():
+                    destination.write_bytes(source.read_bytes())
+                marker.touch(exist_ok=True)
+            except OSError:
+                self.logger.exception("初始化内置卡片文件 %s 失败", filename)
 
     @staticmethod
     def validate_filename(filename: str) -> str:
@@ -98,7 +127,8 @@ class CardFilePluginManager:
                 card = factory(dict(context if context is not None else self._context))
                 self._validate_card(card, name)
                 self.registry.register(card)
-            except Exception:
+            except Exception as exc:
+                self._errors[name] = str(exc)[:300]
                 sys.modules.pop(module_name, None)
                 raise
             self._loaded[name] = (card.card_id, module_name)
@@ -151,6 +181,7 @@ class CardFilePluginManager:
                 return self.load_file(name, self._context)
             except Exception:
                 path.unlink(missing_ok=True)
+                self._errors.pop(name, None)
                 raise
 
     def uninstall(self, filename: str) -> dict[str, str]:
