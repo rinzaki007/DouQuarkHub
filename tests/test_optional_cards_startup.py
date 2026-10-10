@@ -4,12 +4,9 @@ from moviesync import app as app_module
 
 
 def _create_test_app(tmp_path, monkeypatch):
-    # Exercise a genuinely empty card directory instead of auto-seeding bundled cards.
-    monkeypatch.setattr(
-        app_module.CardFilePluginManager,
-        "_seed_bundled_cards",
-        lambda self, bundled_dir: None,
-    )
+    # Production defaults to an empty card directory; existing tests that need
+    # bundled cards opt in through tests/conftest.py.
+    monkeypatch.setenv("MOVIESYNC_AUTO_INSTALL_BUNDLED_CARDS", "0")
     return app_module.create_app(
         {"MOVIESYNC_DATA_DIR": str(tmp_path)},
         start_scheduler=False,
