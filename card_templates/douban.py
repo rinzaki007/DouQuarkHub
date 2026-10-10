@@ -1,10 +1,10 @@
-"""内置豆瓣元数据卡片。"""
+"""Standalone Douban metadata-provider card shipped as one Python file."""
 from __future__ import annotations
 
 from typing import Any
 
-from .cards import CardManifest, MetadataProviderCard
-from .clients.douban import DoubanClient
+from moviesync.cards import CardManifest, MetadataProviderCard
+from moviesync.clients.douban import DoubanClient
 
 
 class DoubanMetadataCard(MetadataProviderCard):
@@ -28,3 +28,8 @@ class DoubanMetadataCard(MetadataProviderCard):
 
     def get_detail(self, item_id: str) -> dict[str, Any] | None:
         return None
+
+
+def create_card(context):
+    """Create the metadata card using the shared Douban client."""
+    return DoubanMetadataCard(context["douban"])

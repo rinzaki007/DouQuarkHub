@@ -13,8 +13,7 @@ from flask import Flask, session
 
 from .auth import AuthStore
 from .card_plugins import CardFilePluginManager
-from .cards import CardRegistry, QuarkStorageCard
-from .cards_metadata import DoubanMetadataCard
+from .cards import CardRegistry
 from .clients.douban import DoubanClient
 from .clients.http import HttpClient
 from .clients.telegram import TelegramClient
@@ -73,8 +72,19 @@ def create_app(
     douban = DoubanClient()
     telegram = TelegramClient()
     card_registry = CardRegistry()
+    file_card_plugins = CardFilePluginManager(
+        settings.data_dir / "cards",
+        card_registry,
+        logger,
+        PROJECT_ROOT / "card_templates",
+    )
+    file_card_plugins.load_all({
+        "telegram": telegram,
+        "douban": douban,
+        "config_store": config_store,
+        "logger": logger,
+    })
     resource_sources = ResourceSourceManager(
-        telegram,
         config_store,
         logger,
         registry=card_registry,
@@ -84,8 +94,6 @@ def create_app(
         "config_store": config_store,
         "logger": logger,
     })
-    card_registry.register(QuarkStorageCard(config_store))
-    card_registry.register(DoubanMetadataCard(douban))
     metadata = MetadataProviderManager(card_registry, logger, config_store=config_store)
     metadata.load_plugins({
         "config_store": config_store,
@@ -102,18 +110,6 @@ def create_app(
     })
     notifications = NotificationManager(card_registry, logger, config_store=config_store)
     notifications.load_plugins({
-        "config_store": config_store,
-        "logger": logger,
-    })
-    file_card_plugins = CardFilePluginManager(
-        settings.data_dir / "cards",
-        card_registry,
-        logger,
-        PROJECT_ROOT / "card_templates",
-    )
-    file_card_plugins.load_all({
-        "telegram": telegram,
-        "douban": douban,
         "config_store": config_store,
         "logger": logger,
     })
