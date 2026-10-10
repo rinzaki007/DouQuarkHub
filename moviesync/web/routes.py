@@ -1534,8 +1534,26 @@ def proxy_img():
             if content_type not in allowed_image_types:
                 return Response("Not an image", status=415)
 
+            max_image_bytes = 12 * 1024 * 1024
+            try:
+                declared_size = int(response.headers.get("Content-Length") or 0)
+            except (TypeError, ValueError):
+                declared_size = 0
+            if declared_size > max_image_bytes:
+                return Response("Image too large", status=413)
+
+            chunks = []
+            total_size = 0
+            for chunk in response.iter_content(chunk_size=16 * 1024):
+                if not chunk:
+                    continue
+                total_size += len(chunk)
+                if total_size > max_image_bytes:
+                    return Response("Image too large", status=413)
+                chunks.append(chunk)
+
             return Response(
-                response.iter_content(chunk_size=16 * 1024),
+                b"".join(chunks),
                 content_type=content_type,
                 headers={"Cache-Control": "public, max-age=86400"},
             )
