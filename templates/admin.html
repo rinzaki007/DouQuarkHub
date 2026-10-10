@@ -1,5 +1,5 @@
 <!-- MovieSync 管理后台
-     用途：管理夸克 Cookie、FID、OpenList、Telegram 频道、日志和管理员账号安全。
+     用途：管理通用卡片、OpenList、日志和管理员账号安全。
      维护说明：账号修改成功后服务端会清理 Session，用户需要重新登录；本页包含账户安全输入框的深色兼容样式。 -->
 <!DOCTYPE html>
 <html lang="zh-CN">
@@ -942,20 +942,6 @@
                         cfg.openlist_url || '';
 
 
-                    const telegramConfig =
-                        cfg.cards &&
-                        cfg.cards.telegram &&
-                        cfg.cards.telegram.config
-                            ? cfg.cards.telegram.config
-                            : {};
-
-                    tgChannels =
-                        Array.isArray(telegramConfig.channels)
-                            ? telegramConfig.channels
-                            : [];
-
-                    renderTGChannels();
-
                 }
 
             } catch (err) {
@@ -1415,8 +1401,6 @@
         }
 
         /* Card-specific configuration is driven by the generic Manifest editor. */
-
-        let tgChannels = [];
 
         /* ==========================================================
            日志
