@@ -589,3 +589,16 @@ def test_private_key_config_empty_submission_preserves_saved_secret(tmp_path):
     assert response.status_code == 200
     assert services["config"].load()["cards"]["private-key-source"]["config"]["private_key"] == "KEEP_ME"
     assert "KEEP_ME" not in response.get_data(as_text=True)
+
+
+
+def test_card_config_routes_are_generic_and_do_not_register_builtin_card_endpoints():
+    from moviesync.app import create_app
+
+    app = create_app({"MOVIESYNC_DATA_DIR": "/tmp/moviesync-generic-card-routes"}, start_scheduler=False)
+    rules = {rule.rule for rule in app.url_map.iter_rules()}
+
+    assert "/api/cards/<card_id>/config" in rules
+    assert "/api/cards/<card_id>/check" in rules
+    assert "/api/cards/quark/config" not in rules
+    assert "/api/cards/telegram/config" not in rules
