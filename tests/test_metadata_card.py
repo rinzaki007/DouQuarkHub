@@ -266,3 +266,24 @@ def test_metadata_plugin_factory_closes_card_when_registration_fails(monkeypatch
     assert manager.load_plugins() == []
     assert candidate.closed is True
     assert registry.get("duplicate-provider") is not candidate
+
+
+
+def test_metadata_image_policy_uses_card_manifest_hosts_not_provider_ids():
+    from types import SimpleNamespace
+
+    from moviesync.web.routes import _metadata_image_policy
+
+    card = SimpleNamespace(
+        manifest=SimpleNamespace(
+            image_hosts=("example-cdn.test",),
+            image_referer="https://metadata.example.test/",
+        )
+    )
+
+    assert _metadata_image_policy("https://img.example-cdn.test/poster.jpg", [card]) == {
+        "referer": "https://metadata.example.test/"
+    }
+    assert _metadata_image_policy("http://img.example-cdn.test/poster.jpg", [card]) is None
+    assert _metadata_image_policy("https://example-cdn.test:8443/poster.jpg", [card]) is None
+    assert _metadata_image_policy("https://evil.test/poster.jpg", [card]) is None
