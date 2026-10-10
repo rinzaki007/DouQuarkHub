@@ -245,21 +245,77 @@ class ResourceSourceManager:
                     }
 
             results.append(result)
-            update_health = getattr(self.config_store, "update_resource_source_health", None)
-            if callable(update_health):
-                try:
-                    update_health(
-                        source_id,
-                        result["status"],
-                        result.get("message", ""),
-                        result.get("channels"),
-                    )
-                except Exception:
-                    # Persisting one card's health must not prevent checking the
-                    # remaining sources or returning the already-computed results.
-                    self.logger.exception("保存资源源 %s 健康状态失败", source_id)
+            try:
+                self._save_health(source_id, result)
+            except Exception:
+                # Persisting one card's health must not prevent checking the
+                # remaining sources or returning the already-computed results.
+                self.logger.exception("保存资源源 %s 健康状态失败", source_id)
 
         return results
 
+    def _save_health(self, source_id: str, result: dict[str, Any]) -> None:
+        """Persist health on the matching card, without assuming a built-in source ID."""
+        saver = getattr(self.config_store, "save_card_config", None)
+        if callable(saver):
+            config = self.config_store.load()
+            saved = self._card_config(config, source_id)
+            health = dict(saved.get("health") or {})
+            import time
+
+            now = time.time()
+            health["status"] = str(result.get("status") or "unknown")
+            health["message"] = str(result.get("message") or "")[:200]
+            health["last_checked_at"] = now
+            if isinstance(result.get("channels"), list):
+                health["channels"] = [
+                    {
+                        "id": str(item.get("id") or ""),
+                        "name": str(item.get("name") or ""),
+                        "status": str(item.get("status") or "unknown"),
+                        "message": str(item.get("message") or "")[:200],
+                    }
+                    for item in result["channels"]
+                    if isinstance(item, dict)
+                ]
+            if result.get("status") == "healthy":
+                health["last_success_at"] = now
+            elif result.get("status") == "unavailable":
+                try:
+                    failures = int(health.get("failure_count", 0) or 0)
+                except (TypeError, ValueError, OverflowError):
+                    failures = 0
+                health["failure_count"] = max(0, failures) + 1
+            saver(source_id, {"health": health})
+            return
+
+        # Compatibility for test doubles and older ConfigStore-like adapters.
+        updater = getattr(self.config_store, "update_resource_source_health", None)
+        if callable(updater):
+            updater(
+                source_id,
+                result.get("status", "unknown"),
+                result.get("message", ""),
+                result.get("channels"),
+            )
+
     def get_status(self) -> list[dict[str, Any]]:
-        return self.config_store.get_resource_sources()
+        """Return health status for every loaded resource card."""
+        config = self.config_store.load()
+        cards = config.get("cards") if isinstance(config, dict) else {}
+        statuses = []
+        for source_id, source in self.sources.items():
+            saved = cards.get(source_id, {}) if isinstance(cards, dict) else {}
+            saved = saved if isinstance(saved, dict) else {}
+            card_config = saved.get("config", {})
+            card_config = card_config if isinstance(card_config, dict) else {}
+            health = card_config.get("health", {})
+            health = dict(health) if isinstance(health, dict) else {}
+            statuses.append({
+                "id": source_id,
+                "name": self._source_name(source),
+                "type": self._source_type(source),
+                "enabled": bool(saved.get("enabled", True)),
+                "health": health,
+            })
+        return statuses

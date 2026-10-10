@@ -1057,7 +1057,7 @@ def search_candidates():
             _services()["logger"].exception("资源检索失败: %s", title)
             return _json_error("资源检索暂时失败，请稍后重试；若持续出现，请查看服务日志", 502)
 
-    source_status = config.get_resource_sources()
+    source_status = _services()["resource_sources"].get_status()
     unavailable_sources = [
         item.get("name", item.get("id", "未知来源"))
         for item in source_status
