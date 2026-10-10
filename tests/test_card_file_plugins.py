@@ -201,3 +201,51 @@ def test_uninstall_rejects_cards_referenced_by_subscriptions(
     assert "自动追剧订阅" in response.get_json()["message"]
     assert (tmp_path / "cards" / f"{card_id}.py").is_file()
     assert services["card_registry"].get(card_id) is not None
+
+def test_cards_api_uses_card_interface_for_configuration_status(tmp_path):
+    """The platform should not special-case card IDs to determine configured state."""
+    from moviesync.app import create_app
+    from moviesync.cards import Card, CardManifest
+
+    app = create_app({"MOVIESYNC_DATA_DIR": str(tmp_path)}, start_scheduler=False)
+    services = app.extensions["moviesync"]
+
+    class CustomConfiguredCard(Card):
+        manifest = CardManifest(
+            id="custom-configured",
+            name="Custom Configured",
+            type="custom",
+            config_fields=({"key": "endpoint", "label": "Endpoint", "required": True},),
+        )
+
+    services["card_registry"].register(CustomConfiguredCard())
+    services["config"].save_card_config(
+        "custom-configured", {"endpoint": "https://example.invalid"}
+    )
+
+    response = app.test_client().get("/api/cards")
+    assert response.status_code == 200
+    cards = response.get_json()["cards"]
+    custom = next(item for item in cards if item["id"] == "custom-configured")
+    assert custom["configured"] is True
+    assert custom["health"]["status"] == "configured"
+
+
+def test_cards_api_does_not_treat_quark_default_fid_as_configuration(tmp_path):
+    from moviesync.app import create_app
+
+    app = create_app({"MOVIESYNC_DATA_DIR": str(tmp_path)}, start_scheduler=False)
+    cards = app.test_client().get("/api/cards").get_json()["cards"]
+    quark = next(item for item in cards if item["id"] == "quark")
+    assert quark["configured"] is False
+    assert quark["health"]["status"] == "unconfigured"
+
+
+def test_cards_api_does_not_treat_telegram_regex_defaults_as_configuration(tmp_path):
+    from moviesync.app import create_app
+
+    app = create_app({"MOVIESYNC_DATA_DIR": str(tmp_path)}, start_scheduler=False)
+    cards = app.test_client().get("/api/cards").get_json()["cards"]
+    telegram = next(item for item in cards if item["id"] == "telegram")
+    assert telegram["configured"] is False
+    assert telegram["health"]["status"] == "unconfigured"
