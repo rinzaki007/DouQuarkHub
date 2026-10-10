@@ -246,6 +246,14 @@ class Card:
 
         return normalized
 
+    def validate_enabled_config(self, config: dict[str, Any]) -> None:
+        """Validate cross-field requirements before a card is enabled.
+
+        Cards with alternative credentials or other conditional requirements can
+        override this hook. The default keeps existing cards' behavior unchanged.
+        """
+        return None
+
     def close(self) -> None:
         """应用退出时释放卡片资源。默认无需处理。"""
         return None
