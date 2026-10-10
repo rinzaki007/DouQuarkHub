@@ -10,6 +10,7 @@ RUN git init . \
     && git remote add origin https://github.com/fish2018/pansou.git \
     && git fetch --depth 1 origin "${PANSOU_REF}" \
     && git checkout --detach FETCH_HEAD
+RUN mkdir -p /out
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} \
     go build -trimpath -ldflags="-s -w -extldflags '-static'" -o /out/pansou .
 RUN mkdir -p /out/licenses && cp LICENSE /out/licenses/PanSou-LICENSE
