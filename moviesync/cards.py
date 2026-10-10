@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import logging
 import re
 from copy import deepcopy
 from dataclasses import dataclass
@@ -506,20 +507,47 @@ class CardRegistry:
         self._cards: dict[str, Card] = {}
         self.lock = RLock()
 
+    def _close_card(self, card: Card) -> None:
+        """释放卡片资源；单张卡片的清理失败不应影响注册表操作。"""
+        try:
+            card.close()
+        except Exception:
+            logging.getLogger(__name__).exception(
+                "关闭卡片 %s 失败",
+                card.card_id,
+            )
+
     def register(self, card: Card, *, replace: bool = False) -> Card:
         if not isinstance(card, Card):
             raise TypeError("只能注册 Card 实例")
 
         card_id = card.card_id
         with self.lock:
-            if card_id in self._cards and not replace:
+            previous = self._cards.get(card_id)
+            if previous is not None and not replace:
                 raise ValueError(f"卡片已注册: {card_id}")
             self._cards[card_id] = card
+
+        # Do not call third-party cleanup code while holding the registry lock.
+        if previous is not None and previous is not card:
+            self._close_card(previous)
         return card
 
     def unregister(self, card_id: str) -> Card | None:
         with self.lock:
-            return self._cards.pop(str(card_id), None)
+            card = self._cards.pop(str(card_id), None)
+        if card is not None:
+            self._close_card(card)
+        return card
+
+    def close_all(self) -> None:
+        """移除并关闭全部已注册卡片，逐张隔离清理异常。"""
+        with self.lock:
+            cards = list(self._cards.values())
+            self._cards.clear()
+
+        for card in cards:
+            self._close_card(card)
 
     def get(self, card_id: str) -> Card | None:
         with self.lock:
