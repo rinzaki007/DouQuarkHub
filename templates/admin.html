@@ -1280,6 +1280,24 @@
                 let control = "";
                 if (type === "boolean") {
                     control = '<label class="flex items-center gap-2 mt-2 text-xs text-slate-300"><input type="checkbox" ' + common + (value ? ' checked' : '') + ' class="h-4 w-4 accent-blue-500">启用</label>';
+                } else if (type === "json" && field.editor === "object_list") {
+                    const items = Array.isArray(value) ? value : [];
+                    const itemFields = Array.isArray(field.item_fields) ? field.item_fields : [];
+                    const rows = items.map(item => '<div data-card-list-row class="grid grid-cols-1 sm:grid-cols-2 gap-2 rounded-lg border border-slate-800 p-3">' +
+                        itemFields.map(sub => '<label class="block min-w-0 text-[10px] text-slate-400">' + escapeHtml(sub.label || sub.key) +
+                            '<input data-card-item-field="' + escapeHtml(sub.key) + '" value="' + escapeHtml(item && item[sub.key] != null ? item[sub.key] : '') +
+                            '" placeholder="' + escapeHtml(sub.placeholder || '') + '" class="glass-input mt-1 w-full rounded-lg border border-slate-800 px-3 py-2 text-xs text-slate-200"></label>').join('') +
+                        '<div class="sm:col-span-2 flex justify-end"><button type="button" data-card-remove-row class="text-[11px] text-rose-300 hover:text-rose-200">移除此频道</button></div></div>').join('');
+                    control = '<div data-card-structured-list="' + escapeHtml(key) + '" class="mt-2 space-y-2">' + rows + '</div>' +
+                        '<button type="button" data-card-add-row class="mt-2 rounded-lg border border-slate-700 px-3 py-2 text-[11px] text-slate-300 hover:bg-slate-800">＋ 添加频道</button>';
+                } else if (type === "json" && field.editor === "object_fields") {
+                    const objectValue = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+                    const itemFields = Array.isArray(field.item_fields) ? field.item_fields : [];
+                    control = '<div data-card-structured-object="' + escapeHtml(key) + '" class="mt-2 space-y-2">' +
+                        itemFields.map(sub => '<label class="block text-[10px] text-slate-400">' + escapeHtml(sub.label || sub.key) +
+                            '<input data-card-item-field="' + escapeHtml(sub.key) + '" value="' + escapeHtml(objectValue[sub.key] ?? '') +
+                            '" placeholder="' + escapeHtml(sub.placeholder || '') + '" class="glass-input mt-1 w-full rounded-lg border border-slate-800 px-3 py-2 text-xs text-slate-200"></label>').join('') +
+                        '</div>';
                 } else if (type === "json") {
                     let jsonValue = "";
                     try { jsonValue = JSON.stringify(value ?? {}, null, 2); } catch (_) { jsonValue = "{}"; }
@@ -1298,6 +1316,24 @@
                 wrapper.className = "min-w-0 rounded-xl border border-slate-800 bg-slate-900/30 p-3";
                 wrapper.innerHTML = '<label class="block text-[11px] font-semibold text-slate-300">' + escapeHtml(field.label || key) + requiredMark + sensitiveMark + savedMark + '</label>' +
                     (field.description ? '<p class="mt-1 text-[10px] leading-4 text-slate-500">' + escapeHtml(field.description) + '</p>' : '') + control;
+                wrapper.addEventListener("click", event => {
+                    if (event.target.closest("[data-card-add-row]")) {
+                        const list = wrapper.querySelector('[data-card-structured-list="' + CSS.escape(key) + '"]');
+                        const itemFields = Array.isArray(field.item_fields) ? field.item_fields : [];
+                        if (list) {
+                            const row = document.createElement("div");
+                            row.setAttribute("data-card-list-row", "");
+                            row.className = "grid grid-cols-1 sm:grid-cols-2 gap-2 rounded-lg border border-slate-800 p-3";
+                            row.innerHTML = itemFields.map(sub => '<label class="block min-w-0 text-[10px] text-slate-400">' + escapeHtml(sub.label || sub.key) +
+                                '<input data-card-item-field="' + escapeHtml(sub.key) + '" value="" placeholder="' + escapeHtml(sub.placeholder || '') +
+                                '" class="glass-input mt-1 w-full rounded-lg border border-slate-800 px-3 py-2 text-xs text-slate-200"></label>').join('') +
+                                '<div class="sm:col-span-2 flex justify-end"><button type="button" data-card-remove-row class="text-[11px] text-rose-300 hover:text-rose-200">移除此频道</button></div>';
+                            list.appendChild(row);
+                        }
+                    } else if (event.target.closest("[data-card-remove-row]")) {
+                        event.target.closest("[data-card-list-row]")?.remove();
+                    }
+                });
                 container.appendChild(wrapper);
             });
         }
@@ -1337,7 +1373,25 @@
                 const type = input.dataset.cardType || field.type || "string";
                 let value;
                 if (type === "boolean") value = input.checked;
-                else if (type === "json") {
+                else if (type === "json" && field.editor === "object_list") {
+                    const list = document.querySelector('[data-card-structured-list="' + CSS.escape(key) + '"]');
+                    const itemFields = Array.isArray(field.item_fields) ? field.item_fields : [];
+                    value = list ? Array.from(list.querySelectorAll("[data-card-list-row]")).map(row => {
+                        const item = {};
+                        for (const sub of itemFields) {
+                            const control = row.querySelector('[data-card-item-field="' + CSS.escape(String(sub.key)) + '"]');
+                            if (control && control.value.trim()) item[sub.key] = control.value.trim();
+                        }
+                        return item;
+                    }).filter(item => Object.keys(item).length > 0) : [];
+                } else if (type === "json" && field.editor === "object_fields") {
+                    const object = document.querySelector('[data-card-structured-object="' + CSS.escape(key) + '"]');
+                    value = {};
+                    if (object) object.querySelectorAll("[data-card-item-field]").forEach(control => {
+                        if (control.value.trim()) value[control.dataset.cardItemField] = control.value.trim();
+                        else value[control.dataset.cardItemField] = "";
+                    });
+                } else if (type === "json") {
                     try { value = JSON.parse(input.value || (field.default === undefined ? "{}" : JSON.stringify(field.default))); }
                     catch (_) { throw new Error("配置字段「" + (field.label || key) + "」不是有效 JSON"); }
                     if (!value || typeof value !== "object") throw new Error("配置字段「" + (field.label || key) + "」必须是 JSON 对象或数组");
