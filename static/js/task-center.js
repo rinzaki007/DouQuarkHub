@@ -385,7 +385,7 @@ async function searchTaskCandidates() {
     try {
         const resp = await apiFetchTask('/api/search-candidates', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({movies:[{title:title,tag:'电视剧'}]})});
         const res = await resp.json();
-        if (!res.success) throw new Error(res.message || '检索失败');
+        if (!res.success) throw new Error(res.message || '搜索失败');
         const candidates = (res.candidates_map || {})[title] || [];
         if (!candidates.length) {
             box.innerHTML = '<div class="rounded-xl border border-amber-900/50 bg-amber-950/20 p-5 text-center text-xs text-amber-300">没有找到匹配资源，请换一个剧名或检查频道配置。</div>';
