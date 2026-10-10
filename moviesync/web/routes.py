@@ -1095,12 +1095,13 @@ def search_candidates():
         )
 
         try:
+            search_movie = dict(movie) if isinstance(movie, dict) else {"title": str(movie)}
+            search_movie["storage_target_id"] = storage_target_id
             candidates_map[
                 title
             ] = service.search_movie_candidates(
-                movie,
+                search_movie,
                 config.load(),
-                storage_target_id=storage_target_id,
             )
         except Exception:
             _services()["logger"].exception("资源检索失败: %s", title)
