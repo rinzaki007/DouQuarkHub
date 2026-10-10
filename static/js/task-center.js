@@ -263,7 +263,7 @@ function renderTaskDetail(task) {
     title.textContent = task.title || '任务详情';
     const phases = task.type === 'subscription'
         ? [
-            ['searching','搜刮频道资源'],
+            ['searching','搜索资源来源'],
             ['resolve','解析新资源'],
             ['transfer','转存新资源'],
             ['completed','检查完成']
@@ -294,7 +294,7 @@ function renderTaskDetail(task) {
         }).join('') +
         '</div></div>' +
         '<div class="grid gap-3 sm:grid-cols-2">' +
-        '<div class="rounded-xl border border-slate-800 bg-slate-950 p-4"><div class="text-[10px] text-slate-500">资源信息</div><div class="mt-2 space-y-1 text-[11px] text-slate-300"><div>频道：' + escapeTask(task.source_channel || '—') + '</div><div>分享码：<span class="font-mono">' + escapeTask(task.share_code || '—') + '</span></div><div>文件数：' + Number(task.total || 0) + '</div></div></div>' +
+        '<div class="rounded-xl border border-slate-800 bg-slate-950 p-4"><div class="text-[10px] text-slate-500">资源信息</div><div class="mt-2 space-y-1 text-[11px] text-slate-300"><div>资源来源：' + escapeTask(task.source_channel || '—') + '</div><div>分享码：<span class="font-mono">' + escapeTask(task.share_code || '—') + '</span></div><div>文件数：' + Number(task.total || 0) + '</div></div></div>' +
         '<div class="rounded-xl border border-slate-800 bg-slate-950 p-4"><div class="text-[10px] text-slate-500">执行统计</div><div class="mt-2 space-y-1 text-[11px] text-slate-300"><div>成功：' + Number(task.success_count || 0) + '</div><div>跳过：' + Number(task.skipped_count || 0) + '</div><div>失败：' + Number(task.failed_count || 0) + '</div></div></div>' +
         '</div>' +
         '<div class="rounded-xl border border-slate-800 bg-slate-950 p-4"><div class="text-xs font-semibold text-slate-200">当前状态</div><div class="mt-2 text-[11px] leading-5 ' + (task.status === 'failed' ? 'text-rose-400' : 'text-slate-400') + '">' + escapeTask(task.message || '') + '</div></div>' +
@@ -388,7 +388,7 @@ async function searchTaskCandidates() {
         if (!res.success) throw new Error(res.message || '搜索失败');
         const candidates = (res.candidates_map || {})[title] || [];
         if (!candidates.length) {
-            box.innerHTML = '<div class="rounded-xl border border-amber-900/50 bg-amber-950/20 p-5 text-center text-xs text-amber-300">没有找到匹配资源，请换一个剧名或检查频道配置。</div>';
+            box.innerHTML = '<div class="rounded-xl border border-amber-900/50 bg-amber-950/20 p-5 text-center text-xs text-amber-300">没有找到匹配资源，请换个剧名，或检查已启用的资源来源。</div>';
             return;
         }
         document.getElementById('candidate-hint').textContent = '找到 ' + candidates.length + ' 个可用源';
@@ -436,7 +436,7 @@ async function searchTaskCandidates() {
                     document.getElementById('task-submit').disabled = !enabled;
                     document.getElementById('task-submit').classList.toggle('opacity-40', !enabled);
                     document.getElementById('task-form-status').textContent = enabled
-                        ? '已选择 ' + selected.size + ' 集；后续频道新增集数仍会自动追更。'
+                        ? '已选择 ' + selected.size + ' 集；后续有新集时，系统会继续检查并自动转存。'
                         : '至少选择 1 集作为首次处理基线。';
                 }
             };
@@ -457,18 +457,18 @@ async function searchTaskCandidates() {
                 this.textContent='已选择';
                 document.getElementById('task-submit').disabled=false;
                 document.getElementById('task-submit').classList.remove('opacity-40');
-                document.getElementById('task-form-status').textContent='已选择 ' + selectedFids.size + ' 集；后续频道新增集数仍会自动追更。';
+                document.getElementById('task-form-status').textContent='已选择 ' + selectedFids.size + ' 集；后续有新集时，系统会继续检查并自动转存。';
             };
             box.appendChild(row);
         });
 
     } catch (err) {
-        box.innerHTML = '<div class="rounded-xl border border-rose-900/50 bg-rose-950/20 p-5 text-xs text-rose-300">检索失败：' + escapeTask(err.message) + '</div>';
+        box.innerHTML = '<div class="rounded-xl border border-rose-900/50 bg-rose-950/20 p-5 text-xs text-rose-300">搜索失败：' + escapeTask(err.message) + '</div>';
     }
 }
 
 async function createTask() {
-    if (!selectedCandidate) return taskToast('请先选择一个资源源');
+    if (!selectedCandidate) return taskToast('请先选择一个资源来源');
     const title = document.getElementById('task-title').value.trim();
     const selectedFids = selectedCandidate.selectedFids || new Set();
     const files = (selectedCandidate.candidate.files || [])
