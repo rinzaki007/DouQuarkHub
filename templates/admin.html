@@ -1053,35 +1053,48 @@
 
         const CARD_CATEGORY_META = {
             resource_source: {
-                title: "资源来源",
-                description: "负责发现和搜刮资源，例如 Telegram 频道。",
+                title: "资源搜索来源",
+                description: "负责从频道或其他来源查找影视资源。",
                 icon: "fa-tower-broadcast",
             },
             storage_target: {
-                title: "存储目标",
-                description: "负责解析、建目录和转存资源，例如 Quark 网盘。",
+                title: "转存位置",
+                description: "负责选择网盘、创建目录并保存文件。",
                 icon: "fa-hard-drive",
             },
             metadata_provider: {
-                title: "媒体信息",
-                description: "负责影片搜索、资料和元数据，例如豆瓣。",
+                title: "影视资料",
+                description: "负责搜索影视名称、海报和影片介绍。",
                 icon: "fa-film",
             },
             notification: {
-                title: "通知服务",
-                description: "负责向外部渠道发送任务或系统通知。",
+                title: "消息通知",
+                description: "负责把任务结果或系统消息发送给你。",
                 icon: "fa-bell",
             },
             automation: {
-                title: "自动化",
-                description: "负责定时任务、订阅和其它自动化能力。",
+                title: "自动任务",
+                description: "负责按计划自动检查和处理任务。",
                 icon: "fa-clock",
             },
             custom: {
-                title: "其它能力",
-                description: "暂未归类的扩展卡片。",
+                title: "其他功能",
+                description: "提供其他额外功能的卡片。",
                 icon: "fa-puzzle-piece",
             },
+        };
+
+        const CARD_CAPABILITY_LABELS = {
+            "resource.search": "搜索资源",
+            "resource.health_check": "检查连接",
+            "storage.transfer": "转存文件",
+            "storage.list": "查看文件",
+            "storage.destinations": "选择保存位置",
+            "metadata.search": "搜索影视",
+            "metadata.detail": "查看影视详情",
+            "metadata.list": "浏览影视",
+            "notification.send": "发送通知",
+            "automation.run": "执行自动任务",
         };
 
         function renderCardItem(card) {
@@ -1096,7 +1109,7 @@
                         '<div class="mt-0.5 text-[10px] text-slate-500">' + escapeHtml(card.id || "unknown") + " · v" + escapeHtml(card.version || "1.0.0") + "</div></div>" +
                     '</div><span class="shrink-0 rounded-full border ' + (card.enabled === false ? 'border-slate-500/15 bg-slate-500/5 text-slate-400' : ((card.health && card.health.status === "healthy") ? 'border-emerald-400/15 bg-emerald-400/5 text-emerald-300' : 'border-amber-400/15 bg-amber-400/5 text-amber-300')) + ' px-2.5 py-1 text-[10px]">' + (card.enabled === false ? '已停用' : (card.health && card.health.status === "healthy" ? '正常' : (card.configured ? '已配置' : '需配置'))) + '</span>' +
                 '</div><div class="mt-3 flex flex-wrap gap-2"><span class="resource-chip resource-chip-accent">' + escapeHtml(CARD_CATEGORY_META[card.type]?.title || card.type || "其它能力") + "</span>" +
-                capabilities.map(cap => '<span class="resource-chip">' + escapeHtml(cap) + "</span>").join("") + "</div>" +
+                capabilities.map(cap => '<span class="resource-chip">' + escapeHtml(CARD_CAPABILITY_LABELS[cap] || "扩展功能") + "</span>").join("") + "</div>" +
                 (card.description ? '<div class="mt-3 text-[11px] leading-5 text-slate-500">' + escapeHtml(card.description) + "</div>" : "") +
                 '<div class="mt-3 text-[10px] text-blue-300"><i class="fa-solid fa-arrow-right mr-1"></i>' +
                     "点击查看设置和功能说明" +
