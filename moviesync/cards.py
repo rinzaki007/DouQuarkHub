@@ -77,7 +77,10 @@ class CardManifest:
                 if field_type not in text_field_types or not isinstance(pattern, str):
                     raise ValueError("pattern 只能用于文本字段，且必须是字符串")
                 if len(pattern) > 500:
-                    raise ValueError(f"配置字段「{field.get('label') or field.get('key')}」的正则规则不能超过 500 个字符")
+                    label = field.get("label") or field.get("key")
+                    raise ValueError(
+                        f"配置字段「{label}」的正则规则不能超过 500 个字符"
+                    )
                 if has_nested_unbounded_quantifier(pattern):
                     raise ValueError(
                         f"配置字段「{field.get('label') or field.get('key')}」的正则规则包含不安全的嵌套重复"
