@@ -41,7 +41,9 @@ class CardFilePluginManager:
         self.plugin_dir.mkdir(parents=True, exist_ok=True)
         self._seed_bundled_cards(Path(bundled_dir).resolve() if bundled_dir else None)
         self._lock = RLock()
-        self._loaded: dict[str, tuple[str, str]] = {}
+        # Keep the exact instance so stale file bookkeeping can never remove a
+        # different card that later registers under the same ID.
+        self._loaded: dict[str, tuple[str, str, Card]] = {}
         self._errors: dict[str, str] = {}
         self._context: dict[str, Any] = {}
 
@@ -85,7 +87,7 @@ class CardFilePluginManager:
                 loaded = self._loaded.get(filename)
                 items.append({
                     "filename": filename,
-                    "loaded": bool(loaded and self.registry.get(loaded[0]) is not None),
+                    "loaded": bool(loaded and self.registry.get(loaded[0]) is loaded[2]),
                     "card_id": loaded[0] if loaded else None,
                     "error": self._errors.get(filename, ""),
                     "size": path.stat().st_size,
@@ -111,8 +113,13 @@ class CardFilePluginManager:
             raise ValueError("卡片文件不存在")
         with self._lock:
             current = self._loaded.get(name)
-            if current and self.registry.get(current[0]) is not None:
+            if current and self.registry.get(current[0]) is current[2]:
                 raise ValueError("该卡片文件已经加载")
+            if current:
+                # The instance was removed/replaced outside this manager. Forget
+                # stale bookkeeping, but never unregister the replacement.
+                self._loaded.pop(name, None)
+                sys.modules.pop(current[1], None)
             module_name = "moviesync_file_card_" + name[:-3]
             spec = importlib.util.spec_from_file_location(module_name, path)
             if spec is None or spec.loader is None:
@@ -131,7 +138,7 @@ class CardFilePluginManager:
                 self._errors[name] = str(exc)[:300]
                 sys.modules.pop(module_name, None)
                 raise
-            self._loaded[name] = (card.card_id, module_name)
+            self._loaded[name] = (card.card_id, module_name, card)
             self._errors.pop(name, None)
             self.logger.info("已加载单文件卡片 %s（%s）", card.card_id, name)
             return card
@@ -193,9 +200,11 @@ class CardFilePluginManager:
             loaded = self._loaded.pop(name, None)
             card_id = loaded[0] if loaded else ""
             module_name = loaded[1] if loaded else ""
-            if card_id:
-                card = self.registry.get(card_id)
-                if card is not None:
+            loaded_card = loaded[2] if loaded else None
+            if card_id and loaded_card is not None:
+                # A stale plugin entry must not uninstall a different card that
+                # happens to reuse this ID after the original was unloaded.
+                if self.registry.get(card_id) is loaded_card:
                     self.registry.unregister(card_id)
             if module_name:
                 sys.modules.pop(module_name, None)
