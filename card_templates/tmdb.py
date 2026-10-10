@@ -249,7 +249,8 @@ class TMDBMetadataCard(MetadataProviderCard):
             return None
         normalized = self._normalize({**payload, "media_type": media_type}, language)
         if normalized:
-            normalized["external_ids"] = payload.get("external_ids") if isinstance(payload.get("external_ids"), dict) else {}
+            external_ids = payload.get("external_ids")
+            normalized["external_ids"] = external_ids if isinstance(external_ids, dict) else {}
         return normalized
 
 
