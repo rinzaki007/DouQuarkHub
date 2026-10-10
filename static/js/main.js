@@ -89,13 +89,13 @@ async function loadCategoryOptions() {
     try {
         const targetResp = await apiFetch('/api/storage-targets');
         const targetData = await targetResp.json();
-        if (!targetData.success) throw new Error(targetData.message || '读取存储目标失败');
+        if (!targetData.success) throw new Error(targetData.message || '读取保存位置失败');
         const targetId = targetData.default_target_id || targetData.targets?.find(t => t.enabled !== false)?.id;
         window.defaultStorageTargetId = targetId || '';
         if (!targetId) return;
         const destResp = await apiFetch('/api/storage-targets/' + encodeURIComponent(targetId) + '/destinations');
         const destData = await destResp.json();
-        if (!destData.success) throw new Error(destData.message || '读取存储目录失败');
+        if (!destData.success) throw new Error(destData.message || '读取保存目录失败');
         const options = Array.isArray(destData.destinations) ? destData.destinations : [];
         document.querySelectorAll('.global-category-select').forEach(selectEl => {
             selectEl.innerHTML = '';
@@ -113,7 +113,7 @@ async function loadCategoryOptions() {
             if (matched) selectEl.value = matched.id;
         });
     } catch (err) {
-        console.error("加载存储目标目录失败:", err);
+        console.error("读取保存目录失败:", err);
     }
 }
 
@@ -369,7 +369,7 @@ function movieDetailChase() {
 }
 
 async function searchAndOpenCandidates(selectedMovies) {
-    showToast('正在检索资源，请稍候…', 'info');
+    showToast('正在搜索资源，请稍候…', 'info');
     try {
         const requestOptions = {
             method: 'POST',
@@ -386,7 +386,7 @@ async function searchAndOpenCandidates(selectedMovies) {
                     await new Promise(resolve => window.setTimeout(resolve, 350));
                     continue;
                 }
-                throw new Error('资源检索暂时异常（HTTP ' + response.status + '，服务器返回了非预期响应），请稍后重试；若持续出现，请查看服务日志');
+                throw new Error('搜索资源时服务没有正常响应，请稍后再试。如果一直失败，请查看后台日志。');
             }
             try {
                 res = await response.json();
@@ -395,11 +395,11 @@ async function searchAndOpenCandidates(selectedMovies) {
                     await new Promise(resolve => window.setTimeout(resolve, 350));
                     continue;
                 }
-                throw new Error('资源检索响应格式异常，请稍后重试；若持续出现，请查看服务日志');
+                throw new Error('搜索资源时返回的数据有问题，请稍后再试。如果一直失败，请查看后台日志。');
             }
             break;
         }
-        if (!res) throw new Error('资源检索暂时失败，请稍后重试');
+        if (!res) throw new Error('暂时无法搜索资源，请稍后再试');
         if (!res.success) return showToast(res.message || '无法搜索资源', 'error');
         const candidatesMap = res.candidates_map || {};
         const totalFound = selectedMovies.reduce((sum, movie) => sum + ((candidatesMap[movie.title] || []).length), 0);
@@ -639,12 +639,12 @@ function confirmBatchTransferForCandidate(mIdx, cIdx) {
     const movie = candidateModalState?.movies?.[mIdx];
     const title = movie?.title || "未知影片";
     const candidate = candidateModalState?.candidatesMap?.[title]?.[cIdx];
-    if (!movie || !candidate) return alert('候选资源已失效，请重新搜索');
+    if (!movie || !candidate) return alert('这条资源信息已失效，请重新搜索');
     const checkboxes = document.querySelectorAll(`input[name="batch-file-${mIdx}-${cIdx}"]:checked`);
     const selectedFids = Array.from(checkboxes).map(cb => cb.value);
 
     if (selectedFids.length === 0) {
-        return alert('请至少勾选一个要转存的文件！');
+        return alert('请至少选择一个要转存的文件！');
     }
 
     const filteredFiles = candidate.files.filter(f => selectedFids.includes(String(f.fid)));

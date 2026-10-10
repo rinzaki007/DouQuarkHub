@@ -58,7 +58,7 @@ async function loadTaskCategories() {
             if (name === '电视剧') item.selected = true;
         }
     } catch (err) {
-        taskToast('目录配置加载失败');
+        taskToast('读取保存目录失败，请刷新页面后重试');
     }
 }
 
@@ -263,7 +263,7 @@ function renderTaskDetail(task) {
     title.textContent = task.title || '任务详情';
     const phases = task.type === 'subscription'
         ? [
-            ['searching','搜刮频道资源'],
+            ['searching','搜索资源来源'],
             ['resolve','解析新资源'],
             ['transfer','转存新资源'],
             ['completed','检查完成']
@@ -272,7 +272,7 @@ function renderTaskDetail(task) {
             ['validate','校验资源'],
             ['list_files','获取文件列表'],
             ['create_folder','准备目标文件夹'],
-            ['transfer','提交夸克转存'],
+            ['transfer','提交转存任务'],
             ['completed','转存完成']
         ];
     const phaseIndex = task.status === 'failed' ? -1 : phases.findIndex(x => x[0] === task.phase);
@@ -294,7 +294,7 @@ function renderTaskDetail(task) {
         }).join('') +
         '</div></div>' +
         '<div class="grid gap-3 sm:grid-cols-2">' +
-        '<div class="rounded-xl border border-slate-800 bg-slate-950 p-4"><div class="text-[10px] text-slate-500">资源信息</div><div class="mt-2 space-y-1 text-[11px] text-slate-300"><div>频道：' + escapeTask(task.source_channel || '—') + '</div><div>分享码：<span class="font-mono">' + escapeTask(task.share_code || '—') + '</span></div><div>文件数：' + Number(task.total || 0) + '</div></div></div>' +
+        '<div class="rounded-xl border border-slate-800 bg-slate-950 p-4"><div class="text-[10px] text-slate-500">资源信息</div><div class="mt-2 space-y-1 text-[11px] text-slate-300"><div>资源来源：' + escapeTask(task.source_channel || '—') + '</div><div>分享码：<span class="font-mono">' + escapeTask(task.share_code || '—') + '</span></div><div>文件数：' + Number(task.total || 0) + '</div></div></div>' +
         '<div class="rounded-xl border border-slate-800 bg-slate-950 p-4"><div class="text-[10px] text-slate-500">执行统计</div><div class="mt-2 space-y-1 text-[11px] text-slate-300"><div>成功：' + Number(task.success_count || 0) + '</div><div>跳过：' + Number(task.skipped_count || 0) + '</div><div>失败：' + Number(task.failed_count || 0) + '</div></div></div>' +
         '</div>' +
         '<div class="rounded-xl border border-slate-800 bg-slate-950 p-4"><div class="text-xs font-semibold text-slate-200">当前状态</div><div class="mt-2 text-[11px] leading-5 ' + (task.status === 'failed' ? 'text-rose-400' : 'text-slate-400') + '">' + escapeTask(task.message || '') + '</div></div>' +
@@ -378,17 +378,17 @@ async function searchTaskCandidates() {
     if (!title) return taskToast('请输入剧名');
     const box = document.getElementById('task-candidate-list');
     document.getElementById('task-candidates').classList.remove('hidden');
-    box.innerHTML = '<div class="rounded-xl border border-slate-800 bg-slate-950 p-6 text-center text-xs text-slate-500"><i class="fa-solid fa-spinner fa-spin mr-1"></i>正在并发检索频道…</div>';
+    box.innerHTML = '<div class="rounded-xl border border-slate-800 bg-slate-950 p-6 text-center text-xs text-slate-500"><i class="fa-solid fa-spinner fa-spin mr-1"></i>正在同时搜索多个资源来源…</div>';
     selectedCandidate = null;
     document.getElementById('task-submit').disabled = true;
     document.getElementById('task-submit').classList.add('opacity-40');
     try {
         const resp = await apiFetchTask('/api/search-candidates', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({movies:[{title:title,tag:'电视剧'}]})});
         const res = await resp.json();
-        if (!res.success) throw new Error(res.message || '检索失败');
+        if (!res.success) throw new Error(res.message || '搜索失败');
         const candidates = (res.candidates_map || {})[title] || [];
         if (!candidates.length) {
-            box.innerHTML = '<div class="rounded-xl border border-amber-900/50 bg-amber-950/20 p-5 text-center text-xs text-amber-300">没有找到匹配资源，请换一个剧名或检查频道配置。</div>';
+            box.innerHTML = '<div class="rounded-xl border border-amber-900/50 bg-amber-950/20 p-5 text-center text-xs text-amber-300">没有找到匹配资源，请换个剧名，或检查已启用的资源来源。</div>';
             return;
         }
         document.getElementById('candidate-hint').textContent = '找到 ' + candidates.length + ' 个可用源';
@@ -404,7 +404,7 @@ async function searchTaskCandidates() {
             row.className = 'rounded-2xl border border-slate-800 bg-slate-950/80 p-4 transition hover:border-slate-700';
             row.innerHTML =
                 '<div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div class="min-w-0">' +
-                '<div class="flex flex-wrap items-center gap-2"><span class="inline-flex items-center gap-1.5 rounded-lg border border-sky-900/60 bg-sky-950/40 px-2 py-1 text-[11px] font-semibold text-sky-300"><i class="fa-brands fa-telegram"></i>' + escapeTask(candidate.channel) + '</span>' +
+                '<div class="flex flex-wrap items-center gap-2"><span class="inline-flex items-center gap-1.5 rounded-lg border border-sky-900/60 bg-sky-950/40 px-2 py-1 text-[11px] font-semibold text-sky-300"><i class="fa-solid fa-puzzle-piece"></i>' + escapeTask(candidate.source_name || candidate.channel || '资源来源') + '</span>' +
                 '<span class="rounded-lg border border-slate-700 bg-slate-900 px-2 py-1 font-mono text-[10px] text-slate-500">' + escapeTask(candidate.pwd_id) + '</span></div>' +
                 '<div class="mt-3 flex flex-wrap gap-2"><span class="rounded-lg border border-slate-700 bg-slate-900 px-2 py-1 text-[10px] text-slate-400"><i class="fa-solid fa-film mr-1"></i>' + files.length + ' 个视频</span>' +
                 '<span class="rounded-lg border border-slate-700 bg-slate-900 px-2 py-1 text-[10px] text-slate-400"><i class="fa-solid fa-hard-drive mr-1"></i>' + escapeTask(totalSize) + '</span>' +
@@ -436,7 +436,7 @@ async function searchTaskCandidates() {
                     document.getElementById('task-submit').disabled = !enabled;
                     document.getElementById('task-submit').classList.toggle('opacity-40', !enabled);
                     document.getElementById('task-form-status').textContent = enabled
-                        ? '已选择 ' + selected.size + ' 集；后续频道新增集数仍会自动追更。'
+                        ? '已选择 ' + selected.size + ' 集；后续有新集时，系统会继续检查并自动转存。'
                         : '至少选择 1 集作为首次处理基线。';
                 }
             };
@@ -457,18 +457,18 @@ async function searchTaskCandidates() {
                 this.textContent='已选择';
                 document.getElementById('task-submit').disabled=false;
                 document.getElementById('task-submit').classList.remove('opacity-40');
-                document.getElementById('task-form-status').textContent='已选择 ' + selectedFids.size + ' 集；后续频道新增集数仍会自动追更。';
+                document.getElementById('task-form-status').textContent='已选择 ' + selectedFids.size + ' 集；后续有新集时，系统会继续检查并自动转存。';
             };
             box.appendChild(row);
         });
 
     } catch (err) {
-        box.innerHTML = '<div class="rounded-xl border border-rose-900/50 bg-rose-950/20 p-5 text-xs text-rose-300">检索失败：' + escapeTask(err.message) + '</div>';
+        box.innerHTML = '<div class="rounded-xl border border-rose-900/50 bg-rose-950/20 p-5 text-xs text-rose-300">搜索失败：' + escapeTask(err.message) + '</div>';
     }
 }
 
 async function createTask() {
-    if (!selectedCandidate) return taskToast('请先选择一个资源源');
+    if (!selectedCandidate) return taskToast('请先选择一个资源来源');
     const title = document.getElementById('task-title').value.trim();
     const selectedFids = selectedCandidate.selectedFids || new Set();
     const files = (selectedCandidate.candidate.files || [])
@@ -554,7 +554,7 @@ async function retryTask(id) {
 async function deleteTask(id) {
     const task=tasks.find(x=>String(x.id)===String(id));
     if(!task) return;
-    if(!confirm('确定删除“' + task.title + '”吗？删除后不会影响已经转存到夸克的文件。')) return;
+    if(!confirm('确定删除“' + task.title + '”吗？删除后不会影响已经保存到网盘的文件。')) return;
     try {
         const resp=await apiFetchTask('/api/tasks/' + encodeURIComponent(id),{method:'DELETE'});
         const res=await resp.json();
