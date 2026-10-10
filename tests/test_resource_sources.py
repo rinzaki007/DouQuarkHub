@@ -475,3 +475,46 @@ def test_resource_manager_lists_only_resource_source_manifests():
     manifests = manager.get_cards()
     assert [item["id"] for item in manifests] == ["telegram"]
     assert all(item["type"] == "resource_source" for item in manifests)
+
+
+def test_health_persistence_failure_does_not_stop_other_resource_checks():
+    class HealthyCard(ResourceSourceCard):
+        def __init__(self, card_id):
+            self.manifest = CardManifest(
+                id=card_id,
+                name=card_id,
+                type="resource_source",
+                capabilities=("resource.health_check",),
+            )
+
+        def search(self, movie, config):
+            return []
+
+        def check(self, config):
+            return {"status": "healthy", "message": "ok", "total": 1, "valid_count": 1}
+
+    class Store:
+        def load(self):
+            return {
+                "cards": {
+                    "health-one": {"enabled": True, "config": {}},
+                    "health-two": {"enabled": True, "config": {}},
+                }
+            }
+
+        def update_resource_source_health(self, *args, **kwargs):
+            raise RuntimeError("health persistence unavailable")
+
+    manager = ResourceSourceManager(
+        FakeTelegramClient(),
+        Store(),
+        FakeLogger(),
+        resource_cards=[HealthyCard("health-one"), HealthyCard("health-two")],
+    )
+
+    results = manager.check_all()
+    assert [item["id"] for item in results if item["id"].startswith("health-")] == [
+        "health-one",
+        "health-two",
+    ]
+    assert all(item["status"] == "healthy" for item in results if item["id"].startswith("health-"))

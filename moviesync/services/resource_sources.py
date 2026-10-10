@@ -410,12 +410,17 @@ class ResourceSourceManager:
             results.append(result)
             update_health = getattr(self.config_store, "update_resource_source_health", None)
             if callable(update_health):
-                update_health(
-                    source_id,
-                    result["status"],
-                    result.get("message", ""),
-                    result.get("channels"),
-                )
+                try:
+                    update_health(
+                        source_id,
+                        result["status"],
+                        result.get("message", ""),
+                        result.get("channels"),
+                    )
+                except Exception:
+                    # Persisting one card's health must not prevent checking the
+                    # remaining sources or returning the already-computed results.
+                    self.logger.exception("保存资源源 %s 健康状态失败", source_id)
 
         return results
 
