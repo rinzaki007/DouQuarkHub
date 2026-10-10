@@ -453,3 +453,25 @@ def test_resource_plugin_factory_closes_card_when_registration_fails(monkeypatch
     assert manager.load_plugins() == []
     assert candidate.closed is True
     assert registry.get("duplicate-source") is not candidate
+
+
+def test_resource_manager_lists_only_resource_source_manifests():
+    class OtherCard(Card):
+        manifest = CardManifest(
+            id="demo-storage-card",
+            name="Demo Storage",
+            type="storage_target",
+            capabilities=("storage.transfer",),
+        )
+
+    from moviesync.cards import CardRegistry
+
+    registry = CardRegistry()
+    manager = ResourceSourceManager(
+        FakeTelegramClient(), object(), FakeLogger(), registry=registry
+    )
+    registry.register(OtherCard())
+
+    manifests = manager.get_cards()
+    assert [item["id"] for item in manifests] == ["telegram"]
+    assert all(item["type"] == "resource_source" for item in manifests)
