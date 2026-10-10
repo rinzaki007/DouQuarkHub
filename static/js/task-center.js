@@ -2,10 +2,17 @@ let tasks = [];
 let taskFilter = 'all';
 let selectedCandidate = null;
 let taskRefreshTimer = null;
+let taskLoadSequence = 0;
+let candidateSearchSequence = 0;
+let taskCategorySequence = 0;
+let taskDestinationSequence = 0;
 
 document.addEventListener('DOMContentLoaded', () => {
     loadTasks();
     loadTaskCategories();
+    document.getElementById('task-storage-target')?.addEventListener('change', event => {
+        loadTaskDestinations(event.target.value);
+    });
     const presetTitle = new URLSearchParams(window.location.search).get('title');
     if (presetTitle) setTimeout(() => openAddTask(), 120);
 });
@@ -38,36 +45,123 @@ function taskToast(message) {
 }
 
 async function loadTaskCategories() {
+    const requestId = ++taskCategorySequence;
+    const targetSelect = document.getElementById('task-storage-target');
+    const destinationSelect = document.getElementById('task-target-fid');
+    if (!targetSelect || !destinationSelect) return;
     try {
-        const resp = await apiFetchTask('/api/cards/quark/config');
-        const res = await resp.json();
-        if (!res.success || !res.config) return;
-        const select = document.getElementById('task-target-fid');
-        select.innerHTML = '';
-        const cfg = res.config;
-        const option = document.createElement('option');
-        option.value = cfg.default_fid || '0';
-        option.textContent = '默认目录';
-        select.appendChild(option);
-        for (const [name, fid] of Object.entries(cfg.category_fids || {})) {
-            if (!fid) continue;
-            const item = document.createElement('option');
-            item.value = fid;
-            item.textContent = name + '目录';
-            select.appendChild(item);
-            if (name === '电视剧') item.selected = true;
+        const resp = await apiFetchTask('/api/storage-targets');
+        const result = await resp.json();
+        if (requestId !== taskCategorySequence) return;
+        if (!resp.ok || !result.success) throw new Error(result.message || '读取转存位置失败');
+
+        const targets = (Array.isArray(result.targets) ? result.targets : [])
+            .filter(target => target && target.id && target.enabled !== false && !target.config_error);
+        targetSelect.replaceChildren();
+        if (!targets.length) {
+            targetSelect.add(new Option('没有可用的转存位置', ''));
+            targetSelect.disabled = true;
+            destinationSelect.replaceChildren(new Option('请先启用转存卡片', ''));
+            destinationSelect.disabled = true;
+            document.getElementById('task-form-status').textContent = '请先在「卡片管理」中启用并配置一个转存卡片。';
+            refreshTaskSubmitState();
+            return;
         }
-    } catch (err) {
-        taskToast('读取保存目录失败，请刷新页面后重试');
+
+        for (const target of targets) {
+            targetSelect.add(new Option(target.name || target.id, target.id));
+        }
+        const preferred = targets.find(target => target.id === result.default_target_id) || targets[0];
+        targetSelect.disabled = false;
+        targetSelect.value = preferred.id;
+        await loadTaskDestinations(preferred.id);
+    } catch (error) {
+        if (requestId !== taskCategorySequence) return;
+        targetSelect.replaceChildren(new Option('读取转存位置失败', ''));
+        targetSelect.disabled = true;
+        destinationSelect.replaceChildren(new Option('无法读取保存目录', ''));
+        destinationSelect.disabled = true;
+        document.getElementById('task-form-status').textContent = error.message || '读取保存目录失败，请检查卡片配置。';
+        refreshTaskSubmitState();
     }
 }
 
+async function loadTaskDestinations(targetId) {
+    const requestId = ++taskDestinationSequence;
+    const targetSelect = document.getElementById('task-storage-target');
+    const destinationSelect = document.getElementById('task-target-fid');
+    if (!targetSelect || !destinationSelect || !targetId) {
+        if (destinationSelect) {
+            destinationSelect.replaceChildren(new Option('请先选择转存位置', ''));
+            destinationSelect.disabled = true;
+        }
+        refreshTaskSubmitState();
+        return;
+    }
+    destinationSelect.disabled = true;
+    destinationSelect.replaceChildren(new Option('正在读取保存目录…', ''));
+    try {
+        const resp = await apiFetchTask('/api/storage-targets/' + encodeURIComponent(targetId) + '/destinations');
+        const result = await resp.json();
+        if (requestId !== taskDestinationSequence || targetSelect.value !== targetId) return;
+        if (!resp.ok || !result.success) throw new Error(result.message || '读取保存目录失败');
+        const destinations = Array.isArray(result.destinations) ? result.destinations : [];
+        destinationSelect.replaceChildren();
+        if (!destinations.length) {
+            destinationSelect.add(new Option('该转存位置没有可用目录', ''));
+            destinationSelect.disabled = true;
+            document.getElementById('task-form-status').textContent = '当前转存位置没有可用目录，请检查卡片配置。';
+            refreshTaskSubmitState();
+            return;
+        }
+        for (const destination of destinations) {
+            if (!destination || destination.id === undefined || destination.id === null) continue;
+            destinationSelect.add(new Option(destination.name || String(destination.id), String(destination.id)));
+        }
+        if (!destinationSelect.options.length) {
+            destinationSelect.add(new Option('该转存位置没有可用目录', ''));
+            destinationSelect.disabled = true;
+        } else {
+            const preferred = destinations.find(item => item.is_default)
+                || destinations.find(item => item.category === '电视剧')
+                || destinations[0];
+            destinationSelect.value = String(preferred.id);
+            destinationSelect.disabled = false;
+            document.getElementById('task-form-status').textContent = '';
+        }
+        refreshTaskSubmitState();
+    } catch (error) {
+        if (requestId !== taskDestinationSequence) return;
+        destinationSelect.replaceChildren(new Option('读取目录失败', ''));
+        destinationSelect.disabled = true;
+        document.getElementById('task-form-status').textContent = error.message || '读取保存目录失败，请重试。';
+        refreshTaskSubmitState();
+    }
+}
+
+function refreshTaskSubmitState() {
+    const button = document.getElementById('task-submit');
+    if (!button) return;
+    const selectedCount = selectedCandidate?.selectedFids?.size || 0;
+    const targetSelect = document.getElementById('task-storage-target');
+    const destinationSelect = document.getElementById('task-target-fid');
+    const ready = selectedCount > 0
+        && Boolean(targetSelect?.value)
+        && !targetSelect?.disabled
+        && Boolean(destinationSelect?.value)
+        && !destinationSelect?.disabled;
+    button.disabled = !ready;
+    button.classList.toggle('opacity-40', !ready);
+}
+
 async function loadTasks() {
+    const requestId = ++taskLoadSequence;
     const list = document.getElementById('task-list');
     try {
         const resp = await apiFetchTask('/api/tasks');
         const res = await resp.json();
         if (!res.success) throw new Error(res.message || '加载失败');
+        if (requestId !== taskLoadSequence) return;
         tasks = Array.isArray(res.tasks) ? res.tasks : [];
         renderStats();
         renderTasks();
@@ -80,7 +174,9 @@ async function loadTasks() {
             taskRefreshTimer = null;
         }
     } catch (err) {
-        list.innerHTML = '<div class="p-10 text-center text-xs text-rose-400">任务加载失败，请刷新重试。</div>';
+        if (requestId === taskLoadSequence && list) {
+            list.innerHTML = '<div class="p-10 text-center text-xs text-rose-400">任务加载失败，请刷新重试。</div>';
+        }
     }
 }
 
@@ -346,6 +442,7 @@ function renderHistory() {
 }
 
 function openAddTask() {
+    candidateSearchSequence++;
     selectedCandidate = null;
     document.getElementById('task-submit').disabled = true;
     document.getElementById('task-submit').classList.add('opacity-40');
@@ -374,6 +471,7 @@ function formatTaskSize(bytes) {
 }
 
 async function searchTaskCandidates() {
+    const requestId = ++candidateSearchSequence;
     const title = document.getElementById('task-title').value.trim();
     if (!title) return taskToast('请输入剧名');
     const box = document.getElementById('task-candidate-list');
@@ -385,6 +483,7 @@ async function searchTaskCandidates() {
     try {
         const resp = await apiFetchTask('/api/search-candidates', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({movies:[{title:title,tag:'电视剧'}]})});
         const res = await resp.json();
+        if (requestId !== candidateSearchSequence) return;
         if (!res.success) throw new Error(res.message || '搜索失败');
         const candidates = (res.candidates_map || {})[title] || [];
         if (!candidates.length) {
@@ -432,9 +531,8 @@ async function searchTaskCandidates() {
                 row.querySelector('[data-toggle-files]').textContent = selected.size === validFids.length ? '取消全选' : '全选';
                 if (selectedCandidate?.row === row) {
                     selectedCandidate.selectedFids = selected;
+                    refreshTaskSubmitState();
                     const enabled = selected.size > 0;
-                    document.getElementById('task-submit').disabled = !enabled;
-                    document.getElementById('task-submit').classList.toggle('opacity-40', !enabled);
                     document.getElementById('task-form-status').textContent = enabled
                         ? '已选择 ' + selected.size + ' 集；后续有新集时，系统会继续检查并自动转存。'
                         : '至少选择 1 集作为首次处理基线。';
@@ -476,16 +574,20 @@ async function createTask() {
         .map(x => ({fid:x.fid, file_name:x.file_name || ''}))
         .filter(x => x.fid);
     if (!files.length) return taskToast('请至少选择 1 集作为首次处理基线');
+    const storageTargetId = document.getElementById('task-storage-target')?.value;
+    const targetFid = document.getElementById('task-target-fid')?.value;
+    if (!storageTargetId || !targetFid) return taskToast('请先选择可用的转存位置和保存目录');
     const payload = {
         title:title,
         channel:selectedCandidate.candidate.channel_id || selectedCandidate.candidate.channel || '',
         channel_name:selectedCandidate.candidate.channel || '',
-        source_id:selectedCandidate.candidate.source_id || 'telegram',
+        source_id:selectedCandidate.candidate.source_id || '',
+        storage_target_id:document.getElementById('task-storage-target').value,
         pwd_id:selectedCandidate.candidate.pwd_id,
         files:files,
         cover:selectedCandidate.candidate.cover || '',
         interval_hours:Number(document.getElementById('task-interval').value || 6),
-        target_fid:document.getElementById('task-target-fid').value || '0'
+        target_fid:targetFid
     };
     const btn=document.getElementById('task-submit');
     btn.disabled=true;
