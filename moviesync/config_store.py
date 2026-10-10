@@ -17,7 +17,6 @@ from .legacy_card_config import (
     migrate_legacy_files,
     normalize_legacy_card_config,
 )
-from .regex_safety import has_nested_unbounded_quantifier
 from .settings import DEFAULT_CATEGORY_FIDS, DEFAULT_OPENLIST_URL
 from .storage import JsonStore
 
