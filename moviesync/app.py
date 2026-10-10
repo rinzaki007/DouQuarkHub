@@ -104,6 +104,8 @@ def create_app(
         "config_store": config_store,
         "logger": logger,
     })
+    card_registry.migrate_configs(config_store, logger)
+
 
     http = HttpClient()
 
