@@ -37,7 +37,7 @@ jobs:
         run: pip install -r requirements-dev.txt
 
       - name: Run tests
-        run: pytest -q
+        run: pytest -q --cov=moviesync --cov-report=term-missing
 
       - name: Run Ruff
         run: ruff check . --output-format=github
