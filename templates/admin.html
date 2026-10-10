@@ -270,8 +270,8 @@
                     <div class="flex items-start gap-3">
                         <i class="fa-solid fa-puzzle-piece text-blue-400 mt-0.5"></i>
                         <div class="text-xs leading-5 text-slate-500">
-                            <div class="font-semibold text-slate-300 mb-1">能力由卡片提供</div>
-                            Quark、Telegram 等组件不再作为 Core 全局参数。请进入“卡片管理”打开对应卡片配置。
+                            <div class="font-semibold text-slate-300 mb-1">各项功能由卡片提供</div>
+                            夸克、Telegram 等服务的设置已放到各自卡片中。请打开“卡片管理”，选择对应卡片进行设置。
                         </div>
                     </div>
                 </div>
@@ -324,7 +324,7 @@
                 <div class="glass-panel rounded-2xl p-4 border border-slate-800/80">
                     <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
                         <div class="text-xs text-slate-400">
-                            <span id="cards-summary">正在读取卡片…</span>
+                            <span id="cards-summary">正在读取卡片列表…</span>
                         </div>
                         <span class="rounded-full border border-blue-400/20 bg-blue-400/5 px-2.5 py-1 text-[10px] text-blue-300">
                             <i class="fa-solid fa-shield-halved mr-1"></i>
@@ -337,7 +337,7 @@
                         class="grid grid-cols-1 lg:grid-cols-2 gap-3"
                     >
                         <div class="glass-panel rounded-xl p-4 text-xs text-slate-500">
-                            正在读取已加载卡片…
+                            正在正在读取卡片列表…
                         </div>
                     </div>
                 </div>
@@ -346,13 +346,13 @@
                     <div>
                         <h3 class="text-sm font-semibold text-slate-200 flex items-center gap-2">
                             <i class="fa-solid fa-file-code text-blue-400"></i>
-                            单文件卡片插件
+                            卡片文件管理
                         </h3>
                         <p class="text-xs text-slate-500 mt-1 leading-5">
-                            上传可信的 .py 卡片文件即可加载；文件名（不含 .py）必须与卡片 Manifest ID 一致。卸载会删除插件文件，但保留历史配置。
+                            选择可信的 .py 卡片文件即可安装。文件名（不含 .py）需要与卡片 ID 一致。卸载会删除卡片文件，但会保留这张卡片的历史配置。
                         </p>
                         <p class="text-xs text-amber-300 mt-1 leading-5">
-                            安全提示：Python 插件会以 MovieSync 服务权限执行代码。只安装你审查并信任的文件，不要上传来源不明的插件。
+                            安全提醒：卡片代码会在 MovieSync 服务中运行，并拥有与服务相同的权限。只安装你确认可信的文件。
                         </p>
                     </div>
                     <div class="flex flex-col sm:flex-row gap-2">
@@ -373,9 +373,8 @@
                     <div class="flex items-start gap-3">
                         <i class="fa-solid fa-circle-info text-blue-400 mt-0.5"></i>
                         <div class="text-xs leading-5 text-slate-500">
-                            <div class="font-semibold text-slate-300 mb-1">统一卡片配置约定</div>
-                            新卡片只需在 CardManifest 声明配置字段，就会自动生成对应表单。敏感字段不会回传原值；
-                            保存时留空表示保留旧凭据。单文件插件仅支持可信 Python 代码，加载失败不会阻止主平台启动。
+                            <div class="font-semibold text-slate-300 mb-1">卡片配置说明</div>
+                            每张卡片会说明自己需要哪些设置，后台会自动生成填写表单。Cookie、密钥等敏感内容不会显示原文；保存时如果留空，会保留之前保存的值。卡片加载失败时，平台仍会启动，只有这张卡片对应的功能可能无法使用。
                         </div>
                     </div>
                 </div>
@@ -1054,35 +1053,48 @@
 
         const CARD_CATEGORY_META = {
             resource_source: {
-                title: "资源来源",
-                description: "负责发现和搜刮资源，例如 Telegram 频道。",
+                title: "资源搜索来源",
+                description: "负责从频道或其他来源查找影视资源。",
                 icon: "fa-tower-broadcast",
             },
             storage_target: {
-                title: "存储目标",
-                description: "负责解析、建目录和转存资源，例如 Quark 网盘。",
+                title: "转存位置",
+                description: "负责选择网盘、创建目录并保存文件。",
                 icon: "fa-hard-drive",
             },
             metadata_provider: {
-                title: "媒体信息",
-                description: "负责影片搜索、资料和元数据，例如豆瓣。",
+                title: "影视资料",
+                description: "负责搜索影视名称、海报和影片介绍。",
                 icon: "fa-film",
             },
             notification: {
-                title: "通知服务",
-                description: "负责向外部渠道发送任务或系统通知。",
+                title: "消息通知",
+                description: "负责把任务结果或系统消息发送给你。",
                 icon: "fa-bell",
             },
             automation: {
-                title: "自动化",
-                description: "负责定时任务、订阅和其它自动化能力。",
+                title: "自动任务",
+                description: "负责按计划自动检查和处理任务。",
                 icon: "fa-clock",
             },
             custom: {
-                title: "其它能力",
-                description: "暂未归类的扩展卡片。",
+                title: "其他功能",
+                description: "提供其他额外功能的卡片。",
                 icon: "fa-puzzle-piece",
             },
+        };
+
+        const CARD_CAPABILITY_LABELS = {
+            "resource.search": "搜索资源",
+            "resource.health_check": "检查连接",
+            "storage.transfer": "转存文件",
+            "storage.list": "查看文件",
+            "storage.destinations": "选择保存位置",
+            "metadata.search": "搜索影视",
+            "metadata.detail": "查看影视详情",
+            "metadata.list": "浏览影视",
+            "notification.send": "发送通知",
+            "automation.run": "执行自动任务",
         };
 
         function renderCardItem(card) {
@@ -1097,10 +1109,10 @@
                         '<div class="mt-0.5 text-[10px] text-slate-500">' + escapeHtml(card.id || "unknown") + " · v" + escapeHtml(card.version || "1.0.0") + "</div></div>" +
                     '</div><span class="shrink-0 rounded-full border ' + (card.enabled === false ? 'border-slate-500/15 bg-slate-500/5 text-slate-400' : ((card.health && card.health.status === "healthy") ? 'border-emerald-400/15 bg-emerald-400/5 text-emerald-300' : 'border-amber-400/15 bg-amber-400/5 text-amber-300')) + ' px-2.5 py-1 text-[10px]">' + (card.enabled === false ? '已停用' : (card.health && card.health.status === "healthy" ? '正常' : (card.configured ? '已配置' : '需配置'))) + '</span>' +
                 '</div><div class="mt-3 flex flex-wrap gap-2"><span class="resource-chip resource-chip-accent">' + escapeHtml(CARD_CATEGORY_META[card.type]?.title || card.type || "其它能力") + "</span>" +
-                capabilities.map(cap => '<span class="resource-chip">' + escapeHtml(cap) + "</span>").join("") + "</div>" +
+                capabilities.map(cap => '<span class="resource-chip">' + escapeHtml(CARD_CAPABILITY_LABELS[cap] || "扩展功能") + "</span>").join("") + "</div>" +
                 (card.description ? '<div class="mt-3 text-[11px] leading-5 text-slate-500">' + escapeHtml(card.description) + "</div>" : "") +
                 '<div class="mt-3 text-[10px] text-blue-300"><i class="fa-solid fa-arrow-right mr-1"></i>' +
-                    "点击查看卡片配置与能力详情" +
+                    "点击查看设置和功能说明" +
                     "</div>" +
                 "</button>";
         }
@@ -1109,8 +1121,8 @@
             const container = document.getElementById("cards-list");
             const summary = document.getElementById("cards-summary");
             if (!Array.isArray(cards) || !cards.length) {
-                summary.textContent = "当前没有已加载卡片";
-                container.innerHTML = '<div class="glass-panel rounded-xl p-5 text-xs text-slate-500 lg:col-span-2">暂无已加载卡片。</div>';
+                summary.textContent = "目前没有可用的卡片";
+                container.innerHTML = '<div class="glass-panel rounded-xl p-5 text-xs text-slate-500 lg:col-span-2">目前没有可用的卡片。某张卡片加载失败时，平台其他功能仍可继续使用。</div>';
                 return;
             }
 
@@ -1151,13 +1163,19 @@
             try {
                 const resp = await apiFetch("/api/cards");
                 const result = await resp.json();
-                if (!result.success) throw new Error(result.message || "读取卡片失败");
+                if (!result.success) throw new Error(result.message || "读取卡片列表失败");
                 window.moviesyncCards = result.cards || [];
                 renderCards(window.moviesyncCards);
                 renderFileCardPlugins(result.file_plugins || []);
+                document.getElementById("cards-summary").classList.remove("text-amber-300");
+                if (Array.isArray(result.warnings) && result.warnings.length) {
+                    const summary = document.getElementById("cards-summary");
+                    summary.textContent += " · " + result.warnings.join(" ");
+                    summary.classList.add("text-amber-300");
+                }
             } catch (error) {
-                document.getElementById("cards-summary").textContent = "读取卡片失败";
-                document.getElementById("cards-list").innerHTML = '<div class="glass-panel rounded-xl p-4 text-xs text-rose-300 lg:col-span-2">' + escapeHtml(error.message || "读取卡片失败") + "</div>";
+                document.getElementById("cards-summary").textContent = "读取卡片列表失败";
+                document.getElementById("cards-list").innerHTML = '<div class="glass-panel rounded-xl p-4 text-xs text-rose-300 lg:col-span-2">' + escapeHtml(error.message || "读取卡片列表失败") + "</div>";
             }
         }
 
@@ -1172,7 +1190,7 @@
             const container = document.getElementById("card-plugin-files");
             if (!container) return;
             if (!plugins.length) {
-                container.innerHTML = '<div class="rounded-lg border border-slate-800 p-3 text-xs text-slate-500">暂无单文件插件。内置卡片不会显示在这里。</div>';
+                container.innerHTML = '<div class="rounded-lg border border-slate-800 p-3 text-xs text-slate-500">这里还没有额外安装的卡片文件。系统自带的卡片不会显示在这里。</div>';
                 return;
             }
             container.innerHTML = plugins.map(item => {
@@ -1189,7 +1207,7 @@
                     '<div class="min-w-0"><div class="text-xs font-semibold text-slate-200 break-all">' + filename + '</div>' +
                     '<div class="mt-1 text-[11px]">' + status + ' · ' + Number(item.size || 0) + ' bytes</div>' + error + '</div>' +
                     '<div class="flex shrink-0 items-center gap-2">' + loadButton +
-                    '<button type="button" onclick="uninstallCardFile(\'' + filename + '\')" class="glass-btn rounded-md px-2.5 py-1.5 text-[11px] text-rose-300">卸载并删除</button></div></div>';
+                    '<button type="button" onclick="uninstallCardFile(\'' + filename + '\')" class="glass-btn rounded-md px-2.5 py-1.5 text-[11px] text-rose-300">卸载卡片文件</button></div></div>';
             }).join("");
         }
 
@@ -1236,7 +1254,7 @@
         }
 
         async function uninstallCardFile(filename) {
-            if (!window.confirm("确定卸载并删除 " + filename + "？该操作会移除插件文件，但保留该卡片的历史配置。")) return;
+            if (!window.confirm("确定卸载卡片文件 " + filename + "？该操作会移除插件文件，但保留该卡片的历史配置。")) return;
             try {
                 const response = await apiFetch("/api/cards/plugins/" + encodeURIComponent(filename), { method: "DELETE" });
                 const result = await response.json();

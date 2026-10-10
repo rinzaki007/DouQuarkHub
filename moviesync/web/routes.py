@@ -51,7 +51,7 @@ def _normalize_fid(
 
     if len(fid) > 128:
         raise ValueError(
-            "目标存储目录 FID 不能超过 128 个字符"
+            "目标目录编号不能超过 128 个字符"
         )
 
     if not all(
@@ -59,7 +59,7 @@ def _normalize_fid(
         for char in fid
     ):
         raise ValueError(
-            "目标存储目录 FID 格式无效"
+            "目标目录编号格式不正确"
         )
 
     return fid
@@ -551,7 +551,7 @@ def storage_targets():
 def storage_target_destinations(target_id):
     manager = _services()["storage_targets"]
     if not manager.get(target_id):
-        return _json_error("指定的存储目标未加载或已停用", 404)
+        return _json_error("这个转存位置尚未加载或已停用", 404)
     return jsonify({
         "success": True,
         "target_id": target_id,
@@ -566,7 +566,7 @@ def set_default_storage_target():
     data = request.get_json(silent=True) or {}
     target_id = str(data.get("target_id") or "").strip()
     if target_id and not _services()["storage_targets"].get(target_id):
-        return _json_error("指定的存储目标未加载或已停用")
+        return _json_error("这个转存位置尚未加载或已停用")
     try:
         saved = _services()["config"].set_default_storage_target_id(target_id)
     except ValueError as exc:
@@ -576,41 +576,67 @@ def set_default_storage_target():
 
 @api.get("/cards")
 def cards():
-    """返回当前进程已加载的卡片 Manifest。动态安装暂未开放。"""
-    registry = _services()["card_registry"]
-    config_store = _services()["config"]
+    """返回已加载卡片列表；单张卡片出错时只显示提示，不影响其他卡片。"""
+    services = _services()
+    registry = services["card_registry"]
+    config_store = services["config"]
+    logger = services["logger"]
     config = config_store.load()
     card_configs = config.get("cards") if isinstance(config, dict) else {}
     cards = []
-    for card in registry.list():
-        saved = card_configs.get(card.card_id) if isinstance(card_configs, dict) else {}
-        saved = saved if isinstance(saved, dict) else {}
-        item = card.manifest.to_dict()
-        item["enabled"] = bool(saved.get("enabled", True))
-        card_config = saved.get("config", {})
-        card_config = card_config if isinstance(card_config, dict) else {}
+    warnings = []
 
-        # 状态由卡片接口自身提供；平台只调用通用方法，不识别 Telegram/Quark 等 ID。
-        item["configured"] = bool(card.is_configured(card_config))
-        health = card_config.get("health")
-        if isinstance(health, dict) and health:
-            item["health"] = health
-        else:
-            # Listing never performs network checks; unknown health remains idle.
-            item["health"] = {
-                "status": "idle",
-                "message": "尚未检查，请手动检查连接",
-            }
-        cards.append(item)
-    plugin_manager = _services().get("file_card_plugins")
-    return jsonify(
-        {
-            "success": True,
-            "cards": cards,
-            "dynamic_install_enabled": plugin_manager is not None,
-            "file_plugins": plugin_manager.list_plugins() if plugin_manager else [],
-        }
-    )
+    for card in registry.list():
+        card_id = "unknown"
+        try:
+            manifest = card.manifest.to_dict()
+            card_id = str(manifest.get("id") or getattr(card, "card_id", "unknown"))
+            saved = card_configs.get(card_id) if isinstance(card_configs, dict) else {}
+            saved = saved if isinstance(saved, dict) else {}
+            item = manifest
+            item["enabled"] = bool(saved.get("enabled", True))
+            card_config = saved.get("config", {})
+            card_config = card_config if isinstance(card_config, dict) else {}
+
+            try:
+                item["configured"] = bool(card.is_configured(card_config))
+            except Exception:
+                logger.exception("读取卡片 %s 的配置状态失败", card_id)
+                item["configured"] = False
+                item["health"] = {
+                    "status": "error",
+                    "message": "卡片状态读取失败，请检查这张卡片的日志。",
+                }
+                warnings.append(f"「{item.get('name') or card_id}」状态读取失败，其他卡片仍可使用。")
+            else:
+                health = card_config.get("health")
+                if isinstance(health, dict) and health:
+                    item["health"] = health
+                else:
+                    item["health"] = {
+                        "status": "idle",
+                        "message": "还没有检查连接，可以点开卡片后手动检查。",
+                    }
+            cards.append(item)
+        except Exception:
+            logger.exception("读取卡片 %s 的信息失败", card_id)
+            warnings.append("有一张卡片的信息读取失败，已跳过；其他卡片仍可使用。")
+
+    plugin_manager = services.get("file_card_plugins")
+    try:
+        file_plugins = plugin_manager.list_plugins() if plugin_manager else []
+    except Exception:
+        logger.exception("读取卡片文件列表失败")
+        file_plugins = []
+        warnings.append("卡片文件列表暂时无法读取，已加载的功能不受影响。")
+
+    return jsonify({
+        "success": True,
+        "cards": cards,
+        "warnings": warnings,
+        "dynamic_install_enabled": plugin_manager is not None,
+        "file_plugins": file_plugins,
+    })
 
 
 @api.post("/cards/plugins")
@@ -619,7 +645,7 @@ def install_card_plugin():
     """Install one trusted Python card file and load it immediately."""
     plugin_manager = _services().get("file_card_plugins")
     if plugin_manager is None:
-        return _json_error("单文件卡片管理未启用", 503)
+        return _json_error("卡片文件管理功能暂不可用，请检查服务配置", 503)
     uploaded = request.files.get("file")
     if uploaded is None:
         return _json_error("请选择一个 .py 卡片文件")
@@ -633,12 +659,12 @@ def install_card_plugin():
         return _json_error(str(exc))
     except Exception:
         _services()["logger"].exception("安装单文件卡片失败")
-        return _json_error("卡片加载失败，请检查文件格式并查看服务日志", 400)
+        return _json_error("卡片加载失败，请检查文件内容和服务日志", 400)
     return jsonify({
         "success": True,
         "card_id": card.card_id,
         "manifest": card.manifest.to_dict(),
-        "message": "卡片已安装并加载",
+        "message": "卡片已安装并启用",
     })
 
 
@@ -647,7 +673,7 @@ def install_card_plugin():
 def load_card_plugin(filename):
     plugin_manager = _services().get("file_card_plugins")
     if plugin_manager is None:
-        return _json_error("单文件卡片管理未启用", 503)
+        return _json_error("卡片文件管理功能暂不可用，请检查服务配置", 503)
     try:
         card = plugin_manager.load_file(filename)
     except FileNotFoundError as exc:
@@ -656,8 +682,8 @@ def load_card_plugin(filename):
         return _json_error(str(exc))
     except Exception:
         _services()["logger"].exception("加载单文件卡片 %s 失败", filename)
-        return _json_error("卡片加载失败，请检查文件格式并查看服务日志", 400)
-    return jsonify({"success": True, "card_id": card.card_id, "message": "卡片已加载"})
+        return _json_error("卡片加载失败，请检查文件内容和服务日志", 400)
+    return jsonify({"success": True, "card_id": card.card_id, "message": "卡片已加载，可以使用了"})
 
 
 @api.delete("/cards/plugins/<filename>")
@@ -665,7 +691,7 @@ def load_card_plugin(filename):
 def uninstall_card_plugin(filename):
     plugin_manager = _services().get("file_card_plugins")
     if plugin_manager is None:
-        return _json_error("单文件卡片管理未启用", 503)
+        return _json_error("卡片文件管理功能暂不可用，请检查服务配置", 503)
     try:
         safe_filename = plugin_manager.validate_filename(filename)
         services = _services()
@@ -711,11 +737,11 @@ def uninstall_card_plugin(filename):
         return _json_error(str(exc))
     except Exception:
         _services()["logger"].exception("卸载单文件卡片 %s 失败", filename)
-        return _json_error("卸载卡片失败，请查看服务日志", 500)
+        return _json_error("卸载卡片失败，请查看服务日志中的详细原因", 500)
     return jsonify({
         "success": True,
         **removed,
-        "message": "卡片文件已删除，卡片已卸载；历史配置会保留",
+        "message": "卡片文件已删除，卡片已卸载；之前保存的设置会保留",
     })
 
 
@@ -765,7 +791,7 @@ def resource_card_config(card_id):
     """所有已注册卡片共用的配置接口；字段由 CardManifest 声明。"""
     card = _services()["card_registry"].get(card_id)
     if card is None:
-        return _json_error("卡片未加载", 404)
+        return _json_error("这张卡片尚未加载，暂时无法配置", 404)
 
     config_store = _services()["config"]
     cards_config = config_store.load().get("cards", {})
@@ -781,14 +807,14 @@ def resource_card_config(card_id):
 
     data = request.get_json(silent=True)
     if not isinstance(data, dict):
-        return _json_error("请求内容必须是 JSON 对象")
+        return _json_error("提交的数据格式不正确")
     incoming = data.get("config", {})
     if not isinstance(incoming, dict):
-        return _json_error("config 必须是 JSON 对象")
+        return _json_error("卡片设置格式不正确")
     fields_by_key = {str(field.get("key")): field for field in card.manifest.config_fields}
     unknown = set(incoming) - set(fields_by_key)
     if unknown:
-        return _json_error("包含未声明的配置字段: " + ", ".join(sorted(unknown)))
+        return _json_error("包含这张卡片不支持的设置项：" + ", ".join(sorted(unknown)))
 
     merged, persisted_incoming = dict(raw_config), {}
     sensitive_markers = (
@@ -878,7 +904,7 @@ def check_card_connection(card_id):
     """调用卡片自身的健康检查；卡片必须声明健康检查能力。"""
     card = _services()["card_registry"].get(card_id)
     if card is None:
-        return _json_error("卡片未加载", 404)
+        return _json_error("这张卡片尚未加载，暂时无法配置", 404)
     supports_check = any(
         capability.endswith(".health_check") or capability.endswith(".check")
         for capability in card.capabilities
