@@ -128,6 +128,22 @@ class Card:
             "message": "卡片可用",
         }
 
+    def is_configured(self, config: dict[str, Any]) -> bool:
+        """根据 Manifest 判断是否完成配置；具体卡片可覆盖，无需核心识别卡片 ID。"""
+        config = config if isinstance(config, dict) else {}
+        fields = self.manifest.config_fields
+        required = [field for field in fields if field.get("required")]
+        if required:
+            return all(
+                _has_config_value(config.get(str(field.get("key") or "")))
+                for field in required
+            )
+        return any(
+            _has_config_value(config.get(str(field.get("key") or "")))
+            for field in fields
+            if str(field.get("key") or "") in config
+        )
+
     def validate_config(self, config: dict[str, Any]) -> dict[str, Any]:
         """校验并返回规范化后的完整配置；具体卡片可覆盖业务规则。
 
@@ -242,6 +258,17 @@ class Card:
     @property
     def capabilities(self) -> tuple[str, ...]:
         return self.manifest.capabilities
+
+
+def _has_config_value(value: Any) -> bool:
+    """配置状态判断的共享规则；空白文本、空对象和空数组视为未配置。"""
+    if value is None:
+        return False
+    if isinstance(value, str):
+        return bool(value.strip())
+    if isinstance(value, (dict, list, tuple, set)):
+        return bool(value)
+    return True
 
 
 class ResourceSourceCard(Card):
