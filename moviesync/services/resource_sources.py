@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import re
+import threading
 from collections.abc import Iterable
 from concurrent.futures import ThreadPoolExecutor
 from importlib.metadata import entry_points
@@ -262,7 +263,7 @@ class PanSouResourceSource(ResourceSource):
         self.http = http_client or HttpClient()
         self._token = ""
         self._token_expires_at = 0.0
-        self._auth_lock = __import__("threading").RLock()
+        self._auth_lock = threading.RLock()
 
     def validate_config(self, config: dict[str, Any]) -> dict[str, Any]:
         from urllib.parse import urlparse
