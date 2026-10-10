@@ -1,7 +1,8 @@
 """Bundled single-file PanSou resource-source card.
 
-This file is copied to the persistent data card directory on first startup. The
-runtime loads the copied file, so uninstalling it does not require changing core code.
+The file can be copied to the persistent data card directory when bundled-card
+installation is explicitly enabled. The runtime loads that copy, so uninstalling it
+does not require changing core code.
 """
 from __future__ import annotations
 
