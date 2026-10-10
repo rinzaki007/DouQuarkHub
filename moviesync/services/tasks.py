@@ -197,7 +197,12 @@ class TaskManager:
             "failed_count": 0,
             "message": "任务已创建，等待执行",
             "source_channel": str(candidate.get("channel") or ""),
-            "share_code": str(candidate.get("resource_id") or candidate.get("share_id") or candidate.get("pwd_id") or ""),
+            "share_code": str(
+                candidate.get("resource_id")
+                or candidate.get("share_id")
+                or candidate.get("pwd_id")
+                or ""
+            ),
             "target_fid": str(payload.get("target_fid") or "0"),
             "created_at": now,
             "started_at": None,
