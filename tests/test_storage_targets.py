@@ -380,3 +380,24 @@ def test_explicit_default_target_is_not_used_when_config_cannot_be_read():
     result = manager.resolve_resource({"pwd_id": "abc"})
     assert result["files"] == []
     assert "无法读取存储目标配置" in result["error"]
+
+def test_default_target_lookup_failure_is_isolated_without_fallback():
+    class BrokenDefaultLookupStore:
+        def load(self):
+            return {"cards": {"demo-storage": {"enabled": True}}}
+
+        def get_default_storage_target_id(self):
+            raise OSError("simulated default target read failure")
+
+    registry = CardRegistry()
+    registry.register(DemoStorage())
+    manager = StorageTargetManager(
+        registry, BrokenDefaultLookupStore(), FakeLogger()
+    )
+
+    # A failed default lookup must not escape into the API or silently select
+    # the first available storage card.
+    assert manager.get() is None
+    result = manager.resolve_resource({"pwd_id": "abc"})
+    assert result["files"] == []
+    assert "无法读取默认存储目标配置" in result["error"]
