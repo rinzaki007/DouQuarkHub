@@ -72,6 +72,18 @@ def create_app(
     douban = DoubanClient()
     telegram = TelegramClient()
     card_registry = CardRegistry()
+    file_card_plugins = CardFilePluginManager(
+        settings.data_dir / "cards",
+        card_registry,
+        logger,
+        PROJECT_ROOT / "card_templates",
+    )
+    file_card_plugins.load_all({
+        "telegram": telegram,
+        "douban": douban,
+        "config_store": config_store,
+        "logger": logger,
+    })
     resource_sources = ResourceSourceManager(
         config_store,
         logger,
@@ -98,18 +110,6 @@ def create_app(
     })
     notifications = NotificationManager(card_registry, logger, config_store=config_store)
     notifications.load_plugins({
-        "config_store": config_store,
-        "logger": logger,
-    })
-    file_card_plugins = CardFilePluginManager(
-        settings.data_dir / "cards",
-        card_registry,
-        logger,
-        PROJECT_ROOT / "card_templates",
-    )
-    file_card_plugins.load_all({
-        "telegram": telegram,
-        "douban": douban,
         "config_store": config_store,
         "logger": logger,
     })
