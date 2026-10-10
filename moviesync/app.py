@@ -15,7 +15,7 @@ from .auth import AuthStore
 from .card_plugins import CardFilePluginManager
 from .cards import CardRegistry
 from .clients.http import HttpClient
-from .clients.telegram import TelegramClient
+from .clients.compat import LazyTelegramClient
 from .config_store import ConfigStore
 from .logging_setup import configure_logging, recent_logs
 from .services.metadata import MetadataProviderManager
@@ -68,7 +68,8 @@ def create_app(
         PROJECT_ROOT,
     )
 
-    telegram = TelegramClient()
+    # Compatibility shim for older third-party cards; creates the legacy client only on first use.
+    telegram = LazyTelegramClient()
     card_registry = CardRegistry()
     file_card_plugins = CardFilePluginManager(
         settings.data_dir / "cards",
@@ -150,6 +151,11 @@ def create_app(
             card_registry.close_all()
         except Exception:
             logger.exception("关闭卡片注册表失败")
+
+        try:
+            telegram.close()
+        except Exception:
+            logger.exception("关闭旧版 Telegram 兼容客户端失败")
 
     services = {
         "logger": logger,
