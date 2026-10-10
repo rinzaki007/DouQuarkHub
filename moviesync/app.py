@@ -73,7 +73,6 @@ def create_app(
     telegram = TelegramClient()
     card_registry = CardRegistry()
     resource_sources = ResourceSourceManager(
-        telegram,
         config_store,
         logger,
         registry=card_registry,
