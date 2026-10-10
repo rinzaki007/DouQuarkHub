@@ -432,3 +432,44 @@ def create_card(context):
     assert fields["channels"]["item_fields"][0]["key"] == "id"
     assert fields["channels"]["description"] == "点击添加频道"
     assert "JSON 数组" in (plugin_dir / "telegram.py").read_text(encoding="utf-8")
+
+
+
+def test_custom_legacy_card_keeps_shared_telegram_context(tmp_path):
+    plugin_dir = tmp_path / "cards"
+    bundled_dir = tmp_path / "bundled"
+    plugin_dir.mkdir()
+    bundled_dir.mkdir()
+    (bundled_dir / "telegram.py").write_text(
+        "from moviesync.cards import Card, CardManifest\n"
+        "class TelegramCard(Card):\n"
+        "    manifest = CardManifest(id='telegram', name='Telegram', type='custom')\n"
+        "    def __init__(self, telegram):\n"
+        "        self.telegram = telegram\n"
+        "def create_card(context):\n"
+        "    return TelegramCard(context.get('telegram'))\n",
+        encoding="utf-8",
+    )
+    manager = CardFilePluginManager(
+        plugin_dir,
+        CardRegistry(),
+        logging.getLogger("test-card-plugins"),
+        bundled_dir,
+    )
+    (plugin_dir / "legacy_custom.py").write_text(
+        "from moviesync.cards import Card, CardManifest\n"
+        "class LegacyCard(Card):\n"
+        "    manifest = CardManifest(id='legacy_custom', name='Legacy', type='custom')\n"
+        "    def __init__(self, telegram):\n"
+        "        self.telegram = telegram\n"
+        "def create_card(context):\n"
+        "    return LegacyCard(context['telegram'])\n",
+        encoding="utf-8",
+    )
+    legacy_client = object()
+
+    bundled_card = manager.load_file("telegram.py", {"telegram": legacy_client})
+    legacy_card = manager.load_file("legacy_custom.py", {"telegram": legacy_client})
+
+    assert bundled_card.telegram is None
+    assert legacy_card.telegram is legacy_client

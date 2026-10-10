@@ -10,7 +10,7 @@ from collections.abc import Iterable
 from importlib.metadata import entry_points
 from typing import Any
 
-from ..cards import Card, CardManifest, CardRegistry, ResourceSourceCard
+from ..cards import Card, CardManifest, CardRegistry, FilenameProcessorCard, ResourceSourceCard
 from .filename_rules import parse_tv_episode
 
 
@@ -176,15 +176,19 @@ class ResourceSourceManager:
         """优先使用全局文件名识别规则，兼容旧资源卡片的专属规则。"""
         config = self.config_store.load()
         cards = config.get("cards") if isinstance(config, dict) else {}
-        global_card = cards.get("filename_recognition") if isinstance(cards, dict) else {}
-        global_card = global_card if isinstance(global_card, dict) else {}
-        global_enabled = bool(global_card.get("enabled", True))
-        global_config = global_card.get("config", {})
-        global_config = global_config if isinstance(global_config, dict) else {}
-        global_magic = global_config.get("magic_regex")
-
-        if global_enabled and isinstance(global_magic, dict):
-            parsed = parse_tv_episode(file_name, global_magic)
+        # 通过 filename_processor 类型发现识别能力，不绑定固定卡片 ID。
+        for processor in self.registry.find_by_type("filename_processor"):
+            if not isinstance(processor, FilenameProcessorCard):
+                continue
+            saved = cards.get(processor.card_id) if isinstance(cards, dict) else {}
+            if isinstance(saved, dict) and not saved.get("enabled", True):
+                continue
+            processor_config = self._card_config(config, processor.card_id)
+            try:
+                parsed = processor.parse_episode(file_name, processor_config)
+            except Exception:
+                self.logger.exception("文件名识别卡片 %s 执行失败", processor.card_id)
+                continue
             if parsed[1] is not None:
                 return parsed
 

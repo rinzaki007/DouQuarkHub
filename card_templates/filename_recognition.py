@@ -4,13 +4,13 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from moviesync.cards import Card, CardManifest
+from moviesync.cards import CardManifest, FilenameProcessorCard
 from moviesync.errors import ConfigValidationError
 from moviesync.regex_safety import has_nested_unbounded_quantifier
-from moviesync.services.filename_rules import DEFAULT_TV_MAGIC_REGEX
+from moviesync.services.filename_rules import DEFAULT_TV_MAGIC_REGEX, parse_tv_episode
 
 
-class FilenameRecognitionCard(Card):
+class FilenameRecognitionCard(FilenameProcessorCard):
     """Configure the global filename episode-recognition rules."""
 
     manifest = CardManifest(
@@ -39,6 +39,18 @@ class FilenameRecognitionCard(Card):
             },
         ),
     )
+
+    def parse_episode(
+        self, file_name: str, config: dict[str, Any]
+    ) -> tuple[int | None, int | None]:
+        """先使用通用内置格式，再应用本卡片配置的特殊命名规则。"""
+        builtin = parse_tv_episode(file_name, {"pattern": "", "replace": ""})
+        if builtin[1] is not None:
+            return builtin
+        magic = config.get("magic_regex") if isinstance(config, dict) else None
+        if not isinstance(magic, dict) or not str(magic.get("pattern") or "").strip():
+            return None, None
+        return parse_tv_episode(file_name, magic)
 
     def validate_config(self, config: dict[str, Any]) -> dict[str, Any]:
         normalized = super().validate_config(config)

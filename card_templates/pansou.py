@@ -16,8 +16,8 @@ from moviesync.config_store import ConfigValidationError
 class PanSouResourceSource(ResourceSourceCard):
     """PanSou Web 搜索适配器。
 
-    当前只输出可由内置 Quark 存储卡解析的夸克分享链接；
-    其他网盘类型不会被错误地交给 Quark。
+    当前输出夸克分享链接并声明资源类型；由平台根据存储卡能力匹配目标，
+    不直接绑定 Quark 卡片 ID。其他网盘类型不会被错误地交给夸克解析。
     """
 
     source_id = "pansou"
@@ -211,7 +211,7 @@ class PanSouResourceSource(ResourceSourceCard):
             "pwd_id": share_id,
             "url": link_url,
             "password": str(item.get("password") or item.get("passcode") or "").strip(),
-            "storage_target_id": "quark",
+            "resource_type": "quark_share",
             "title": title[:500],
             "channel": channel[:200],
         }
