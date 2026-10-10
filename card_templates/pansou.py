@@ -70,7 +70,7 @@ class PanSouResourceSource(ResourceSourceCard):
     )
 
     def __init__(self, http_client=None):
-        from ..clients.http import HttpClient
+        from moviesync.clients.http import HttpClient
 
         self.http = http_client or HttpClient()
         self._token = ""
