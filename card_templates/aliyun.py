@@ -12,8 +12,8 @@ from typing import Any
 from urllib.parse import urlparse
 
 from moviesync.cards import CardManifest, StorageTargetCard
-from moviesync.errors import ConfigValidationError
 from moviesync.clients.http import ApiError, HttpClient
+from moviesync.errors import ConfigValidationError
 
 _API = "https://api.aliyundrive.com"
 _AUTH = "https://auth.aliyundrive.com"
@@ -37,7 +37,9 @@ def _share_id(resource: object) -> str:
         try:
             parsed = urlparse(url)
             host = (parsed.hostname or "").lower()
-            if host == "alipan.com" or host.endswith(".alipan.com") or host == "aliyundrive.com" or host.endswith(".aliyundrive.com"):
+            is_alipan = host == "alipan.com" or host.endswith(".alipan.com")
+            is_aliyundrive = host == "aliyundrive.com" or host.endswith(".aliyundrive.com")
+            if is_alipan or is_aliyundrive:
                 match = re.match(r"^/s/([A-Za-z0-9_-]{1,128})(?:/|$)", parsed.path)
                 if match:
                     raw = match.group(1)
