@@ -21,7 +21,7 @@ def test_channel_subscription_uses_telegram_title_search():
     results = source.search_channel(
         {"id": "movie_channel", "name": "影视资源频道"},
         "怪奇物语",
-        {},
+        {"channels": [{"id": "movie_channel", "name": "影视资源频道"}]},
     )
 
     assert results == [{"pwd_id": "share123"}]
