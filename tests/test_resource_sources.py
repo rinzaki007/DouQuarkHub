@@ -357,7 +357,7 @@ def test_resource_search_result_cannot_spoof_source_identity():
             return {"status": "healthy"}
 
     manager = ResourceSourceManager(
-        FakeTelegramClient(), Store(), FakeLogger(), resource_cards=[SpoofCard()]
+        Store(), FakeLogger(), resource_cards=[SpoofCard()]
     )
     results = manager.search({"title": "Film"}, Store().load())
     item = next(result for result in results if result["pwd_id"] == "abc123")
