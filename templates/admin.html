@@ -1046,6 +1046,7 @@
             metadata_provider: '元数据',
             notification: '通知',
             automation: '自动化',
+            filename_processor: '文件名识别',
             custom: '自定义'
         };
 
@@ -1074,6 +1075,11 @@
                 title: "自动任务",
                 description: "负责按计划自动检查和处理任务。",
                 icon: "fa-clock",
+            },
+            filename_processor: {
+                title: "文件名识别",
+                description: "统一识别剧名、季集信息和特殊命名规则，供所有资源来源共用。",
+                icon: "fa-file-signature",
             },
             custom: {
                 title: "其他功能",
@@ -1130,7 +1136,7 @@
                 (groups[type] ||= []).push(card);
             });
 
-            const order = ["resource_source", "storage_target", "metadata_provider", "notification", "automation", "custom"];
+            const order = ["resource_source", "storage_target", "metadata_provider", "notification", "automation", "filename_processor", "custom"];
             summary.textContent = "已加载 " + cards.length + " 张卡片 · " + Object.keys(groups).length + " 个能力分类";
 
             container.innerHTML = order.filter(type => groups[type]?.length).map(type => {
@@ -1283,11 +1289,17 @@
                 } else if (type === "json" && field.editor === "object_list") {
                     const items = Array.isArray(value) ? value : [];
                     const itemFields = Array.isArray(field.item_fields) ? field.item_fields : [];
-                    const rows = items.map(item => '<div data-card-list-row class="grid grid-cols-1 sm:grid-cols-2 gap-2 rounded-lg border border-slate-800 p-3">' +
+                    const rows = items.map((item, index) => '<div data-card-list-row class="rounded-xl border border-slate-700/80 bg-slate-950/45 p-3 shadow-sm">' +
+                        '<div class="mb-3 flex items-center justify-between gap-2 border-b border-slate-800 pb-2">' +
+                        '<div class="flex min-w-0 items-center gap-2"><span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 text-blue-300"><i class="fa-solid fa-tower-broadcast"></i></span>' +
+                        '<div class="min-w-0"><div class="text-xs font-semibold text-slate-200">' + escapeHtml(item && (item.name || item.id) || ("频道 " + (index + 1))) + '</div>' +
+                        '<div class="truncate text-[10px] text-slate-500">@' + escapeHtml(item && item.id || "尚未填写用户名") + '</div></div></div>' +
+                        '<button type="button" data-card-remove-row class="shrink-0 rounded-lg border border-rose-400/20 px-2.5 py-1.5 text-[10px] text-rose-300 hover:bg-rose-400/10">删除频道</button></div>' +
+                        '<div class="grid grid-cols-1 sm:grid-cols-2 gap-2">' +
                         itemFields.map(sub => '<label class="block min-w-0 text-[10px] text-slate-400">' + escapeHtml(sub.label || sub.key) +
                             '<input data-card-item-field="' + escapeHtml(sub.key) + '" value="' + escapeHtml(item && item[sub.key] != null ? item[sub.key] : '') +
                             '" placeholder="' + escapeHtml(sub.placeholder || '') + '" class="glass-input mt-1 w-full rounded-lg border border-slate-800 px-3 py-2 text-xs text-slate-200"></label>').join('') +
-                        '<div class="sm:col-span-2 flex justify-end"><button type="button" data-card-remove-row class="text-[11px] text-rose-300 hover:text-rose-200">移除此频道</button></div></div>').join('');
+                        '</div></div>').join('');
                     control = '<div data-card-structured-list="' + escapeHtml(key) + '" class="mt-2 space-y-2">' + rows + '</div>' +
                         '<button type="button" data-card-add-row class="mt-2 rounded-lg border border-slate-700 px-3 py-2 text-[11px] text-slate-300 hover:bg-slate-800">＋ 添加频道</button>';
                 } else if (type === "json" && field.editor === "object_fields") {
@@ -1323,11 +1335,11 @@
                         if (list) {
                             const row = document.createElement("div");
                             row.setAttribute("data-card-list-row", "");
-                            row.className = "grid grid-cols-1 sm:grid-cols-2 gap-2 rounded-lg border border-slate-800 p-3";
-                            row.innerHTML = itemFields.map(sub => '<label class="block min-w-0 text-[10px] text-slate-400">' + escapeHtml(sub.label || sub.key) +
+                            row.className = "rounded-xl border border-slate-700/80 bg-slate-950/45 p-3 shadow-sm";
+                            row.innerHTML = '<div class="mb-3 flex items-center justify-between gap-2 border-b border-slate-800 pb-2"><div class="flex items-center gap-2"><span class="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500/10 text-blue-300"><i class="fa-solid fa-tower-broadcast"></i></span><div><div class="text-xs font-semibold text-slate-200">新频道</div><div class="text-[10px] text-slate-500">填写用户名后保存</div></div></div><button type="button" data-card-remove-row class="rounded-lg border border-rose-400/20 px-2.5 py-1.5 text-[10px] text-rose-300 hover:bg-rose-400/10">删除频道</button></div>' +
+                                '<div class="grid grid-cols-1 sm:grid-cols-2 gap-2">' + itemFields.map(sub => '<label class="block min-w-0 text-[10px] text-slate-400">' + escapeHtml(sub.label || sub.key) +
                                 '<input data-card-item-field="' + escapeHtml(sub.key) + '" value="" placeholder="' + escapeHtml(sub.placeholder || '') +
-                                '" class="glass-input mt-1 w-full rounded-lg border border-slate-800 px-3 py-2 text-xs text-slate-200"></label>').join('') +
-                                '<div class="sm:col-span-2 flex justify-end"><button type="button" data-card-remove-row class="text-[11px] text-rose-300 hover:text-rose-200">移除此频道</button></div>';
+                                '" class="glass-input mt-1 w-full rounded-lg border border-slate-800 px-3 py-2 text-xs text-slate-200"></label>').join('') + '</div>';
                             list.appendChild(row);
                         }
                     } else if (event.target.closest("[data-card-remove-row]")) {
