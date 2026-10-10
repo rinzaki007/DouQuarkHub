@@ -439,7 +439,10 @@ class QuarkStorageCard(StorageTargetCard):
         pwd_id = sanitize_pwd_id(resource.get("pwd_id"))
         if not pwd_id:
             return {"files": [], "token": None, "error": "分享资源 ID 无效"}
-        files, stoken, error = self._client().get_share_files(pwd_id)
+        files, stoken, error = self._client().get_share_files(
+            pwd_id,
+            passcode=str(resource.get("password") or resource.get("passcode") or ""),
+        )
         return {
             "files": files or [],
             "token": stoken,
