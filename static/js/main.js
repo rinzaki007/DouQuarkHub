@@ -44,7 +44,9 @@ async function loadMetadataProviders() {
             .sort((a, b) => String(a.name || a.id).localeCompare(String(b.name || b.id)));
         select.replaceChildren(new Option('自动来源', ''));
         for (const provider of providers) {
-            const label = provider.configured === false
+            const requiresConfig = Array.isArray(provider.config_fields)
+                && provider.config_fields.some(field => field.required);
+            const label = requiresConfig && provider.configured === false
                 ? `${provider.name || provider.id}（未配置）`
                 : (provider.name || provider.id);
             select.add(new Option(label, provider.id));
