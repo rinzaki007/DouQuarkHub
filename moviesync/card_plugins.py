@@ -5,8 +5,8 @@ code, not a sandboxed data format; the web UI must warn users to install trusted
 """
 from __future__ import annotations
 
-import hashlib
 import importlib.util
+import hashlib
 import re
 import sys
 from pathlib import Path
@@ -114,7 +114,10 @@ class CardFilePluginManager:
                 elif not marker_value:
                     # Older releases created empty markers. Upgrade only exact,
                     # known bundled versions; an unknown file may be user-edited.
-                    if destination_blob == source_blob or destination_blob in _LEGACY_BUNDLED_CARD_BLOBS.get(filename, set()):
+                    if (
+                        destination_blob == source_blob
+                        or destination_blob in _LEGACY_BUNDLED_CARD_BLOBS.get(filename, set())
+                    ):
                         if destination_blob != source_blob:
                             destination.write_bytes(source_content)
                             self.logger.info("已迁移旧版内置卡片 %s", filename)
