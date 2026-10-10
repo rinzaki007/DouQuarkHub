@@ -217,7 +217,7 @@ class SearchService:
                 "resource_id": resource_id,
                 "channel": source.get("channel", ""),
                 "channel_id": source.get("channel_id", ""),
-                "pwd_id": str(source.get("pwd_id") or "").strip(),
+                **({"pwd_id": str(source.get("pwd_id") or "").strip()} if source.get("pwd_id") else {}),
                 "password": str(source.get("password") or source.get("passcode") or ""),
                 "url": str(source.get("url") or ""),
                 "files": videos,
