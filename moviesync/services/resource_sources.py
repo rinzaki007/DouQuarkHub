@@ -184,13 +184,20 @@ class ResourceSourceManager:
         global_magic = global_config.get("magic_regex")
 
         if global_enabled and isinstance(global_magic, dict):
-            return parse_tv_episode(file_name, global_magic)
+            parsed = parse_tv_episode(file_name, global_magic)
+            if parsed[1] is not None:
+                return parsed
 
-        # 旧版本将增强规则存放在资源来源卡片内。仅在全局规则未启用或未配置时回退，
-        # 避免升级后原有订阅的集数识别突然失效。
+        # 旧版本将增强规则存放在资源来源卡片内。全局规则没有识别出集数时，
+        # 继续尝试旧规则，避免升级后已有订阅的特殊命名突然失效。
         source = self.sources.get(str(source_id))
         card_config = self._card_config(config, source.card_id) if source else {}
-        return parse_tv_episode(file_name, card_config.get("magic_regex"))
+        legacy_magic = card_config.get("magic_regex")
+        if isinstance(legacy_magic, dict):
+            parsed = parse_tv_episode(file_name, legacy_magic)
+            if parsed[1] is not None:
+                return parsed
+        return parse_tv_episode(file_name)
 
     def search_channel(self, source_id: str, channel: object, title: str) -> list[dict[str, Any]]:
         config = self.config_store.load()
