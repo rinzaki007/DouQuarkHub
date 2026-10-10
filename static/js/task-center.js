@@ -613,7 +613,7 @@ async function createTask() {
         await loadTasks();
     }catch(err){
         taskToast(err.message || '保存失败');
-        btn.disabled=false;
+        refreshTaskSubmitState();
     }
 }
 
