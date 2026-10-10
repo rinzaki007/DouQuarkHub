@@ -11,6 +11,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from .settings import DEFAULT_CATEGORY_FIDS, DEFAULT_OPENLIST_URL
+from .regex_safety import has_nested_unbounded_quantifier
 from .storage import JsonStore
 
 CHANNEL_ID_RE = re.compile(r"^[A-Za-z0-9_]{2,64}$")
@@ -400,6 +401,8 @@ class ConfigStore:
                 re.compile(pattern) if pattern else None
             except re.error as exc:
                 raise ConfigValidationError(f"文件名正则无效：{exc}") from exc
+            if pattern and has_nested_unbounded_quantifier(pattern):
+                raise ConfigValidationError("文件名正则包含高风险的嵌套无限量词")
             config["magic_regex"] = {"pattern": pattern, "replace": replacement}
         if "enabled" in incoming:
             card["enabled"] = bool(incoming["enabled"])
