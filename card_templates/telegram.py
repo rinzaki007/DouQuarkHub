@@ -103,6 +103,9 @@ class TelegramResourceSource(ResourceSourceCard):
         return self.client.search_channel(channel, title, scan_all=True)
 
 
+    def is_configured(self, config: dict[str, Any]) -> bool:
+        return bool(config.get("channels")) if isinstance(config, dict) else False
+
     def check(self, config: dict) -> dict[str, Any]:
         channels = config.get("channels") or []
         if not channels:
