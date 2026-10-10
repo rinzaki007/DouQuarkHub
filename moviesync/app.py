@@ -29,6 +29,19 @@ from .settings import PROJECT_ROOT, load_settings
 from .web import LoginRateLimiter, register_web
 
 
+def _load_optional_cards(logger, label: str, loader, context: dict) -> list[str]:
+    """Load one card group without letting an extension failure stop the app."""
+    try:
+        loaded = loader(context)
+        return loaded if isinstance(loaded, list) else []
+    except Exception:
+        logger.exception(
+            "加载%s失败，MovieSync 会继续启动；相关卡片功能可能暂时不可用",
+            label,
+        )
+        return []
+
+
 def create_app(
     test_config: dict | None = None,
     *,
@@ -77,40 +90,53 @@ def create_app(
         logger,
         PROJECT_ROOT / "card_templates",
     )
-    file_card_plugins.load_all({
+    card_context = {
         "telegram": telegram,
         "config_store": config_store,
         "logger": logger,
-    })
+    }
+    _load_optional_cards(
+        logger,
+        "卡片文件",
+        file_card_plugins.load_all,
+        card_context,
+    )
     resource_sources = ResourceSourceManager(
         config_store,
         logger,
         registry=card_registry,
     )
-    resource_sources.load_plugins({
-        "telegram": telegram,
-        "config_store": config_store,
-        "logger": logger,
-    })
+    _load_optional_cards(
+        logger,
+        "资源搜索",
+        resource_sources.load_plugins,
+        card_context,
+    )
     metadata = MetadataProviderManager(card_registry, logger, config_store=config_store)
-    metadata.load_plugins({
-        "config_store": config_store,
-        "logger": logger,
-    })
+    _load_optional_cards(
+        logger,
+        "影视资料",
+        metadata.load_plugins,
+        {"config_store": config_store, "logger": logger},
+    )
     storage_targets = StorageTargetManager(
         card_registry,
         config_store,
         logger,
     )
-    storage_targets.load_plugins({
-        "config_store": config_store,
-        "logger": logger,
-    })
+    _load_optional_cards(
+        logger,
+        "转存位置",
+        storage_targets.load_plugins,
+        {"config_store": config_store, "logger": logger},
+    )
     notifications = NotificationManager(card_registry, logger, config_store=config_store)
-    notifications.load_plugins({
-        "config_store": config_store,
-        "logger": logger,
-    })
+    _load_optional_cards(
+        logger,
+        "消息通知",
+        notifications.load_plugins,
+        {"config_store": config_store, "logger": logger},
+    )
     card_registry.migrate_configs(config_store, logger)
 
 
