@@ -504,19 +504,24 @@ def admin_logs():
 
 @api.get("/check-channels")
 def check_channels_health():
+    """兼容旧接口路径，但汇总所有资源来源卡片，不再绑定 Telegram。"""
     results = _services()["resource_sources"].check_all()
-    telegram = next(
-        (item for item in results if item.get("id") == "telegram"),
-        {"total": 0, "valid_count": 0},
+    total = sum(
+        int(item.get("total") or 0)
+        for item in results
+        if isinstance(item, dict)
     )
-    return jsonify(
-        {
-            "success": True,
-            "total": telegram.get("total", 0),
-            "valid_count": telegram.get("valid_count", 0),
-            "resource_sources": results,
-        }
+    valid_count = sum(
+        int(item.get("valid_count") or 0)
+        for item in results
+        if isinstance(item, dict)
     )
+    return jsonify({
+        "success": True,
+        "total": total,
+        "valid_count": valid_count,
+        "resource_sources": results,
+    })
 
 
 @api.get("/resource-sources")
@@ -580,42 +585,16 @@ def cards():
         item["enabled"] = bool(saved.get("enabled", True))
         card_config = saved.get("config", {})
         card_config = card_config if isinstance(card_config, dict) else {}
-        item["configured"] = False
-        if card.card_id == "telegram":
-            health = card_config.get("health", {}) if isinstance(card_config, dict) else {}
-            item["configured"] = bool(card_config.get("channels"))
-            item["health"] = health if isinstance(health, dict) and health else {
-                "status": "idle",
-                "message": "尚未检查",
-            }
-        elif card.card_id == "quark":
-            has_cookie = bool(card_config.get("cookie")) if isinstance(card_config, dict) else False
-            item["configured"] = has_cookie
-            item["health"] = {
-                "status": "configured" if has_cookie else "unconfigured",
-                "message": "Cookie 已配置，可检查连接状态" if has_cookie else "尚未配置夸克 Cookie",
-            }
+
+        # 状态由卡片接口自身提供；平台只调用通用方法，不识别 Telegram/Quark 等 ID。
+        item["configured"] = bool(card.is_configured(card_config))
+        health = card_config.get("health")
+        if isinstance(health, dict) and health:
+            item["health"] = health
         else:
-            # 列表接口只读状态，不在每次刷新时触发第三方网络请求。
-            fields = card.manifest.config_fields
-            required_fields = [field for field in fields if field.get("required")]
-            configured = all(
-                _has_config_value(
-                    card_config.get(str(field.get("key")), field.get("default"))
-                )
-                for field in required_fields
-            )
-            if not required_fields and fields:
-                configured = any(
-                    _has_config_value(
-                        card_config.get(str(field.get("key")), field.get("default"))
-                    )
-                    for field in fields
-                )
-            item["configured"] = configured
             item["health"] = {
-                "status": "idle",
-                "message": "尚未检查，请手动检查连接",
+                "status": "configured" if item["configured"] else "unconfigured",
+                "message": "已完成基础配置" if item["configured"] else "尚未完成配置",
             }
         cards.append(item)
     plugin_manager = _services().get("file_card_plugins")
