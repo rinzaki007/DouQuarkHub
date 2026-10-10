@@ -42,7 +42,6 @@ class ResourceSourceManager:
 
     def __init__(
         self,
-        telegram,
         config_store,
         logger,
         registry: CardRegistry | None = None,
