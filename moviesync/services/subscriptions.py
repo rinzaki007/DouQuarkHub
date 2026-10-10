@@ -134,8 +134,12 @@ class SubscriptionManager:
 
             item["schema_version"] = SUBSCRIPTION_SCHEMA_VERSION
             item.setdefault("storage_target_id", "")
-            item.setdefault("resource_id", item.get("pwd_id", ""))
-            item.setdefault("resource_type", "")
+            if "resource_id" not in item:
+                item["resource_id"] = item.get("pwd_id", "")
+                changed = True
+            if "resource_type" not in item:
+                item["resource_type"] = ""
+                changed = True
             item.setdefault("cover", "")
             item.setdefault("source_id", "")
             item.setdefault("initial_file_keys", [])
@@ -635,7 +639,7 @@ class SubscriptionManager:
             return self._check_channel_subscription(sub)
 
         resource = {
-            "pwd_id": str(sub.get("pwd_id") or "").strip(),
+            **({"pwd_id": str(sub.get("pwd_id") or "").strip()} if sub.get("pwd_id") else {}),
             "resource_id": str(sub.get("resource_id") or sub.get("pwd_id") or "").strip(),
             "resource_type": str(sub.get("resource_type") or "").strip().lower(),
             "storage_target_id": str(sub.get("storage_target_id") or "").strip(),
@@ -777,16 +781,18 @@ class SubscriptionManager:
         # 标题搜索可能因频道帖子使用英文名、旧消息超出扫描范围等原因返回空列表。
         # 用户创建订阅时选中的分享是可靠的起点，至少先检查该分享中的后续集数。
         selected_pwd_id = str(sub.get("resource_id") or sub.get("pwd_id") or "").strip()
+        selected_resource_type = str(sub.get("resource_type") or "").strip().lower()
         selected_target_id = str(sub.get("storage_target_id") or "").strip()
         if selected_pwd_id and not any(
             str(item.get("resource_id") or item.get("share_id") or item.get("pwd_id") or "").strip() == selected_pwd_id
+            and str(item.get("resource_type") or selected_resource_type).strip().lower() == selected_resource_type
             and str(item.get("storage_target_id") or selected_target_id).strip() == selected_target_id
             for item in sources
             if isinstance(item, dict)
         ):
             sources = [
                 {
-                    "pwd_id": str(sub.get("pwd_id") or "").strip(),
+                    **({"pwd_id": str(sub.get("pwd_id") or "").strip()} if sub.get("pwd_id") else {}),
                     "resource_id": selected_pwd_id,
                     "resource_type": str(sub.get("resource_type") or "").strip().lower(),
                     "channel": channel,
@@ -846,7 +852,7 @@ class SubscriptionManager:
         # A file can legitimately be copied to multiple storage targets. Queue
         # identity therefore includes the destination, while persisted legacy
         # keys remain compatible for the subscription's originally selected target.
-        queued_keys: set[tuple[str, str, str]] = set()
+        queued_keys: set[tuple[str, str, str, str]] = set()
         resolution_errors: list[str] = []
 
         for source in sources:
