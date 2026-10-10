@@ -2,6 +2,7 @@
 # 用途：在 requirements.txt 基础上提供 pytest 等本地测试工具。
 -r requirements.txt
 pytest>=8,<9
+pytest-cov>=5,<8
 ruff==0.15.12
 setuptools>=68
 wheel
