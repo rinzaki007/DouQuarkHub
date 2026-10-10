@@ -65,6 +65,17 @@ def _normalize_fid(
     return fid
 
 
+def _sanitize_persisted_numbers(value):
+    """Keep non-finite JSON numbers from breaking task-center responses."""
+    if isinstance(value, float) and not math.isfinite(value):
+        return 0
+    if isinstance(value, dict):
+        return {key: _sanitize_persisted_numbers(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_sanitize_persisted_numbers(item) for item in value]
+    return value
+
+
 def _task_sort_timestamp(item: dict) -> float:
     """Sort task history safely when persisted timestamps are malformed."""
     value = item.get("updated_at") or item.get("created_at") or 0
@@ -1150,6 +1161,7 @@ def get_tasks():
             "phase_label": task_state["phase_label"],
         })
 
+    items = [_sanitize_persisted_numbers(item) for item in items]
     items.sort(key=_task_sort_timestamp, reverse=True)
     return jsonify({"success": True, "tasks": items})
 
@@ -1217,6 +1229,7 @@ def get_task_detail(task_id):
     task = _services()["tasks"].get_task(task_id)
     if not task:
         return _json_error("未找到任务", 404)
+    task = _sanitize_persisted_numbers(task)
     return jsonify({
         "success": True,
         "task": {key: value for key, value in task.items() if key != "retry_payload"},
