@@ -95,6 +95,11 @@ class StorageTargetManager:
             getter = getattr(self.config_store, "get_default_storage_target_id", None)
             target_id = str(getter() or "").strip() if callable(getter) else ""
 
+        if not target_id:
+            _, available = self._load_card_config()
+            if not available:
+                return "无法读取存储目标配置，请检查配置文件和服务日志后重试"
+
         if target_id:
             card = self.registry.get(str(target_id))
             if isinstance(card, StorageTargetCard):
