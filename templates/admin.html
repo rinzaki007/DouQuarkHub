@@ -1369,8 +1369,9 @@
             for (const field of currentGenericCard.fields) {
                 const key = String(field.key);
                 const input = document.querySelector('[data-card-field="' + CSS.escape(key) + '"]');
-                if (!input) continue;
-                const type = input.dataset.cardType || field.type || "string";
+                const type = input?.dataset.cardType || field.type || "string";
+                const structuredJson = type === "json" && ["object_list", "object_fields"].includes(field.editor);
+                if (!input && !structuredJson) continue;
                 let value;
                 if (type === "boolean") value = input.checked;
                 else if (type === "json" && field.editor === "object_list") {
