@@ -65,9 +65,21 @@ class StorageTargetManager:
                 self.logger.exception("存储卡片插件 %s 加载失败", entry_point.name)
         return loaded
 
+    def _load_card_config(self) -> tuple[dict[str, Any], bool]:
+        """读取卡片配置；返回值同时标记配置是否可信可用。"""
+        try:
+            config = self.config_store.load()
+        except Exception:
+            self.logger.exception("读取存储目标卡片配置失败")
+            return {}, False
+        return (config if isinstance(config, dict) else {}), True
+
     def _enabled_cards(self) -> list[StorageTargetCard]:
+        config, available = self._load_card_config()
+        if not available:
+            # Never guess a destination when we cannot verify its enabled state.
+            return []
         cards = []
-        config = self.config_store.load()
         card_configs = config.get("cards") if isinstance(config, dict) else {}
         for card in self.registry.find_by_type("storage_target"):
             if not isinstance(card, StorageTargetCard):
@@ -83,10 +95,17 @@ class StorageTargetManager:
             getter = getattr(self.config_store, "get_default_storage_target_id", None)
             target_id = str(getter() or "").strip() if callable(getter) else ""
 
+        if not target_id:
+            _, available = self._load_card_config()
+            if not available:
+                return "无法读取存储目标配置，请检查配置文件和服务日志后重试"
+
         if target_id:
             card = self.registry.get(str(target_id))
             if isinstance(card, StorageTargetCard):
-                config = self.config_store.load()
+                config, available = self._load_card_config()
+                if not available:
+                    return "无法读取存储目标配置，请检查配置文件和服务日志后重试"
                 card_configs = config.get("cards") if isinstance(config, dict) else {}
                 saved = card_configs.get(card.card_id) if isinstance(card_configs, dict) else {}
                 if isinstance(saved, dict) and not saved.get("enabled", True):
@@ -108,7 +127,9 @@ class StorageTargetManager:
             card = self.registry.get(str(target_id))
             if not isinstance(card, StorageTargetCard):
                 return None
-            config = self.config_store.load()
+            config, available = self._load_card_config()
+            if not available:
+                return None
             card_configs = config.get("cards") if isinstance(config, dict) else {}
             saved = card_configs.get(card.card_id) if isinstance(card_configs, dict) else {}
             if isinstance(saved, dict) and not saved.get("enabled", True):
@@ -122,7 +143,9 @@ class StorageTargetManager:
                 # Do not silently send files to another destination when the
                 # configured default plugin is missing or has been removed.
                 return None
-            config = self.config_store.load()
+            config, available = self._load_card_config()
+            if not available:
+                return None
             card_configs = config.get("cards") if isinstance(config, dict) else {}
             saved = card_configs.get(card.card_id) if isinstance(card_configs, dict) else {}
             if isinstance(saved, dict) and not saved.get("enabled", True):
@@ -134,15 +157,18 @@ class StorageTargetManager:
         return cards[0] if cards else None
 
     def list_targets(self) -> list[dict[str, Any]]:
-        config = self.config_store.load()
+        config, available = self._load_card_config()
         card_configs = config.get("cards") if isinstance(config, dict) else {}
         results = []
         for card in self.registry.find_by_type("storage_target"):
             saved = card_configs.get(card.card_id) if isinstance(card_configs, dict) else {}
-            enabled = not isinstance(saved, dict) or bool(saved.get("enabled", True))
+            enabled = available and (
+                not isinstance(saved, dict) or bool(saved.get("enabled", True))
+            )
             results.append({
                 **card.manifest.to_dict(),
                 "enabled": enabled,
+                **({"config_error": "无法读取存储目标配置"} if not available else {}),
             })
         return results
 
