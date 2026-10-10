@@ -142,3 +142,49 @@ def test_transfer_plugin_failure_message_is_sanitized():
     assert message == "转存失败，请检查存储目标配置或查看服务日志"
     assert counts["uncertain"] is False
     assert "SECRET_COOKIE_VALUE" not in message
+
+
+
+def test_transfer_refreshes_share_state_and_temporary_token():
+    import logging
+
+    class RotatingTokenStorage(FakeStorageTargets):
+        def __init__(self):
+            self.resolve_count = 0
+            self.transfer_token = None
+
+        def resolve_resource(self, resource, target_id=None):
+            self.resolve_count += 1
+            return {
+                "target_id": target_id or "quark",
+                "files": [
+                    {"fid": "f1", "file_name": "Show.S01E01.1080p.mkv", "size": 1}
+                ],
+                "token": f"token-{self.resolve_count}",
+                "error": None,
+            }
+
+        def create_folder(self, *_args, **_kwargs):
+            return "folder-1"
+
+        def transfer(self, resource, files, target_id="0", storage_target_id=None, token=None):
+            self.transfer_token = token
+            return True, "ok"
+
+    storage = RotatingTokenStorage()
+    service = SearchService(FakeResourceSources(), storage, logging.getLogger("test"))
+    resource = {"pwd_id": "same123", "storage_target_id": "quark"}
+
+    # Search can populate the short-lived cache, but its token must not be reused for transfer.
+    _files, search_token, _error, _target_id = service._get_resource_files(resource)
+    assert search_token == "token-1"
+
+    ok, _message, _counts = service.transfer_selected_resource_with_progress(
+        {"title": "Show"},
+        {"pwd_id": "same123", "storage_target_id": "quark", "files": [{"fid": "f1"}]},
+        "0",
+    )
+
+    assert ok is True
+    assert storage.resolve_count == 2
+    assert storage.transfer_token == "token-2"
