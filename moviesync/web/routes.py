@@ -837,15 +837,18 @@ def resource_card_config(card_id):
         merged[key] = value
         persisted_incoming[key] = value
 
+    enabled = data.get("enabled") if "enabled" in data else None
+    if enabled is not None and not isinstance(enabled, bool):
+        return _json_error("enabled 必须是布尔值")
+    will_be_enabled = bool(saved.get("enabled", True)) if enabled is None else enabled
     for key, field in fields_by_key.items():
         secret = bool(field.get("secret")) or any(marker in key.lower() for marker in sensitive_markers)
         has_value = _has_config_value(merged.get(key))
         has_saved_secret = secret and _has_config_value(raw_config.get(key))
-        if field.get("required") and not has_value and not has_saved_secret:
+        # An unconfigured provider must still be disableable. Required fields
+        # are enforced when enabling it, not when explicitly turning it off.
+        if will_be_enabled and field.get("required") and not has_value and not has_saved_secret:
             return _json_error(f"请填写必填配置：{field.get('label') or key}")
-    enabled = data.get("enabled") if "enabled" in data else None
-    if enabled is not None and not isinstance(enabled, bool):
-        return _json_error("enabled 必须是布尔值")
     try:
         validated = card.validate_config(merged)
         if not isinstance(validated, dict):
