@@ -1391,9 +1391,9 @@ def subscriptions():
                 title=data.get(
                     "title"
                 ),
-                pwd_id=data.get(
-                    "pwd_id"
-                ),
+                pwd_id=data.get("pwd_id", ""),
+                resource_id=data.get("resource_id", ""),
+                resource_type=data.get("resource_type", ""),
                 target_fid=target_fid,
                 interval_hours=int(
                     data.get(
