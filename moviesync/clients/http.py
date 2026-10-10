@@ -50,6 +50,8 @@ class HttpClient:
                     data = response.json()
                 except ValueError as exc:
                     raise ApiError(f"上游返回非 JSON 响应（HTTP {response.status_code}）") from exc
+                if not isinstance(data, dict):
+                    raise ApiError(f"上游返回的 JSON 结构无效（HTTP {response.status_code}）")
                 return response, data
             except (requests.RequestException, ApiError) as exc:
                 last_error = exc
