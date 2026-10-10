@@ -13,6 +13,7 @@ from flask import Flask, session
 
 from .auth import AuthStore
 from .cards import CardRegistry, QuarkStorageCard
+from .card_plugins import CardFilePluginManager
 from .cards_metadata import DoubanMetadataCard
 from .clients.douban import DoubanClient
 from .clients.http import HttpClient
@@ -105,6 +106,17 @@ def create_app(
         "config_store": config_store,
         "logger": logger,
     })
+    file_card_plugins = CardFilePluginManager(
+        settings.data_dir / "cards",
+        card_registry,
+        logger,
+    )
+    file_card_plugins.load_all({
+        "telegram": telegram,
+        "douban": douban,
+        "config_store": config_store,
+        "logger": logger,
+    })
     card_registry.migrate_configs(config_store, logger)
 
 
@@ -157,6 +169,7 @@ def create_app(
         "telegram": telegram,
         "resource_sources": resource_sources,
         "card_registry": card_registry,
+        "file_card_plugins": file_card_plugins,
         "storage_targets": storage_targets,
         "http": http,
         "subscriptions": subscriptions,
