@@ -74,7 +74,13 @@ let logTimerSeconds = 0;
 let logAutoCloseTimer = null;
 
 document.addEventListener("DOMContentLoaded", () => {
-    loadMetadataProviders().finally(() => fetchMovies());loadCategoryOptions();
+    loadMetadataProviders().finally(() => fetchMovies());
+    loadCategoryOptions();
+    document.getElementById('batch-storage-target')?.addEventListener('change', event => {
+        const targetId = String(event.target.value || '');
+        window.defaultStorageTargetId = targetId;
+        loadCategoryDestinations(targetId);
+    });
     applyGlassmorphismStyles();
 });
 
@@ -87,22 +93,79 @@ function applyGlassmorphismStyles() {
 
 async function loadCategoryOptions() {
     const requestId = ++categoryOptionsRequestSeq;
+    const targetSelect = document.getElementById('batch-storage-target');
     const selects = document.querySelectorAll('.global-category-select');
     try {
         const targetResp = await apiFetch('/api/storage-targets');
         const targetData = await targetResp.json();
         if (requestId !== categoryOptionsRequestSeq) return;
-        if (!targetResp.ok || !targetData.success) throw new Error(targetData.message || '读取保存位置失败');
-        const targets = Array.isArray(targetData.targets) ? targetData.targets : [];
-        const targetId = targetData.default_target_id || targets.find(t => t.enabled !== false && !t.config_error)?.id;
-        window.defaultStorageTargetId = targetId || '';
-        if (!targetId) {
+        if (!targetResp.ok || !targetData.success) throw new Error(targetData.message || '读取存储卡片失败');
+
+        const targets = (Array.isArray(targetData.targets) ? targetData.targets : [])
+            .filter(target => target && target.id && target.enabled !== false && !target.config_error);
+        window.storageTargets = targets;
+        if (targetSelect) {
+            const previousTargetId = String(targetSelect.value || '');
+            const configuredDefault = String(targetData.default_target_id || '');
+            targetSelect.replaceChildren();
+            for (const target of targets) {
+                targetSelect.add(new Option(target.name || target.id, target.id));
+            }
+            const preferred = targets.find(target => target.id === previousTargetId)
+                || targets.find(target => target.id === configuredDefault)
+                || (!configuredDefault && targets.length === 1 ? targets[0] : null);
+            if (configuredDefault && !targets.some(target => target.id === configuredDefault)) {
+                targetSelect.add(new Option('默认存储卡片不可用，请手动选择', ''));
+                targetSelect.value = '';
+            } else if (preferred) {
+                targetSelect.value = preferred.id;
+            } else {
+                targetSelect.add(new Option('请选择存储卡片', ''));
+                targetSelect.value = '';
+            }
+            targetSelect.disabled = !targets.length;
+        }
+
+        const targetId = String(targetSelect?.value || targetData.default_target_id || '');
+        if (!targetId || !targets.some(target => target.id === targetId)) {
+            window.defaultStorageTargetId = '';
             selects.forEach(selectEl => {
-                selectEl.replaceChildren(new Option('没有可用的保存位置', ''));
+                selectEl.replaceChildren(new Option(
+                    targets.length ? '请先选择存储卡片' : '没有可用的存储卡片',
+                    ''
+                ));
                 selectEl.disabled = true;
             });
             return;
         }
+        window.defaultStorageTargetId = targetId;
+        await loadCategoryDestinations(targetId, requestId);
+    } catch (err) {
+        if (requestId !== categoryOptionsRequestSeq) return;
+        window.defaultStorageTargetId = '';
+        if (targetSelect) {
+            targetSelect.replaceChildren(new Option('读取存储卡片失败，请刷新重试', ''));
+            targetSelect.disabled = true;
+        }
+        selects.forEach(selectEl => {
+            selectEl.replaceChildren(new Option('读取保存目录失败，请刷新重试', ''));
+            selectEl.disabled = true;
+        });
+        console.error("读取存储卡片或保存目录失败:", err);
+    }
+}
+
+async function loadCategoryDestinations(targetId, requestId = ++categoryOptionsRequestSeq) {
+    const selects = document.querySelectorAll('.global-category-select');
+    if (!targetId) {
+        selects.forEach(selectEl => {
+            selectEl.replaceChildren(new Option('请先选择存储卡片', ''));
+            selectEl.disabled = true;
+        });
+        window.defaultStorageTargetId = '';
+        return;
+    }
+    try {
         const destResp = await apiFetch('/api/storage-targets/' + encodeURIComponent(targetId) + '/destinations');
         const destData = await destResp.json();
         if (requestId !== categoryOptionsRequestSeq) return;
@@ -111,7 +174,7 @@ async function loadCategoryOptions() {
         selects.forEach(selectEl => {
             selectEl.replaceChildren();
             if (!options.length) {
-                selectEl.add(new Option('该转存位置没有可用目录', ''));
+                selectEl.add(new Option('该存储卡片没有可用目录', ''));
                 selectEl.disabled = true;
                 return;
             }
@@ -129,6 +192,7 @@ async function loadCategoryOptions() {
             if (matched) selectEl.value = matched.id;
             selectEl.disabled = false;
         });
+        window.defaultStorageTargetId = targetId;
     } catch (err) {
         if (requestId !== categoryOptionsRequestSeq) return;
         selects.forEach(selectEl => {
