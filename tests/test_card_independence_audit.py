@@ -1,4 +1,5 @@
 """Architecture regression tests for built-in single-file card independence."""
+
 from __future__ import annotations
 
 from pathlib import Path
