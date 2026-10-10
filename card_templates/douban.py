@@ -15,16 +15,26 @@ class DoubanMetadataCard(MetadataProviderCard):
         type="metadata_provider",
         description="豆瓣影视元数据与搜索",
         capabilities=("metadata.list", "metadata.search"),
+        image_hosts=("doubanio.com",),
+        image_referer="https://movie.douban.com/",
     )
 
     def __init__(self, client: DoubanClient):
         self.client = client
 
+    @staticmethod
+    def _annotate(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        return [
+            {**item, "provider_id": "douban", "provider_name": "豆瓣"}
+            for item in items
+            if isinstance(item, dict)
+        ]
+
     def list_movies(self, tag: str, sort_type: str) -> list[dict[str, Any]]:
-        return self.client.get_movies(tag, sort_type)
+        return self._annotate(self.client.get_movies(tag, sort_type))
 
     def search(self, query: str) -> list[dict[str, Any]]:
-        return self.client.search(query)
+        return self._annotate(self.client.search(query))
 
     def get_detail(self, item_id: str) -> dict[str, Any] | None:
         return None
