@@ -49,6 +49,8 @@ class CardManifest:
     def __post_init__(self) -> None:
         if not CARD_ID_RE.fullmatch(self.id):
             raise ValueError(f"卡片 ID 无效: {self.id}")
+        if isinstance(self.config_version, bool) or not isinstance(self.config_version, int) or self.config_version < 1:
+            raise ValueError("卡片 config_version 必须是正整数")
         if self.type not in CARD_TYPES:
             raise ValueError(f"卡片类型无效: {self.type}")
         keys = [str(field.get("key") or "") for field in self.config_fields]
@@ -218,6 +220,18 @@ class Card:
     def close(self) -> None:
         """应用退出时释放卡片资源。默认无需处理。"""
         return None
+
+    def migrate_config(self, config: dict[str, Any], from_version: int) -> dict[str, Any]:
+        """将旧版卡片配置迁移到当前 manifest.config_version。
+
+        需要变更配置结构的卡片应覆盖此方法。默认拒绝隐式升级，避免在
+        没有迁移规则时错误地标记旧配置为新版本。
+        """
+        if from_version != self.manifest.config_version:
+            raise NotImplementedError(
+                f"卡片 {self.card_id} 未实现从配置版本 {from_version} 的迁移"
+            )
+        return deepcopy(config)
 
     @property
     def card_id(self) -> str:
@@ -548,6 +562,65 @@ class CardRegistry:
 
         for card in cards:
             self._close_card(card)
+
+    def migrate_configs(self, config_store, logger=None) -> list[str]:
+        """将已保存配置迁移到各卡片声明的版本；逐张隔离迁移失败。"""
+        try:
+            config = config_store.load()
+        except Exception:
+            if logger:
+                logger.exception("读取卡片配置以执行版本迁移失败")
+            return []
+
+        saved_cards = config.get("cards") if isinstance(config, dict) else {}
+        migrated: list[str] = []
+        for card in self.list():
+            saved = saved_cards.get(card.card_id) if isinstance(saved_cards, dict) else None
+            if not isinstance(saved, dict):
+                continue
+
+            raw_version = saved.get("config_version", 1)
+            if isinstance(raw_version, bool) or not isinstance(raw_version, int) or raw_version < 1:
+                if logger:
+                    logger.warning("卡片 %s 的配置版本无效，跳过迁移", card.card_id)
+                continue
+
+            target_version = card.manifest.config_version
+            if raw_version >= target_version:
+                if raw_version > target_version and logger:
+                    logger.warning(
+                        "卡片 %s 的已保存配置版本 %s 高于当前支持版本 %s，跳过迁移",
+                        card.card_id,
+                        raw_version,
+                        target_version,
+                    )
+                continue
+
+            old_config = saved.get("config")
+            old_config = deepcopy(old_config) if isinstance(old_config, dict) else {}
+            try:
+                new_config = card.migrate_config(old_config, raw_version)
+                if not isinstance(new_config, dict):
+                    raise TypeError("migrate_config 必须返回字典")
+                config_store.save_card_config(
+                    card.card_id,
+                    new_config,
+                    enabled=bool(saved.get("enabled", True)),
+                    config_version=target_version,
+                    replace_config=True,
+                )
+                migrated.append(card.card_id)
+                if logger:
+                    logger.info(
+                        "已迁移卡片 %s 配置版本 %s -> %s",
+                        card.card_id,
+                        raw_version,
+                        target_version,
+                    )
+            except Exception:
+                if logger:
+                    logger.exception("迁移卡片 %s 配置失败，保留旧配置", card.card_id)
+        return migrated
 
     def get(self, card_id: str) -> Card | None:
         with self.lock:
