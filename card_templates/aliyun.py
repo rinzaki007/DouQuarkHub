@@ -221,7 +221,11 @@ class AliyunDriveStorageCard(StorageTargetCard):
         share_id = _share_id(resource)
         if not share_id:
             raise RuntimeError("阿里云盘分享链接或资源 ID 无效")
-        password = str(resource.get("password") or resource.get("passcode") or "").strip() if isinstance(resource, dict) else ""
+        password = (
+            str(resource.get("password") or resource.get("passcode") or "").strip()
+            if isinstance(resource, dict)
+            else ""
+        )
         token_data = self._request(
             "POST",
             f"{_API}/v2/share_link/get_share_token",
