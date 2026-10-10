@@ -288,6 +288,18 @@ def test_metadata_image_policy_uses_card_manifest_hosts_not_provider_ids():
     assert _metadata_image_policy("https://img.example-cdn.test/poster.jpg", [card]) == {
         "referer": "https://metadata.example.test/"
     }
+    douban_card = SimpleNamespace(
+        manifest=SimpleNamespace(
+            image_hosts=("doubanio.com", "douban.com"),
+            image_referer="https://movie.douban.com/explore",
+        )
+    )
+    assert _metadata_image_policy("https://img1.doubanio.com/poster.jpg", [douban_card]) == {
+        "referer": "https://movie.douban.com/explore"
+    }
+    assert _metadata_image_policy("https://img3.douban.com/poster.jpg", [douban_card]) == {
+        "referer": "https://movie.douban.com/explore"
+    }
     assert _metadata_image_policy("http://img.example-cdn.test/poster.jpg", [card]) is None
     assert _metadata_image_policy("https://example-cdn.test:8443/poster.jpg", [card]) is None
     assert _metadata_image_policy("https://evil.test/poster.jpg", [card]) is None
@@ -339,3 +351,15 @@ def test_metadata_routes_forward_explicit_provider_selection(tmp_path):
         ("search", "Arrival", "tmdb"),
         ("list", "电影", "U", "douban"),
     ]
+
+
+
+def test_douban_cover_urls_are_normalized_for_proxy():
+    from moviesync.clients.douban import DoubanClient
+
+    normalize = DoubanClient._normalize_cover_url
+    assert normalize("//img3.douban.com/poster.jpg") == "https://img3.douban.com/poster.jpg"
+    assert normalize("http://img2.doubanio.com/poster.jpg") == "https://img2.doubanio.com/poster.jpg"
+    assert normalize("https://img2.doubanio.com/poster.jpg") == "https://img2.doubanio.com/poster.jpg"
+    # Do not rewrite unrelated hosts.
+    assert normalize("http://example.com/poster.jpg") == "http://example.com/poster.jpg"

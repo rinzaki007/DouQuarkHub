@@ -6,7 +6,7 @@
 from __future__ import annotations
 
 import json
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 
 from .http import ApiError, HttpClient
 
@@ -174,6 +174,24 @@ class DoubanClient:
 
         return []
 
+    @staticmethod
+    def _normalize_cover_url(value: object) -> str:
+        """Normalize legacy/protocol-relative Douban poster URLs for the HTTPS proxy."""
+        cover = str(value or "").strip()
+        if cover.startswith("//"):
+            return f"https:{cover}"
+        if cover.lower().startswith("http://"):
+            parsed = urlsplit(cover)
+            host = (parsed.hostname or "").lower()
+            if (
+                host == "doubanio.com"
+                or host.endswith(".doubanio.com")
+                or host == "douban.com"
+                or host.endswith(".douban.com")
+            ):
+                return "https://" + cover[7:]
+        return cover
+
     def search(self, query: str) -> list[dict]:
         query = str(query or "").strip()
         if not query:
@@ -194,7 +212,7 @@ class DoubanClient:
         return [
             {
                 "title": item.get("title"),
-                "cover": item.get("img", ""),
+                "cover": self._normalize_cover_url(item.get("img", "")),
                 "rate": item.get("rate") or item.get("rating") or "暂无",
                 "year": item.get("year", ""),
                 "url": (
@@ -287,7 +305,7 @@ class DoubanClient:
 
         return {
             "title": title,
-            "cover": cover,
+            "cover": DoubanClient._normalize_cover_url(cover),
             "rate": str(rating),
             "summary": str(summary).strip(),
             "year": str(year).strip(),
