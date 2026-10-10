@@ -214,18 +214,19 @@ class PanSouResourceSource(ResourceSource):
         name="PanSou",
         version="1.0.0",
         type="resource_source",
-        description="通过自部署 PanSou Web 搜索夸克分享资源",
+        description="使用 MovieSync 内置 PanSou 搜索夸克分享资源，也可连接外部 PanSou 服务",
         capabilities=("resource.search", "resource.health_check"),
         config_fields=(
             {
                 "key": "base_url",
-                "label": "PanSou 地址",
+                "label": "PanSou 地址（默认内置）",
                 "type": "string",
                 "format": "url",
-                "required": True,
+                "required": False,
+                "default": "http://127.0.0.1:8888",
                 "max_length": 500,
-                "placeholder": "http://pansou:80",
-                "description": "填写 MovieSync 容器可以访问的 PanSou Web 地址，不要填写 /api 路径。",
+                "placeholder": "http://127.0.0.1:8888",
+                "description": "默认使用 MovieSync 内置 PanSou，无需单独部署。仅在接入外部 PanSou 时修改此地址。",
             },
             {
                 "key": "username",
@@ -288,6 +289,13 @@ class PanSouResourceSource(ResourceSource):
         normalized["timeout"] = timeout
         return normalized
 
+    def _base_url(self, config: dict[str, Any]) -> str:
+        import os
+
+        return str(
+            config.get("base_url") or os.environ.get("MOVIESYNC_PANSOU_URL") or ""
+        ).strip().rstrip("/")
+
     @staticmethod
     def _payload(data: dict[str, Any]) -> dict[str, Any]:
         wrapped = data.get("data")
@@ -334,7 +342,7 @@ class PanSouResourceSource(ResourceSource):
     ) -> tuple[Any, dict[str, Any]]:
         import time
 
-        base_url = str(config.get("base_url") or "").strip().rstrip("/")
+        base_url = self._base_url(config)
         headers: dict[str, str] = {}
         with self._auth_lock:
             token = self._token
@@ -400,7 +408,7 @@ class PanSouResourceSource(ResourceSource):
             if isinstance(movie, dict)
             else movie
         ).strip()
-        base_url = str(config.get("base_url") or "").strip().rstrip("/")
+        base_url = self._base_url(config)
         if not title or not base_url:
             return []
         try:
@@ -467,7 +475,7 @@ class PanSouResourceSource(ResourceSource):
         return results
 
     def check(self, config: dict) -> dict[str, Any]:
-        base_url = str(config.get("base_url") or "").strip().rstrip("/")
+        base_url = self._base_url(config)
         if not base_url:
             return {
                 "status": "unconfigured",
