@@ -155,6 +155,14 @@ class TelegramResourceSource(ResourceSourceCard):
         return self.client.search_channel(channel, title, scan_all=True)
 
 
+    def close(self) -> None:
+        """Release the HTTP session owned by this card."""
+        http = getattr(self.client, "http", None)
+        session = getattr(http, "session", None)
+        close = getattr(session, "close", None)
+        if callable(close):
+            close()
+
     def is_configured(self, config: dict[str, Any]) -> bool:
         return bool(config.get("channels")) if isinstance(config, dict) else False
 
@@ -223,5 +231,9 @@ class TelegramResourceSource(ResourceSourceCard):
 
 
 def create_card(context):
-    """Create Telegram card using the injected Telegram client."""
-    return TelegramResourceSource(context["telegram"], context.get("config_store"))
+    """Create a Telegram card with a client owned by this card.
+
+    The host-provided Telegram context remains available to older/custom cards,
+    but the bundled Telegram card no longer relies on a core-owned client.
+    """
+    return TelegramResourceSource(TelegramClient(), context.get("config_store"))
