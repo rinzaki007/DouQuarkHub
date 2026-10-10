@@ -19,7 +19,6 @@ from ..config_store import ConfigStore, ConfigValidationError
 from .filename_rules import parse_tv_episode
 
 
-
 class ResourceSource(ResourceSourceCard):
     """资源发现卡片的兼容基类。
 
@@ -198,8 +197,6 @@ class TelegramResourceSource(ResourceSource):
             "valid_count": valid_count,
             "channels": channel_results,
         }
-
-
 
 
 class PanSouResourceSource(ResourceSource):
