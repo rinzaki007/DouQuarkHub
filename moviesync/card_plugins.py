@@ -8,7 +8,6 @@ from __future__ import annotations
 import importlib.util
 import re
 import sys
-from hashlib import sha1
 from pathlib import Path
 from threading import RLock
 from typing import Any
@@ -42,7 +41,7 @@ _LEGACY_BUNDLED_CARD_BLOBS = {
 def _git_blob_sha(content: bytes) -> str:
     """Return the Git blob object ID for exact-byte version comparisons."""
     header = f"blob {len(content)}\0".encode("ascii")
-    return sha1(header + content).hexdigest()
+    return __import__("hashlib").sha1(header + content).hexdigest()
 
 
 _PLUGIN_FILE_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}\.py$")
