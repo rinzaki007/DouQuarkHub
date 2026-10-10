@@ -188,3 +188,63 @@ def test_transfer_refreshes_share_state_and_temporary_token():
     assert ok is True
     assert storage.resolve_count == 2
     assert storage.transfer_token == "token-2"
+
+
+def test_search_and_transfer_accept_provider_neutral_resource_ids():
+    import logging
+
+    class GenericSources:
+        def search(self, movie, config):
+            return [
+                {
+                    "source_id": "cloud-b",
+                    "source_name": "Cloud B",
+                    "resource_id": "share-456",
+                    "resource_type": "cloud_b_share",
+                    "storage_target_id": "cloud-b",
+                    "url": "https://example.invalid/share-456",
+                }
+            ]
+
+    class GenericStorage:
+        def __init__(self):
+            self.transferred = None
+
+        def resolve_resource(self, resource, target_id=None):
+            assert resource["resource_id"] == "share-456"
+            assert resource["resource_type"] == "cloud_b_share"
+            assert "pwd_id" not in resource
+            return {
+                "target_id": target_id or "cloud-b",
+                "files": [{"fid": "file-1", "file_name": "Show.S01E01.mkv", "size": 1}],
+                "token": "fresh-token",
+                "error": None,
+            }
+
+        def create_folder(self, *_args, **_kwargs):
+            return "folder-1"
+
+        def transfer(self, resource, files, target_id="0", storage_target_id=None, token=None):
+            self.transferred = (resource, files, storage_target_id, token)
+            return True, "ok"
+
+    storage = GenericStorage()
+    service = SearchService(GenericSources(), storage, logging.getLogger("test"))
+    candidates = service.search_movie_candidates({"title": "Show"}, {})
+    assert len(candidates) == 1
+    candidate = candidates[0]
+    assert candidate["resource_id"] == "share-456"
+    assert candidate["resource_type"] == "cloud_b_share"
+    assert candidate["pwd_id"] == ""
+
+    ok, message, counts = service.transfer_selected_resource_with_progress(
+        {"title": "Show"},
+        {**candidate, "files": [{"fid": "file-1"}]},
+        "0",
+    )
+    assert ok is True
+    assert counts["success"] == 1
+    assert storage.transferred[0]["resource_id"] == "share-456"
+    assert storage.transferred[0]["resource_type"] == "cloud_b_share"
+    assert storage.transferred[2] == "cloud-b"
+    assert storage.transferred[3] == "fresh-token"
