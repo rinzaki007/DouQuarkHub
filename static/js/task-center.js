@@ -109,6 +109,7 @@ async function loadTaskDestinations(targetId) {
     }
     destinationSelect.disabled = true;
     destinationSelect.replaceChildren(new Option('正在读取保存目录…', ''));
+    refreshTaskSubmitState();
     try {
         const resp = await apiFetchTask('/api/storage-targets/' + encodeURIComponent(targetId) + '/destinations');
         const result = await resp.json();
@@ -588,7 +589,11 @@ async function createTask() {
     if (!files.length) return taskToast('请至少选择 1 集作为首次处理基线');
     const storageTargetId = document.getElementById('task-storage-target')?.value;
     const targetFid = document.getElementById('task-target-fid')?.value;
-    if (!storageTargetId || !targetFid) return taskToast('请先选择可用的转存位置和保存目录');
+    if (!storageTargetId || !targetFid
+        || document.getElementById('task-storage-target')?.disabled
+        || document.getElementById('task-target-fid')?.disabled) {
+        return taskToast('请先选择可用的转存位置和保存目录，并等待目录加载完成');
+    }
     const payload = {
         title:title,
         channel:selectedCandidate.candidate.channel_id || selectedCandidate.candidate.channel || '',
