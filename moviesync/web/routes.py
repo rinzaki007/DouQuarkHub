@@ -684,10 +684,43 @@ def uninstall_card_plugin(filename):
         return _json_error("单文件卡片管理未启用", 503)
     try:
         safe_filename = plugin_manager.validate_filename(filename)
-        default_target = _services()["config"].get_default_storage_target_id()
-        if default_target and str(default_target) == safe_filename[:-3]:
-            return _json_error("该卡片是当前默认存储目标，请先切换默认目标后再卸载")
-        removed = plugin_manager.uninstall(safe_filename)
+        services = _services()
+        card_id = safe_filename[:-3]
+        default_target = services["config"].get_default_storage_target_id()
+        if default_target and str(default_target) == card_id:
+            return _json_error("该卡片是当前默认存储目标，请先切换默认目标后再卸载", 409)
+
+        # Subscriptions are durable references to both source and storage cards.
+        # Hold the subscription lock through the check and unload so a scheduler
+        # cannot start a referenced subscription between validation and removal.
+        subscriptions = services.get("subscriptions")
+        subscription_lock = getattr(subscriptions, "lock", None)
+        if subscription_lock is not None:
+            with subscription_lock:
+                dependent = next(
+                    (
+                        item
+                        for item in subscriptions.get_subscriptions()
+                        if str(item.get("source_id") or "").strip() == card_id
+                        or str(item.get("storage_target_id") or "").strip() == card_id
+                    ),
+                    None,
+                )
+                if dependent is not None:
+                    role = (
+                        "资源来源"
+                        if str(dependent.get("source_id") or "").strip() == card_id
+                        else "存储目标"
+                    )
+                    title = str(dependent.get("title") or dependent.get("id") or "未命名订阅")
+                    return _json_error(
+                        f"该卡片仍被自动追剧订阅「{title}」作为{role}引用，"
+                        "请先删除或修改相关订阅后再卸载",
+                        409,
+                    )
+                removed = plugin_manager.uninstall(safe_filename)
+        else:
+            removed = plugin_manager.uninstall(safe_filename)
     except FileNotFoundError as exc:
         return _json_error(str(exc), 404)
     except ValueError as exc:
