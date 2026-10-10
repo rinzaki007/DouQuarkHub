@@ -652,3 +652,19 @@ def test_builtin_metadata_provider_can_be_disabled_before_required_config_is_set
     assert response.status_code == 400
     assert "API Read Access Token" in response.get_json()["message"]
     assert services["config"].load()["cards"]["tmdb"]["enabled"] is False
+
+
+
+def test_telegram_source_manifest_uses_form_editors_instead_of_raw_json():
+    from card_templates.telegram import TelegramResourceSource
+
+    fields = {field["key"]: field for field in TelegramResourceSource.manifest.config_fields}
+    channels = fields["channels"]
+    regex = fields["magic_regex"]
+
+    assert channels["type"] == "json"
+    assert channels["editor"] == "object_list"
+    assert [field["key"] for field in channels["item_fields"]] == ["id", "name"]
+    assert regex["editor"] == "object_fields"
+    assert [field["key"] for field in regex["item_fields"]] == ["pattern", "replace"]
+    assert "JSON 数组" not in channels["description"]

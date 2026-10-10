@@ -63,15 +63,31 @@ class TelegramResourceSource(ResourceSourceCard):
                 "key": "channels",
                 "label": "资源频道",
                 "type": "json",
+                "editor": "object_list",
+                "item_fields": (
+                    {"key": "id", "label": "频道用户名", "placeholder": "例如 movie_channel", "required": True},
+                    {"key": "name", "label": "显示名称", "placeholder": "可留空，默认使用频道用户名"},
+                ),
                 "default": [],
-                "description": "JSON 数组，每项包含频道 id，可选 name。",
+                "description": (
+                    "点击“添加频道”，每行填写一个公开频道用户名，不需要输入 @。"
+                    "频道列表留空时不会搜索 Telegram 资源。"
+                ),
             },
             {
                 "key": "magic_regex",
-                "label": "文件名识别增强",
+                "label": "文件名识别增强（高级）",
                 "type": "json",
+                "editor": "object_fields",
+                "item_fields": (
+                    {"key": "pattern", "label": "匹配规则", "placeholder": "例如：第(\\d+)集"},
+                    {"key": "replace", "label": "替换规则", "placeholder": "例如：Episode \\1"},
+                ),
                 "default": {},
-                "description": "JSON 对象，可配置 pattern 与 replace。",
+                "description": (
+                    "用于特殊文件名的高级识别。一般不需要修改；"
+                    "不清楚正则表达式时请留空。"
+                ),
             },
         ),
     )
