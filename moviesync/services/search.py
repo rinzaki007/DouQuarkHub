@@ -81,7 +81,7 @@ class SearchService:
         pwd_id = str(resource.get("pwd_id") or "").strip()
         if not pwd_id:
             return [], None, "资源标识无效", storage_target_id
-        cache_key = f"{storage_target_id}:{pwd_id}"
+        cache_key = f"{storage_target_id}:{pwd_id}:{str(resource.get('password') or resource.get('passcode') or '')}"
         with self._share_lock:
             cached = self._share_cache.get(cache_key)
         if cached is not None:
@@ -159,6 +159,8 @@ class SearchService:
                 "channel": source.get("channel", ""),
                 "channel_id": source.get("channel_id", ""),
                 "pwd_id": pwd_id,
+                "password": str(source.get("password") or source.get("passcode") or ""),
+                "url": str(source.get("url") or ""),
                 "files": videos,
                 "file_count": len(videos),
                 "total_size": total_size,
