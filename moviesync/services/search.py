@@ -157,7 +157,12 @@ class SearchService:
         title, cleaned_title = self._title(movie)
         if not title:
             return []
-        selected_target_id = str(storage_target_id or "").strip()
+        movie_target_id = (
+            movie.get("storage_target_id")
+            if isinstance(movie, dict)
+            else ""
+        )
+        selected_target_id = str(storage_target_id or movie_target_id or "").strip()
         resource_types: list[str] = []
         if selected_target_id:
             getter = getattr(self.storage_targets, "get", None)
