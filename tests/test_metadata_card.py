@@ -291,11 +291,11 @@ def test_metadata_image_policy_uses_card_manifest_hosts_not_provider_ids():
     douban_card = SimpleNamespace(
         manifest=SimpleNamespace(
             image_hosts=("doubanio.com", "douban.com"),
-            image_referer="https://movie.douban.com/explore",
+            image_referer="https://movie.douban.com/",
         )
     )
     assert _metadata_image_policy("https://img1.doubanio.com/poster.jpg", [douban_card]) == {
-        "referer": "https://movie.douban.com/explore"
+        "referer": "https://movie.douban.com/"
     }
     assert _metadata_image_policy("https://img3.douban.com/poster.jpg", [douban_card]) == {
         "referer": "https://movie.douban.com/explore"
@@ -363,3 +363,23 @@ def test_douban_cover_urls_are_normalized_for_proxy():
     assert normalize("https://img2.doubanio.com/poster.jpg") == "https://img2.doubanio.com/poster.jpg"
     # Do not rewrite unrelated hosts.
     assert normalize("http://example.com/poster.jpg") == "http://example.com/poster.jpg"
+
+
+def test_douban_normalizer_preserves_string_shaped_cover_fields():
+    from moviesync.clients.douban import DoubanClient
+
+    item_cover = DoubanClient._normalize_item({
+        "id": "123",
+        "title": "电影 A",
+        "cover": "//img3.doubanio.com/view/photo/s_ratio_poster/public/p123.jpg",
+    })
+    target_cover = DoubanClient._normalize_item({
+        "target": {
+            "id": "456",
+            "title": "电影 B",
+            "cover": "https://img1.doubanio.com/view/photo/s_ratio_poster/public/p456.jpg",
+        }
+    })
+
+    assert item_cover["cover"] == "https://img3.doubanio.com/view/photo/s_ratio_poster/public/p123.jpg"
+    assert target_cover["cover"] == "https://img1.doubanio.com/view/photo/s_ratio_poster/public/p456.jpg"
