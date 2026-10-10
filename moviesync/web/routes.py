@@ -1156,6 +1156,11 @@ def transfer_selected():
         return _json_error("指定的存储目标不存在或已停用", 400)
 
     resource_type = str(candidate.get("resource_type") or "").strip().lower()
+    if resource_type and not storage_target:
+        return _json_error(
+            "没有已启用的存储卡片支持此资源类型，请安装或启用兼容的存储卡片",
+            400,
+        )
     if resource_type and storage_target:
         required_capability = f"storage.accepts.{resource_type}"
         if (
