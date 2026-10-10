@@ -409,3 +409,47 @@ def test_resource_source_manager_reflects_registry_unregister():
 
     assert "removable-source" not in manager.sources
     assert manager.search({"title": "test"}, Store().load()) == []
+
+
+def test_resource_plugin_factory_closes_card_when_registration_fails(monkeypatch):
+    class ExistingCard(ResourceSourceCard):
+        manifest = CardManifest(
+            id="duplicate-source",
+            name="Existing",
+            type="resource_source",
+            capabilities=("resource.search", "resource.health_check"),
+        )
+
+        def search(self, movie, config):
+            return []
+
+        def check(self, config):
+            return {"status": "healthy"}
+
+    class CandidateCard(ExistingCard):
+        def __init__(self):
+            self.closed = False
+
+        def close(self):
+            self.closed = True
+
+    candidate = CandidateCard()
+
+    class EntryPoint:
+        name = "duplicate-source-plugin"
+
+        def load(self):
+            return lambda context: candidate
+
+    monkeypatch.setattr(
+        resource_sources_module, "entry_points", lambda **kwargs: [EntryPoint()]
+    )
+    registry = __import__("moviesync.cards", fromlist=["CardRegistry"]).CardRegistry()
+    registry.register(ExistingCard())
+    manager = ResourceSourceManager(
+        FakeTelegramClient(), object(), FakeLogger(), registry=registry
+    )
+
+    assert manager.load_plugins() == []
+    assert candidate.closed is True
+    assert registry.get("duplicate-source") is not candidate

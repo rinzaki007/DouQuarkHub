@@ -12,7 +12,7 @@ from concurrent.futures import ThreadPoolExecutor
 from importlib.metadata import entry_points
 from typing import Any
 
-from ..cards import CardManifest, CardRegistry, ResourceSourceCard
+from ..cards import Card, CardManifest, CardRegistry, ResourceSourceCard
 from ..clients.telegram import TelegramClient
 from ..config_store import ConfigStore, ConfigValidationError
 from .filename_rules import parse_tv_episode
@@ -261,6 +261,7 @@ class ResourceSourceManager:
             return loaded
 
         for entry_point in candidates:
+            card = None
             try:
                 factory = entry_point.load()
                 if not callable(factory):
@@ -270,9 +271,21 @@ class ResourceSourceManager:
                 loaded.append(card.card_id)
                 self.logger.info("已加载资源卡片插件: %s", card.card_id)
             except Exception as exc:
+                self._close_unregistered_plugin_card(card, entry_point.name)
                 self.logger.exception("资源卡片插件 %s 加载失败: %s", entry_point.name, exc)
         return loaded
 
+
+    def _close_unregistered_plugin_card(self, card: object, plugin_name: str) -> None:
+        """工厂已创建但未成功注册的卡片也必须释放资源。"""
+        if not isinstance(card, Card):
+            return
+        try:
+            if self.registry.get(card.card_id) is card:
+                return
+            card.close()
+        except Exception:
+            self.logger.exception("清理未注册资源卡片插件 %s 失败", plugin_name)
 
     def get_cards(self) -> list[dict[str, Any]]:
         """返回已加载资源卡片的 Manifest。"""
