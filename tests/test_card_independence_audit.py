@@ -1,4 +1,5 @@
 """Architecture regression tests for built-in single-file card independence."""
+
 import pathlib
 
 import pytest
