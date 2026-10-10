@@ -209,3 +209,17 @@ def test_tmdb_health_check_reports_auth_status_without_exposing_credentials():
     assert result["status"] == "unhealthy"
     assert "HTTP 401" in result["message"]
     assert "secret-token" not in str(result)
+
+
+def test_tmdb_enabled_config_requires_either_supported_credential():
+    card = TMDBMetadataCard(FakeConfigStore())
+
+    try:
+        card.validate_enabled_config({})
+    except ValueError as exc:
+        assert "API Read Access Token 或 API Key" in str(exc)
+    else:
+        raise AssertionError("TMDB should not be enabled without credentials")
+
+    card.validate_enabled_config({"api_read_access_token": "token"})
+    card.validate_enabled_config({"api_key": "v3-key"})
