@@ -124,6 +124,25 @@ def test_resource_type_without_compatible_target_does_not_fall_back_to_default()
     assert "没有已启用的存储卡片支持此资源类型" in result["error"]
 
 
+
+def test_explicit_incompatible_storage_target_is_rejected_without_fallback():
+    registry = CardRegistry()
+    registry.register(DemoStorage())
+    registry.register(QuarkCompatibleStorage())
+    manager = StorageTargetManager(registry, FakeStore(), FakeLogger())
+
+    result = manager.resolve_resource({
+        "pwd_id": "abc",
+        "resource_type": "quark_share",
+        "storage_target_id": "demo-storage",
+    })
+
+    assert result["target_id"] == "demo-storage"
+    assert result["files"] == []
+    assert "不支持此资源类型" in result["error"]
+
+
+
 def test_explicit_storage_target_is_never_replaced_by_compatibility_matching():
     registry = CardRegistry()
     registry.register(DemoStorage())
