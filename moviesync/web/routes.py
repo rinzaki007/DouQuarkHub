@@ -1540,7 +1540,17 @@ def proxy_img():
             stream=True,
         ) as response:
             if response.status_code != 200:
-                return Response("Image unavailable", status=404)
+                host = urlparse(target).hostname or "unknown"
+                _services()["logger"].warning(
+                    "元数据海报上游请求失败: host=%s status=%s",
+                    host,
+                    response.status_code,
+                )
+                return Response(
+                    f"Image upstream HTTP {response.status_code}",
+                    status=502,
+                    headers={"X-MovieSync-Image-Error": f"upstream_http_{response.status_code}"},
+                )
 
             content_type = (
                 response.headers.get("Content-Type", "image/jpeg")
@@ -1552,7 +1562,18 @@ def proxy_img():
                 "image/jpeg", "image/png", "image/webp", "image/gif", "image/avif",
             }
             if content_type not in allowed_image_types:
-                return Response("Not an image", status=415)
+                host = urlparse(target).hostname or "unknown"
+                _services()["logger"].warning(
+                    "元数据海报上游返回非图片内容: host=%s content_type=%s status=%s",
+                    host,
+                    content_type or "unknown",
+                    response.status_code,
+                )
+                return Response(
+                    f"Upstream content is not an image ({content_type or 'unknown'})",
+                    status=415,
+                    headers={"X-MovieSync-Image-Error": "upstream_not_image"},
+                )
 
             max_image_bytes = 12 * 1024 * 1024
             try:
@@ -1578,8 +1599,13 @@ def proxy_img():
                 headers={"Cache-Control": "public, max-age=86400"},
             )
     except Exception:
-        _services()["logger"].debug("代理元数据海报失败", exc_info=True)
-        return Response("Image unavailable", status=502)
+        host = urlparse(target).hostname or "unknown"
+        _services()["logger"].warning("代理元数据海报请求异常: host=%s", host, exc_info=True)
+        return Response(
+            "Image proxy request failed",
+            status=502,
+            headers={"X-MovieSync-Image-Error": "proxy_request_failed"},
+        )
 
 
 @api.post("/change-username")
