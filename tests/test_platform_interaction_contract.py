@@ -32,3 +32,5 @@ def test_async_frontend_lists_ignore_stale_responses():
     assert "requestId!==destinationRequestSeq" in resource_script
     assert "let cardsLoadSequence = 0;" in admin_template
     assert "requestId !== cardsLoadSequence" in admin_template
+    assert "let genericCardRequestSequence = 0;" in admin_template
+    assert "requestId !== genericCardRequestSequence" in admin_template
