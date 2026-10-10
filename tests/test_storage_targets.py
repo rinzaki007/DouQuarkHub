@@ -338,3 +338,45 @@ def test_storage_plugin_factory_closes_card_when_registration_fails(monkeypatch)
     assert manager.load_plugins() == []
     assert candidate.closed is True
     assert registry.get("demo-storage") is not candidate
+
+
+
+def test_storage_config_read_failure_does_not_crash_and_never_guesses_target():
+    class BrokenStore:
+        def load(self):
+            raise OSError("simulated config read failure")
+
+        def get_default_storage_target_id(self):
+            return ""
+
+    registry = CardRegistry()
+    registry.register(DemoStorage())
+    manager = StorageTargetManager(registry, BrokenStore(), FakeLogger())
+
+    assert manager.get() is None
+    assert manager._enabled_cards() == []
+    targets = manager.list_targets()
+    assert len(targets) == 1
+    assert targets[0]["enabled"] is False
+    assert targets[0]["config_error"] == "无法读取存储目标配置"
+    result = manager.resolve_resource({"pwd_id": "abc"})
+    assert result["files"] == []
+    assert "无法读取存储目标配置" in result["error"]
+
+
+def test_explicit_default_target_is_not_used_when_config_cannot_be_read():
+    class BrokenDefaultStore:
+        def load(self):
+            raise OSError("simulated config read failure")
+
+        def get_default_storage_target_id(self):
+            return "demo-storage"
+
+    registry = CardRegistry()
+    registry.register(DemoStorage())
+    manager = StorageTargetManager(registry, BrokenDefaultStore(), FakeLogger())
+
+    assert manager.get() is None
+    result = manager.resolve_resource({"pwd_id": "abc"})
+    assert result["files"] == []
+    assert "无法读取存储目标配置" in result["error"]
