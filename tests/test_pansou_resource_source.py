@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from card_templates.pansou import PanSouResourceSource
 
 
@@ -150,3 +152,16 @@ def test_pansou_uses_bundled_service_url_when_card_address_is_empty(monkeypatch)
 
     assert len(results) == 1
     assert http.calls[0][1] == "http://127.0.0.1:8888/api/search"
+
+
+
+def test_bundled_pansou_can_be_disabled_without_marking_movie_sync_unhealthy():
+    root = Path(__file__).resolve().parents[1]
+    entrypoint = (root / "docker-entrypoint.sh").read_text(encoding="utf-8")
+    dockerfile = (root / "Dockerfile").read_text(encoding="utf-8")
+
+    assert "MOVIESYNC_BUNDLED_PANSOU_ENABLED" in entrypoint
+    assert "MOVIESYNC_BUNDLED_PANSOU_ENABLED=true" in dockerfile
+    healthcheck = next(line for line in dockerfile.splitlines() if line.startswith("HEALTHCHECK"))
+    assert "/healthz" in healthcheck
+    assert "/api/health" not in healthcheck
