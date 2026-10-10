@@ -5,8 +5,10 @@
 """
 from __future__ import annotations
 
+import hashlib
 import re
 import threading
+import time
 from typing import Any
 
 from .resource_sources import ResourceSourceManager
@@ -16,6 +18,8 @@ from .transfer_outcome import is_uncertain_transfer_message
 VIDEO_EXTENSIONS = (".mp4", ".mkv", ".avi", ".mov", ".flv", ".wmv", ".m4v", ".ts", ".m2ts", ".iso")
 MAX_VIDEO_FILES_PER_CANDIDATE = 200
 MAX_CANDIDATES_PER_MOVIE = 20
+SHARE_CACHE_TTL_SECONDS = 30
+MAX_SHARE_CACHE_ENTRIES = 128
 
 
 def _format_size(value: object) -> str:
@@ -59,7 +63,12 @@ class SearchService:
         self.resource_sources = resource_sources
         self.storage_targets = storage_targets
         self.logger = logger
-        self._share_cache: dict[str, tuple[list[dict[str, Any]], str | None, str | None, str]] = {}
+        # 缓存仅用于搜索结果展示，不缓存可用于转存的临时 token。
+        # TTL 和容量上限避免分享文件列表长期过期或随搜索次数无限增长。
+        self._share_cache: dict[
+            str,
+            tuple[float, tuple[list[dict[str, Any]], str | None, str]],
+        ] = {}
         self._share_lock = threading.Lock()
 
     @staticmethod
@@ -72,7 +81,12 @@ class SearchService:
     def _simplify(value: str) -> str:
         return re.sub(r"[^\w\u4e00-\u9fa5]", "", value or "")
 
-    def _get_resource_files(self, resource: dict):
+    def _get_resource_files(self, resource: dict, *, refresh: bool = False):
+        """解析分享文件。
+
+        普通搜索允许短时复用文件列表；转存前必须 refresh，重新获取文件状态和
+        临时 token。缓存键只保留提取码摘要，缓存内容不保存 token。
+        """
         storage_target_id = str(resource.get("storage_target_id") or "").strip()
         if not storage_target_id:
             getter = getattr(self.storage_targets, "get", None)
@@ -81,21 +95,39 @@ class SearchService:
         pwd_id = str(resource.get("pwd_id") or "").strip()
         if not pwd_id:
             return [], None, "资源标识无效", storage_target_id
-        cache_key = f"{storage_target_id}:{pwd_id}:{str(resource.get('password') or resource.get('passcode') or '')}"
-        with self._share_lock:
-            cached = self._share_cache.get(cache_key)
-        if cached is not None:
-            return cached
+
+        password = str(resource.get("password") or resource.get("passcode") or "")
+        password_digest = hashlib.sha256(password.encode("utf-8")).hexdigest()
+        cache_key = f"{storage_target_id}:{pwd_id}:{password_digest}"
+        now = time.monotonic()
+
+        if not refresh:
+            with self._share_lock:
+                cached = self._share_cache.get(cache_key)
+                if cached is not None:
+                    cached_at, cached_result = cached
+                    if now - cached_at < SHARE_CACHE_TTL_SECONDS:
+                        files, error, target_id = cached_result
+                        return files, None, error, target_id
+                    self._share_cache.pop(cache_key, None)
+
         resolved = self.storage_targets.resolve_resource(resource, storage_target_id or None)
-        result = (
-            resolved.get("files") or [],
-            resolved.get("token"),
-            resolved.get("error"),
-            resolved.get("target_id") or storage_target_id,
-        )
+        files = resolved.get("files") or []
+        token = resolved.get("token")
+        error = resolved.get("error")
+        target_id = resolved.get("target_id") or storage_target_id
+
+        # 只缓存不含临时 token 的解析结果，并限制缓存总量。
         with self._share_lock:
-            self._share_cache[cache_key] = result
-        return result
+            self._share_cache[cache_key] = (now, (files, error, target_id))
+            while len(self._share_cache) > MAX_SHARE_CACHE_ENTRIES:
+                oldest_key = min(
+                    self._share_cache,
+                    key=lambda key: self._share_cache[key][0],
+                )
+                self._share_cache.pop(oldest_key, None)
+
+        return files, token, error, target_id
 
     def search_movie_candidates(self, movie: object, config: dict) -> list[dict]:
         title, cleaned_title = self._title(movie)
@@ -222,7 +254,7 @@ class SearchService:
             "storage_target_id": storage_target_id,
         }
         progress(20, "正在重新验证分享资源…")
-        files, fresh_stoken, err, storage_target_id = self._get_resource_files(resource)
+        files, fresh_stoken, err, storage_target_id = self._get_resource_files(resource, refresh=True)
         if err or not files or not fresh_stoken:
             if err:
                 self.logger.warning("分享资源解析失败: %s", err)
