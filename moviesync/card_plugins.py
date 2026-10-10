@@ -5,6 +5,7 @@ code, not a sandboxed data format; the web UI must warn users to install trusted
 """
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import re
 import sys
@@ -20,6 +21,28 @@ from .cards import (
     ResourceSourceCard,
     StorageTargetCard,
 )
+
+# Git blob IDs for bundled card versions shipped before automatic card upgrades.
+# These hashes allow safe migration of old empty-marker installs without replacing
+# administrator-edited files.
+_LEGACY_BUNDLED_CARD_BLOBS = {
+    "tmdb.py": {
+        "76292d41d3af54ffbd17fe31de4512427af87b10",
+    },
+    "douban.py": {
+        "4c601e750bfb312a3d7e028908568965f819d0f6",
+        "d2cb3df5d76fdf7d35f24d05471d878796101899",
+        "d768c1f3f9269549b1052bae46d37a98701992d4",
+        "11928ad2e76f7b4ff224dcb0cca012b925e0780c",
+    },
+}
+
+
+def _git_blob_sha(content: bytes) -> str:
+    """Return the Git blob object ID for exact-byte version comparisons."""
+    header = f"blob {len(content)}\0".encode("ascii")
+    return hashlib.sha1(header + content).hexdigest()
+
 
 _PLUGIN_FILE_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}\.py$")
 _MAX_PLUGIN_BYTES = 256 * 1024
@@ -48,7 +71,7 @@ class CardFilePluginManager:
         self._context: dict[str, Any] = {}
 
     def _seed_bundled_cards(self, bundled_dir: Path | None) -> None:
-        """Copy bundled examples once and apply narrow migrations to known legacy factories."""
+        """Seed bundled cards and safely upgrade copies that have not been edited."""
         if bundled_dir is None or not bundled_dir.is_dir():
             return
         marker_dir = self.plugin_dir / ".seeded"
@@ -58,18 +81,55 @@ class CardFilePluginManager:
                 filename = self.validate_filename(source.name)
             except ValueError:
                 continue
+
             marker = marker_dir / f"{filename}.seeded"
             destination = self.plugin_dir / filename
-            if marker.exists():
-                self._migrate_legacy_builtin_card(filename, destination)
+            source_content = source.read_bytes()
+            source_blob = _git_blob_sha(source_content)
+
+            if not destination.exists():
+                # A marker with no file means an administrator intentionally
+                # uninstalled this card. Only seed files on first installation.
+                if marker.exists():
+                    continue
+                try:
+                    destination.write_bytes(source_content)
+                    marker.write_text(source_blob, encoding="ascii")
+                except OSError:
+                    self.logger.exception("初始化内置卡片文件 %s 失败", filename)
                 continue
+
             try:
-                if not destination.exists():
-                    destination.write_bytes(source.read_bytes())
-                marker.touch(exist_ok=True)
-                self._migrate_legacy_builtin_card(filename, destination)
+                destination_content = destination.read_bytes()
+                destination_blob = _git_blob_sha(destination_content)
+                marker_value = marker.read_text(encoding="ascii").strip() if marker.exists() else ""
+
+                if marker_value and marker_value == destination_blob:
+                    # The file still matches the last bundled version: upgrade it.
+                    if destination_blob != source_blob:
+                        destination.write_bytes(source_content)
+                        self.logger.info("已更新未修改的内置卡片 %s", filename)
+                    marker.write_text(source_blob, encoding="ascii")
+                elif not marker_value:
+                    # Older releases created empty markers. Upgrade only exact,
+                    # known bundled versions; an unknown file may be user-edited.
+                    if (
+                        destination_blob == source_blob
+                        or destination_blob in _LEGACY_BUNDLED_CARD_BLOBS.get(filename, set())
+                    ):
+                        if destination_blob != source_blob:
+                            destination.write_bytes(source_content)
+                            self.logger.info("已迁移旧版内置卡片 %s", filename)
+                        marker.write_text(source_blob, encoding="ascii")
+                    else:
+                        marker.write_text(f"customized:{destination_blob}", encoding="ascii")
+                        self.logger.info("保留可能已自定义的内置卡片 %s，不自动覆盖", filename)
+                # A changed destination, or a marker already marked customized,
+                # is intentionally preserved to avoid losing administrator edits.
             except OSError:
-                self.logger.exception("初始化内置卡片文件 %s 失败", filename)
+                self.logger.exception("升级内置卡片文件 %s 失败", filename)
+
+            self._migrate_legacy_builtin_card(filename, destination)
 
     def _migrate_legacy_builtin_card(self, filename: str, destination: Path) -> None:
         """Apply narrowly-scoped upgrades without replacing administrator card files."""
