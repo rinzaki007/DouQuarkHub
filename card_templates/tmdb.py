@@ -32,10 +32,17 @@ class TMDBMetadataCard(MetadataProviderCard):
         config_fields=(
             {
                 "key": "api_read_access_token",
-                "label": "API Read Access Token",
+                "label": "API Read Access Token（优先）",
                 "type": "password",
-                "required": True,
+                "required": False,
                 "max_length": 4096,
+            },
+            {
+                "key": "api_key",
+                "label": "API Key（v3 密钥，可选）",
+                "type": "password",
+                "required": False,
+                "max_length": 256,
             },
             {
                 "key": "language",
@@ -55,6 +62,7 @@ class TMDBMetadataCard(MetadataProviderCard):
         self.http = http_client or HttpClient()
         self._cache: dict[tuple[str, str, str, tuple[tuple[str, str], ...]], tuple[float, dict[str, Any]]] = {}
         self._cache_lock = threading.RLock()
+        self._last_error = ""
 
     def _config(self) -> dict[str, Any]:
         try:
@@ -74,29 +82,41 @@ class TMDBMetadataCard(MetadataProviderCard):
         params: dict[str, Any] | None = None,
         *,
         token: str | None = None,
+        api_key: str | None = None,
         language: str = "zh-CN",
     ) -> dict[str, Any] | None:
         config = self._config()
         token = str(token if token is not None else config.get("api_read_access_token") or "").strip()
-        if not token:
+        api_key = str(api_key if api_key is not None else config.get("api_key") or "").strip()
+        if not token and not api_key:
+            self._last_error = "请填写 API Read Access Token 或 API Key"
             return None
 
         query = {str(key): str(value) for key, value in (params or {}).items() if value is not None}
         query.setdefault("language", language or self._language(config))
+        credential = token or api_key
+        credential_type = "bearer" if token else "api_key"
+        if not token:
+            query["api_key"] = api_key
+        cache_params = {key: value for key, value in query.items() if key != "api_key"}
         cache_key = (
             path,
             query.get("language", "zh-CN"),
-            hashlib.sha256(token.encode("utf-8")).hexdigest(),
-            tuple(sorted(query.items())),
+            hashlib.sha256(f"{credential_type}:{credential}".encode()).hexdigest(),
+            tuple(sorted(cache_params.items())),
         )
         now = time.monotonic()
         with self._cache_lock:
             cached = self._cache.get(cache_key)
             if cached and cached[0] > now:
+                self._last_error = ""
                 return dict(cached[1])
             if cached:
                 self._cache.pop(cache_key, None)
 
+        headers = {"Accept": "application/json"}
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
         try:
             response, payload = self.http.request_json(
                 "GET",
@@ -104,14 +124,24 @@ class TMDBMetadataCard(MetadataProviderCard):
                 timeout=8,
                 retries=1,
                 params=query,
-                headers={"Authorization": f"Bearer {token}", "Accept": "application/json"},
+                headers=headers,
             )
         except ApiError:
+            self._last_error = "无法连接 TMDB API，请检查容器网络、DNS 或 HTTPS 连接"
             return None
 
         if response.status_code != 200 or not isinstance(payload, dict):
+            if response.status_code in {401, 403}:
+                self._last_error = f"TMDB 拒绝认证（HTTP {response.status_code}），请核对凭据类型与内容"
+            elif response.status_code == 429:
+                self._last_error = "TMDB API 请求频率受限（HTTP 429），请稍后重试"
+            elif response.status_code >= 500:
+                self._last_error = f"TMDB 服务暂时异常（HTTP {response.status_code}）"
+            else:
+                self._last_error = f"TMDB API 返回异常状态（HTTP {response.status_code}）"
             return None
 
+        self._last_error = ""
         with self._cache_lock:
             if len(self._cache) >= MAX_CACHE_ENTRIES:
                 oldest = min(self._cache, key=lambda key: self._cache[key][0])
@@ -169,16 +199,36 @@ class TMDBMetadataCard(MetadataProviderCard):
         }
 
     def is_configured(self, config: dict[str, Any]) -> bool:
-        return bool(str((config or {}).get("api_read_access_token") or "").strip())
+        config = config if isinstance(config, dict) else {}
+        return bool(
+            str(config.get("api_read_access_token") or "").strip()
+            or str(config.get("api_key") or "").strip()
+        )
+
+    def validate_enabled_config(self, config: dict[str, Any]) -> None:
+        if not self.is_configured(config):
+            raise ValueError("启用 TMDB 前，请填写 API Read Access Token 或 API Key")
 
     def check(self, config: dict) -> dict[str, Any]:
         config = config if isinstance(config, dict) else {}
         token = str(config.get("api_read_access_token") or "").strip()
-        if not token:
-            return {"status": "unconfigured", "message": "请先填写 TMDB API Read Access Token"}
-        payload = self._request("/configuration", token=token, language=self._language(config))
+        api_key = str(config.get("api_key") or "").strip()
+        if not token and not api_key:
+            return {
+                "status": "unconfigured",
+                "message": "请填写 API Read Access Token 或 API Key",
+            }
+        payload = self._request(
+            "/configuration",
+            token=token,
+            api_key=api_key,
+            language=self._language(config),
+        )
         if payload is None:
-            return {"status": "unhealthy", "message": "TMDB API 暂时不可用，请检查 Token 或网络"}
+            return {
+                "status": "unhealthy",
+                "message": self._last_error or "TMDB API 请求失败",
+            }
         return {"status": "healthy", "message": "TMDB API 连接正常"}
 
     def list_movies(self, tag: str, sort_type: str) -> list[dict[str, Any]]:

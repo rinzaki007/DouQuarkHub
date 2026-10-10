@@ -16,7 +16,7 @@ class DoubanMetadataCard(MetadataProviderCard):
         description="豆瓣影视元数据与搜索",
         capabilities=("metadata.list", "metadata.search"),
         image_hosts=("doubanio.com", "douban.com"),
-        image_referer="https://movie.douban.com/explore",
+        image_referer="https://movie.douban.com/",
     )
 
     def __init__(self, client: DoubanClient):

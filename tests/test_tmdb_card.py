@@ -14,13 +14,14 @@ class FakeConfigStore:
 
 
 class FakeHttpClient:
-    def __init__(self, payload):
+    def __init__(self, payload, status_code=200):
         self.payload = payload
+        self.status_code = status_code
         self.calls = []
 
     def request_json(self, method, url, **kwargs):
         self.calls.append((method, url, kwargs))
-        return SimpleNamespace(status_code=200), self.payload
+        return SimpleNamespace(status_code=self.status_code), self.payload
 
 
 def test_tmdb_card_is_a_standalone_metadata_provider_with_manifest_config():
@@ -33,7 +34,10 @@ def test_tmdb_card_is_a_standalone_metadata_provider_with_manifest_config():
     assert "metadata.detail" in card.capabilities
     assert card.manifest.image_hosts == ("image.tmdb.org",)
     assert card.manifest.config_fields[0]["key"] == "api_read_access_token"
+    assert card.manifest.config_fields[0]["required"] is False
+    assert card.manifest.config_fields[1]["key"] == "api_key"
     assert card.is_configured({"api_read_access_token": "token"}) is True
+    assert card.is_configured({"api_key": "v3-key"}) is True
     assert card.is_configured({}) is False
 
 
@@ -132,7 +136,7 @@ def test_tmdb_details_return_external_ids_and_health_check_never_exposes_token()
     assert detail["external_ids"] == {"imdb_id": "tt123"}
     assert card.check({}) == {
         "status": "unconfigured",
-        "message": "请先填写 TMDB API Read Access Token",
+        "message": "请填写 API Read Access Token 或 API Key",
     }
     assert "secret-token" not in str(card.check({"api_read_access_token": "secret-token"}))
 
@@ -171,3 +175,51 @@ def test_tmdb_is_seeded_and_can_be_uninstalled_without_affecting_douban(tmp_path
     assert services["card_registry"].get("tmdb") is None
     assert services["card_registry"].get("douban") is not None
     assert not plugin_path.exists()
+
+
+def test_tmdb_api_key_auth_uses_query_parameter_without_bearer_header():
+    http = FakeHttpClient({"images": {}})
+    card = TMDBMetadataCard(
+        FakeConfigStore({"api_key": "v3-api-key", "language": "zh-CN"}),
+        http,
+    )
+
+    assert card.check({"api_key": "v3-api-key"}) == {
+        "status": "healthy",
+        "message": "TMDB API 连接正常",
+    }
+    kwargs = http.calls[0][2]
+    assert kwargs["params"]["api_key"] == "v3-api-key"
+    assert "Authorization" not in kwargs["headers"]
+    assert "v3-api-key" not in http.calls[0][1]
+
+
+def test_tmdb_health_check_reports_auth_status_without_exposing_credentials():
+    http = FakeHttpClient(
+        {"status_message": "Invalid API key"},
+        status_code=401,
+    )
+    card = TMDBMetadataCard(
+        FakeConfigStore({"api_read_access_token": "secret-token"}),
+        http,
+    )
+
+    result = card.check({"api_read_access_token": "secret-token"})
+
+    assert result["status"] == "unhealthy"
+    assert "HTTP 401" in result["message"]
+    assert "secret-token" not in str(result)
+
+
+def test_tmdb_enabled_config_requires_either_supported_credential():
+    card = TMDBMetadataCard(FakeConfigStore())
+
+    try:
+        card.validate_enabled_config({})
+    except ValueError as exc:
+        assert "API Read Access Token 或 API Key" in str(exc)
+    else:
+        raise AssertionError("TMDB should not be enabled without credentials")
+
+    card.validate_enabled_config({"api_read_access_token": "token"})
+    card.validate_enabled_config({"api_key": "v3-key"})
