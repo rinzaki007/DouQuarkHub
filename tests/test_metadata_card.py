@@ -287,3 +287,14 @@ def test_metadata_image_policy_uses_card_manifest_hosts_not_provider_ids():
     assert _metadata_image_policy("http://img.example-cdn.test/poster.jpg", [card]) is None
     assert _metadata_image_policy("https://example-cdn.test:8443/poster.jpg", [card]) is None
     assert _metadata_image_policy("https://evil.test/poster.jpg", [card]) is None
+
+
+
+def test_metadata_search_exposes_generic_route_and_keeps_legacy_alias(tmp_path):
+    from moviesync.app import create_app
+
+    app = create_app({"MOVIESYNC_DATA_DIR": str(tmp_path)}, start_scheduler=False)
+    routes = {rule.rule for rule in app.url_map.iter_rules()}
+
+    assert "/api/search-metadata" in routes
+    assert "/api/search-douban" in routes
