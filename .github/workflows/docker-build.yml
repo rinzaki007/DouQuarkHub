@@ -13,7 +13,8 @@ on:
 
 # 避免重复构建
 concurrency:
-  group: ${{ github.workflow }}
+  # Isolate each PR's checks; only newer runs for the same PR/ref should cancel older runs.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 permissions:
