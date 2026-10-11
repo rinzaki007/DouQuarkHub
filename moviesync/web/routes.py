@@ -595,6 +595,103 @@ def playback_resolve():
     return jsonify({"success": True, "provider_id": provider_id, "playback": info})
 
 
+
+@api.route("/playback/stream", methods=["GET", "HEAD"])
+def playback_stream():
+    """Proxy short-lived provider URLs while preserving HTTP Range semantics for HTML5 video."""
+    manager = _services().get("playback_providers")
+    if manager is None:
+        return _json_error("在线播放功能暂不可用", 503)
+
+    provider_id = str(request.args.get("provider_id") or "").strip()
+    try:
+        fid = _normalize_fid(request.args.get("fid", ""), default="")
+        if not fid:
+            return _json_error("文件 FID 不能为空")
+        info = manager.resolve_playback(provider_id, fid)
+        target = str(info.get("url") or "").strip()
+        parsed = urlparse(target)
+        if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password:
+            return _json_error("播放卡片未返回有效的 HTTPS 地址", 502)
+    except LookupError as exc:
+        return _json_error(str(exc), 404)
+    except ValueError as exc:
+        return _json_error(str(exc))
+    except Exception:
+        _services()["logger"].exception("为在线播放准备视频流失败")
+        return _json_error("暂时无法获取视频流，请重新点击视频", 502)
+
+    forwarded_headers = {}
+    range_header = request.headers.get("Range")
+    if range_header:
+        forwarded_headers["Range"] = range_header
+    try:
+        upstream = _services()["http"].session.request(
+            request.method,
+            target,
+            headers=forwarded_headers,
+            timeout=(5, 30),
+            stream=True,
+            allow_redirects=True,
+        )
+    except Exception:
+        _services()["logger"].warning("请求视频流上游失败", exc_info=True)
+        return Response(
+            "视频源暂时无法连接，请重新点击视频",
+            status=502,
+            content_type="text/plain; charset=utf-8",
+            headers={"X-MovieSync-Playback-Error": "upstream_unreachable"},
+        )
+
+    if upstream.status_code not in {200, 206, 416}:
+        upstream_status = upstream.status_code
+        upstream.close()
+        _services()["logger"].warning("视频流上游返回 HTTP %s", upstream_status)
+        return Response(
+            "视频源拒绝请求（HTTP %s），播放地址可能已过期，请重新点击视频" % upstream_status,
+            status=502,
+            content_type="text/plain; charset=utf-8",
+            headers={"X-MovieSync-Playback-Error": "upstream_http_%s" % upstream_status},
+        )
+
+    upstream_type = str(upstream.headers.get("Content-Type") or "").split(";", 1)[0].strip().lower()
+    playback_type = str(info.get("mime_type") or "").strip().lower()
+    if upstream_type.startswith("video/") or upstream_type in {
+        "application/vnd.apple.mpegurl",
+        "application/x-mpegurl",
+    }:
+        content_type = upstream_type
+    elif playback_type.startswith("video/") or playback_type in {
+        "application/vnd.apple.mpegurl",
+        "application/x-mpegurl",
+    }:
+        content_type = playback_type
+    else:
+        content_type = "application/octet-stream"
+
+    headers = {
+        "Content-Type": content_type,
+        "Accept-Ranges": upstream.headers.get("Accept-Ranges", "bytes"),
+        "Cache-Control": "no-store",
+        "X-Content-Type-Options": "nosniff",
+        "Content-Disposition": "inline",
+    }
+    for name in ("Content-Length", "Content-Range", "Last-Modified", "ETag"):
+        value = upstream.headers.get(name)
+        if value:
+            headers[name] = value
+
+    def stream_chunks():
+        try:
+            if request.method != "HEAD":
+                for chunk in upstream.iter_content(chunk_size=64 * 1024):
+                    if chunk:
+                        yield chunk
+        finally:
+            upstream.close()
+
+    return Response(stream_chunks(), status=upstream.status_code, headers=headers, direct_passthrough=True)
+
 @api.get("/storage-targets")
 def storage_targets():
     manager = _services()["storage_targets"]
