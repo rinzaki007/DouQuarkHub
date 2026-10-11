@@ -354,11 +354,11 @@ def test_hls_playlist_rewrites_relative_segment_and_key_uris():
 
     playlist_url = "https://video-play-h-zb.drive.quark.cn/qv/sample/media.m3u8?playlist_sig=abc"
     body = (
-        "#EXTM3U\\n"
-        '#EXT-X-KEY:METHOD=AES-128,URI="key.bin?key_sig=secret"\\n'
-        "#EXTINF:5.0,\\n"
-        "media-0.ts?segment_sig=xyz\\n"
-        "#EXT-X-ENDLIST\\n"
+        "#EXTM3U\n"
+        '#EXT-X-KEY:METHOD=AES-128,URI="key.bin?key_sig=secret"\n'
+        "#EXTINF:5.0,\n"
+        "media-0.ts?segment_sig=xyz\n"
+        "#EXT-X-ENDLIST\n"
     )
 
     rewritten = _rewrite_hls_playlist(body, playlist_url)
