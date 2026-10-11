@@ -337,7 +337,7 @@ class ResourceSourceCard(Card):
 
 
 class PlaybackProviderCard(Card):
-    """统一在线播放能力接口；每个网盘以独立卡片实现。"""
+    """兼容旧版/第三方插件的播放能力接口；MovieSync 当前不注册在线播放页面或 API。"""
 
     manifest = CardManifest(
         id="unknown.playback",

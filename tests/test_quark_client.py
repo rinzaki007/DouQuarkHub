@@ -1,5 +1,9 @@
 """Regression tests for Quark share parsing and transfer safety."""
 
+from types import SimpleNamespace
+
+import pytest
+
 from moviesync.clients.http import ApiError
 from moviesync.clients.quark import QuarkClient
 
@@ -101,50 +105,33 @@ def test_share_parser_rejects_invalid_id_before_network_request():
     assert error == "分享链接 ID 无效"
     assert client.http.calls == []
 
+def test_list_drive_files_reports_api_failure_instead_of_empty_directory(monkeypatch):
+    client = QuarkClient("cookie=test")
+    response = SimpleNamespace(status_code=200)
+    monkeypatch.setattr(
+        client.http,
+        "request_json",
+        lambda *args, **kwargs: (response, {"code": 14001, "message": "invalid cookie"}),
+    )
+
+    with pytest.raises(RuntimeError, match="目录读取失败"):
+        client.list_drive_files("0")
 
 
-def test_get_playback_info_uses_browser_compatible_hls_request_and_prefers_m3u8():
-    response = FakeResponse(200)
-    http = FakeHttp([
-        (response, {
-            "code": 0,
-            "data": {
-                "file_name": "movie.mp4",
-                "video_list": [
-                    {
-                        "resolution": "4k",
-                        "video_info": {
-                            "format": "mp4",
-                            "url": "https://video-play-c-zb.drive.quark.cn/signed/movie.mp4?token=redacted",
-                            "size": 1000,
-                        },
-                    },
-                    {
-                        "resolution": "super",
-                        "video_info": {
-                            "format": "m3u8",
-                            "url": "https://video-play-h-zb.drive.quark.cn/qv/example/media.m3u8?token=redacted",
-                            "size": 500,
-                        },
-                    },
-                ],
-            },
-        }),
-    ])
-    client = QuarkClient("session=value")
-    client.http = http
-
-    info = client.get_playback_info("file_123")
-
-    assert info["url"].endswith("/media.m3u8?token=redacted")
-    assert info["resolution"] == "super"
-    assert info["format"] == "m3u8"
-    assert info["mime_type"] == "application/vnd.apple.mpegurl"
-    method, url, kwargs = http.calls[0]
-    assert method == "POST"
-    assert url.endswith("/play/project?pr=ucpro&fr=pc&uc_param_str=")
-    assert kwargs["json"] == {
-        "fid": "file_123",
-        "resolutions": "normal,low,high,super,2k,4k",
-        "supports": "fmp4,m3u8",
+def test_list_drive_files_normalizes_destination_items(monkeypatch):
+    client = QuarkClient("cookie=test")
+    response = SimpleNamespace(status_code=200)
+    payload = {
+        "code": 0,
+        "data": {"list": [
+            {"fid": "folder1", "file_name": "电影", "dir_file": True, "size": 0},
+            {"fid": "file1", "file_name": "sample.mkv", "file_type": 1, "size": 1024},
+        ]},
     }
+    monkeypatch.setattr(client.http, "request_json", lambda *args, **kwargs: (response, payload))
+
+    files = client.list_drive_files("0")
+
+    assert files[0]["is_dir"] is True
+    assert files[1]["is_video"] is True
+    assert files[1]["size"] == 1024

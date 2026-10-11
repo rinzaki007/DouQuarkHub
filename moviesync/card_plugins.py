@@ -44,6 +44,7 @@ _LEGACY_BUNDLED_CARD_BLOBS = {
 # Only these known built-in copies are removed; customized/user-installed cards stay intact.
 _RETIRED_BUNDLED_CARD_BLOBS = {
     "aliyun.py": {"504fe978f795cd825544ffb2abefc49b2def9a55"},
+    "quark_playback.py": {"d9211e0422e29b11e2d10a94f8a41ffd5a80a37e"},
 }
 
 
