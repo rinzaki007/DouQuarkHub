@@ -186,7 +186,8 @@ class QuarkClient:
             raise RuntimeError(f"获取夸克播放地址失败：{exc}") from exc
         if response.status_code != 200 or str(data.get("code")) != "0":
             # Keep diagnostics useful while avoiding logging cookies, FIDs, or signed URLs.
-            upstream_message = str(data.get("message") or data.get("msg") or "").replace("\\r", " ").replace("\\n", " ").replace("\\t", " ").strip()
+            upstream_message = str(data.get("message") or data.get("msg") or "")
+            upstream_message = upstream_message.replace("\r", " ").replace("\n", " ").replace("\t", " ").strip()
             upstream_message = upstream_message[:160]
             details = [f"HTTP {response.status_code}", f"code={data.get('code', 'missing')}"]
             if upstream_message:
