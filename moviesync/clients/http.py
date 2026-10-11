@@ -38,7 +38,8 @@ class HttpClient:
         timeout: float,
         retries: int = 1,
         **kwargs: Any,
-    ) -> tuple[requests.Response, dict[str, Any]]:
+        allow_non_dict: bool = False,
+    ) -> tuple[requests.Response, Any]:
         last_error: Exception | None = None
         for attempt in range(retries + 1):
             try:
@@ -50,7 +51,7 @@ class HttpClient:
                     data = response.json()
                 except ValueError as exc:
                     raise ApiError(f"上游返回非 JSON 响应（HTTP {response.status_code}）") from exc
-                if not isinstance(data, dict):
+                if not isinstance(data, dict) and not (allow_non_dict and isinstance(data, list)):
                     raise ApiError(f"上游返回的 JSON 结构无效（HTTP {response.status_code}）")
                 return response, data
             except (requests.RequestException, ApiError) as exc:
