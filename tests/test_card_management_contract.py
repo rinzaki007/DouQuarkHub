@@ -655,6 +655,24 @@ def test_builtin_metadata_provider_can_be_disabled_before_required_config_is_set
 
 
 
+def test_quark_category_fids_use_simple_text_editor_and_keep_legacy_dict_support():
+    from card_templates.quark import QuarkStorageCard
+
+    fields = {field["key"]: field for field in QuarkStorageCard.manifest.config_fields}
+    category_fids = fields["category_fids"]
+    assert category_fids["type"] == "textarea"
+    assert category_fids["editor"] == "fid_lines"
+
+    card = object.__new__(QuarkStorageCard)
+    legacy = card.validate_config({"category_fids": {"电影": "123"}})
+    assert legacy["category_fids"]["电影"] == "123"
+    assert legacy["category_fids"]["电视剧"] == ""
+
+    parsed = card.validate_config({"category_fids": "电影=123\n电视剧=456"})
+    assert parsed["category_fids"]["电影"] == "123"
+    assert parsed["category_fids"]["电视剧"] == "456"
+
+
 def test_telegram_channels_use_form_editor_and_filename_rules_are_global():
     from card_templates.filename_recognition import FilenameRecognitionCard
     from card_templates.telegram import TelegramResourceSource
