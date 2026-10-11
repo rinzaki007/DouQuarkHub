@@ -298,8 +298,10 @@ class CardFilePluginManager:
             for declared in card.manifest.config_fields:
                 field = dict(declared)
                 canonical = canonical_fields.get(str(field.get("key") or ""))
-                if canonical and canonical.get("type", "string") == field.get("type", "string"):
-                    for key in ("editor", "item_fields", "placeholder", "description", "label"):
+                if canonical:
+                    # 配置编辑器属于可迁移的表单定义；允许新版内置卡片更新旧版字段类型，
+                    # 例如把旧 JSON 配置界面升级为文本框，而不覆盖用户实际保存的数据。
+                    for key in ("type", "editor", "item_fields", "placeholder", "description", "label"):
                         if key in canonical and field.get(key) != canonical[key]:
                             field[key] = canonical[key]
                             changed = True
