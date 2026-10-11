@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import re
+import time
 from typing import Any
 from urllib.parse import quote
 
@@ -229,6 +230,34 @@ class QuarkClient:
                         "Referer": "https://pan.quark.cn/",
                         "Origin": "https://pan.quark.cn",
                     }
+                    # The PC-client flow may require a short-lived social download token.
+                    now = int(time.time())
+                    token_url = (
+                        "https://drive-social-api.quark.cn/1/clouddrive/chat/conv/file/acquire_dl_token"
+                        "?pr=ucpro&fr=pc&sys=win32&ve=6.9.7.761"
+                        "&fr=win&la=zh-CN&ch=pckk%40product_guanwan"
+                    )
+                    download_token = ""
+                    try:
+                        _, token_data = self._request_json(
+                            "POST",
+                            token_url,
+                            timeout=8,
+                            retries=0,
+                            headers=pc_headers,
+                            json={
+                                "conversation_id": f"300000{now}",
+                                "conversation_type": 3,
+                                "msg_id": f"{now}000",
+                            },
+                        )
+                        token_obj = token_data.get("data")
+                        if isinstance(token_obj, dict):
+                            download_token = str(token_obj.get("token") or "")
+                    except ApiError:
+                        # Some sessions still allow PC-link retrieval without this token.
+                        pass
+
                     try:
                         download_response, download_data = self._request_json(
                             "POST",
@@ -236,7 +265,11 @@ class QuarkClient:
                             timeout=12,
                             retries=1,
                             headers=pc_headers,
-                            json={"fids": [file_id]},
+                            json={
+                                "fids": [file_id],
+                                "speedup_session": "",
+                                "token": download_token,
+                            },
                         )
                     except ApiError as exc:
                         raise RuntimeError(
