@@ -86,7 +86,8 @@ def test_quark_playback_parses_https_url_and_rejects_invalid_fid(monkeypatch):
         client.get_playback_info("../not-a-fid")
 
 
-def test_playback_routes_keep_core_available_without_playback_card(tmp_path):
+def test_playback_routes_keep_core_available_without_playback_card(tmp_path, monkeypatch):
+    monkeypatch.delenv("MOVIESYNC_AUTO_INSTALL_BUNDLED_CARDS", raising=False)
     app = create_app({"MOVIESYNC_DATA_DIR": str(tmp_path)}, start_scheduler=False)
     client = app.test_client()
     client.post("/api/setup", json={"username": "admin", "password": "password123"})
