@@ -20,8 +20,8 @@ from .clients.http import HttpClient
 from .config_store import ConfigStore
 from .logging_setup import configure_logging, recent_logs
 from .services.metadata import MetadataProviderManager
-from .services.playback_providers import PlaybackProviderManager
 from .services.notifications import NotificationManager
+from .services.playback_providers import PlaybackProviderManager
 from .services.resource_sources import ResourceSourceManager
 from .services.search import SearchService
 from .services.storage_targets import StorageTargetManager
