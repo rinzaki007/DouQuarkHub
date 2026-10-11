@@ -99,7 +99,10 @@ class AliyunDriveStorageCard(StorageTargetCard):
                 "required": False,
                 "max_length": 4096,
                 "placeholder": "使用上述自有应用完成授权后填写",
-                "description": "必须由同一组自有 App ID / App Secret 获取；OpenList 内置密钥生成的 Token 不保证可供 MovieSync 使用。",
+                "description": (
+                    "必须由同一组自有 App ID / App Secret 获取；"
+                    "OpenList 内置密钥生成的 Token 不保证可供 MovieSync 使用。"
+                ),
             },
             {
                 "key": "default_drive_id",
@@ -180,7 +183,10 @@ class AliyunDriveStorageCard(StorageTargetCard):
         client_secret = str(config.get("client_secret") or "").strip()
         refresh_token = str(config.get("refresh_token") or "").strip()
         if not client_id or not client_secret:
-            raise RuntimeError("请配置自己的阿里云盘开放平台 App ID 和 App Secret；不支持直接使用 OpenList 内置密钥生成的 Token")
+            raise RuntimeError(
+                "请配置自己的阿里云盘开放平台 App ID 和 App Secret；"
+                "不支持直接使用 OpenList 内置密钥生成的 Token"
+            )
         if not refresh_token:
             raise RuntimeError("尚未配置阿里云盘 Refresh Token")
         if (
@@ -250,7 +256,10 @@ class AliyunDriveStorageCard(StorageTargetCard):
         if not self.is_configured(saved):
             return {
                 "status": "unconfigured",
-                "message": "请配置自有应用的 App ID、App Secret 和 Refresh Token；OpenList 内置密钥 Token 不适用于此直连模式",
+                "message": (
+                    "请配置自有应用的 App ID、App Secret 和 Refresh Token；"
+                    "OpenList 内置密钥 Token 不适用于此直连模式"
+                ),
             }
         try:
             self._ensure_login(saved)
