@@ -746,3 +746,14 @@ def test_legacy_fid_lines_field_is_exposed_as_textarea_by_config_api():
     assert fields[0]["type"] == "textarea"
     assert fields[0]["editor"] == "fid_lines"
     assert config["category_fids"] == {"电影": "123", "电视剧": "456"}
+
+
+
+def test_telegram_channel_config_uses_full_width_and_wide_dialog():
+    from pathlib import Path
+
+    template = (Path(__file__).resolve().parents[1] / "templates" / "admin.html").read_text(encoding="utf-8")
+
+    assert 'field.editor === "channel_chips" ? " md:col-span-2" : ""' in template
+    assert '.generic-card-dialog-wide{' in template
+    assert 'classList.toggle("generic-card-dialog-wide", cardId === "telegram")' in template
