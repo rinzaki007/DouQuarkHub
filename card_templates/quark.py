@@ -68,7 +68,10 @@ class QuarkStorageCard(StorageTargetCard):
                 "editor": "fid_lines",
                 "default": "",
                 "placeholder": "电影=123\n电视剧=456",
-                "description": "每行填写一个分类和目录 FID，格式为“分类=FID”。可只填写需要的分类；留空表示使用默认目录。",
+                "description": (
+                    "每行填写一个分类和目录 FID，格式为“分类=FID”。"
+                    "可只填写需要的分类；留空表示使用默认目录。"
+                ),
             },
         ),
     )
