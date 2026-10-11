@@ -88,3 +88,32 @@ def test_exact_retired_card_upload_without_marker_is_removed(tmp_path, monkeypat
     )
 
     assert not (plugin_dir / filename).exists()
+
+def test_removed_quark_playback_card_is_cleaned_up_when_unmodified(tmp_path):
+    bundled = tmp_path / "bundled"
+    plugin_dir = tmp_path / "data" / "cards"
+    marker_dir = plugin_dir / ".seeded"
+    bundled.mkdir()
+    marker_dir.mkdir(parents=True)
+
+    filename = "quark_playback.py"
+    old_content = b'legacy quark playback card'
+    old_blob = card_plugins._RETIRED_BUNDLED_CARD_BLOBS[filename].copy()
+    monkeypatch_blob = card_plugins._git_blob_sha(old_content)
+    card_plugins._RETIRED_BUNDLED_CARD_BLOBS[filename] = {monkeypatch_blob}
+    (plugin_dir / filename).write_bytes(old_content)
+    (marker_dir / f"{filename}.seeded").write_text(monkeypatch_blob, encoding="ascii")
+
+    try:
+        manager = card_plugins.CardFilePluginManager(
+            plugin_dir,
+            card_plugins.CardRegistry(),
+            FakeLogger(),
+            bundled,
+            seed_missing=False,
+        )
+        assert not (plugin_dir / filename).exists()
+        assert not (marker_dir / f"{filename}.seeded").exists()
+        assert manager.list_plugins() == []
+    finally:
+        card_plugins._RETIRED_BUNDLED_CARD_BLOBS[filename] = old_blob
