@@ -42,7 +42,7 @@ async function loadDriveFiles() {
         if (!state.providerId) {
             const providerResult = await playbackApi("/api/playback/providers");
             const providers = providerResult.providers || [];
-            const provider = providers.find(item => item.id === "quark-playback") || providers[0];
+            const provider = providers.find(item => item.id === "quark_playback") || providers[0];
             if (!provider) throw new Error("尚未安装并启用在线播放卡片，请在「设置 → 卡片管理」中安装 quark_playback.py");
             if (!provider.configured) throw new Error("请先在夸克存储卡片中配置 Cookie");
             state.providerId = provider.id;
