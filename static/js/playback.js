@@ -93,17 +93,52 @@ async function playFile(file) {
             + "&fid=" + encodeURIComponent(file.fid));
         const playback = result.playback || {};
         if (!playback.url || !/^https:\/\//i.test(playback.url)) throw new Error("夸克未返回有效的 HTTPS 播放地址");
-        player.src = playback.url;
+        // Stream through MovieSync so the backend can forward byte-range requests and
+        // return an inline video response instead of a browser download attachment.
+        const streamUrl = "/api/playback/stream?provider_id=" + encodeURIComponent(state.providerId)
+            + "&fid=" + encodeURIComponent(file.fid);
+        player.src = streamUrl;
         player.load();
         status.textContent = "播放地址已获取" + (playback.resolution ? " · " + playback.resolution : "")
-            + "。如果无法播放，请检查视频编码是否受浏览器支持。";
-        player.play().catch(() => {});
+            + "，正在加载视频数据…";
+        player.play().catch(() => {
+            if (player.readyState < HTMLMediaElement.HAVE_METADATA) {
+                status.textContent = "地址已获取，但浏览器尚未加载到视频信息。请稍后点击播放器的播放按钮；若仍失败，请检查浏览器控制台中的媒体请求状态。";
+            }
+        });
     } catch (error) {
         status.textContent = error.message || "获取播放地址失败";
     }
 }
 
 document.addEventListener("DOMContentLoaded", () => {
+    const player = document.getElementById("video-player");
+    const status = document.getElementById("play-status");
+    player?.addEventListener("loadedmetadata", () => {
+        if (Number.isFinite(player.duration) && player.duration > 0) {
+            status.textContent = "视频已加载 · 时长 " + formatPlaybackDuration(player.duration);
+        }
+    });
+    player?.addEventListener("error", () => {
+        const mediaError = player.error;
+        const details = mediaError ? ({
+            1: "播放已取消",
+            2: "视频数据读取失败（网络或上游响应异常）",
+            3: "浏览器无法解码此视频（可能是编码或封装格式不受支持）",
+            4: "浏览器不支持此视频格式或视频源返回了非视频内容"
+        }[mediaError.code] || "未知媒体错误") : "未知媒体错误";
+        status.textContent = details + "。可以重新点击视频获取新地址；如果仍失败，请检查该文件是否为浏览器支持的 MP4/H.264 格式。";
+    });
     document.getElementById("refresh-files")?.addEventListener("click", loadDriveFiles);
     loadDriveFiles();
 });
+
+function formatPlaybackDuration(seconds) {
+    const total = Math.floor(seconds);
+    const hours = Math.floor(total / 3600);
+    const minutes = Math.floor((total % 3600) / 60);
+    const remainder = total % 60;
+    return (hours ? hours + ":" : "")
+        + String(minutes).padStart(2, "0") + ":"
+        + String(remainder).padStart(2, "0");
+}

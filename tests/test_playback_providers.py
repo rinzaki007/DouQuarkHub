@@ -257,6 +257,29 @@ def test_playback_routes_keep_core_available_without_playback_card(tmp_path, mon
     assert response.status_code == 200
     assert response.get_json()["playback"]["url"] == "https://media.example/video.mp4"
 
+    # The browser's byte-range requests must be relayed to the short-lived upstream URL.
+    upstream = SimpleNamespace(
+        status_code=206,
+        headers={
+            "Content-Type": "application/octet-stream",
+            "Content-Length": "10",
+            "Content-Range": "bytes 0-9/100",
+            "Accept-Ranges": "bytes",
+        },
+        iter_content=lambda chunk_size: iter([b"video-data"]),
+        close=lambda: None,
+    )
+    app.extensions["moviesync"]["http"].session.request = lambda *args, **kwargs: upstream
+    stream_response = client.get(
+        "/api/playback/stream?provider_id=fake-playback&fid=video-1",
+        headers={"Range": "bytes=0-9"},
+    )
+    assert stream_response.status_code == 206
+    assert stream_response.data == b"video-data"
+    assert stream_response.headers["Content-Range"] == "bytes 0-9/100"
+    assert stream_response.headers["Accept-Ranges"] == "bytes"
+    assert stream_response.headers["Content-Disposition"] == "inline"
+
     anonymous = app.test_client()
     assert anonymous.get("/api/playback/providers").status_code == 401
 
