@@ -47,17 +47,41 @@ class QuarkPlaybackCard(PlaybackProviderCard):
             "message": "夸克 Cookie 有效" if healthy else "夸克 Cookie 无效或已过期",
         }
 
+    def _persist_refreshed_cookie(self, client: QuarkClient) -> None:
+        """Persist Quark's rotated session cookies without touching other card settings."""
+        cookie = client.get_cookie()
+        getter = getattr(self.config_store, "get_card_config", None)
+        saver = getattr(self.config_store, "save_card_config", None)
+        if not cookie or not callable(getter) or not callable(saver):
+            return
+        try:
+            current = getter("quark")
+            current_cookie = str(current.get("cookie") or "") if isinstance(current, dict) else ""
+            if cookie != current_cookie:
+                saver("quark", {"cookie": cookie})
+        except Exception:
+            # Playback must remain usable even if an optional persistence API is unavailable.
+            return
+
     def list_files(self, parent_fid: str = "0") -> list[dict[str, Any]]:
         fid = str(parent_fid or "0").strip()
         if not _FID_RE.fullmatch(fid):
             raise ValueError("目录 FID 格式无效")
-        return self._client().list_drive_files(fid)
+        client = self._client()
+        try:
+            return client.list_drive_files(fid)
+        finally:
+            self._persist_refreshed_cookie(client)
 
     def resolve_playback(self, fid: str) -> dict[str, Any]:
         file_id = str(fid or "").strip()
         if not _FID_RE.fullmatch(file_id):
             raise ValueError("文件 FID 格式无效")
-        info = self._client().get_playback_info(file_id)
+        client = self._client()
+        try:
+            info = client.get_playback_info(file_id)
+        finally:
+            self._persist_refreshed_cookie(client)
         return {
             "fid": file_id,
             "file_name": str(info.get("file_name") or ""),
