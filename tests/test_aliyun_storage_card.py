@@ -88,7 +88,7 @@ def test_aliyun_login_refreshes_with_own_app_credentials_and_persists_rotated_to
     assert access_token == "access"
     assert drive_id == "drive-123"
     request = http.calls[0]
-    assert request[1].endswith("/v2/account/token")
+    assert request[1].endswith("/oauth/access_token")
     assert request[2]["json"] == {
         "grant_type": "refresh_token",
         "refresh_token": "old-refresh",
@@ -98,6 +98,25 @@ def test_aliyun_login_refreshes_with_own_app_credentials_and_persists_rotated_to
     assert store.config["refresh_token"] == "rotated-refresh"
     assert store.config["client_id"] == "my-app-id"
     assert store.config["client_secret"] == "my-app-secret"
+
+
+def test_aliyun_login_uses_open_api_to_discover_default_drive_id():
+    store = FakeStore({
+        "client_id": "my-app-id",
+        "client_secret": "my-app-secret",
+        "refresh_token": "refresh",
+    })
+    http = FakeHTTP([
+        (200, {"access_token": "access", "expires_in": 3600}),
+        (200, {"default_drive_id": "drive-from-open-api"}),
+    ])
+    card = AliyunDriveStorageCard(store, http)
+    card._request = lambda method, url, **kwargs: http.request_json(method, url, **kwargs)[1]
+    access_token, drive_id = card._ensure_login()
+    assert access_token == "access"
+    assert drive_id == "drive-from-open-api"
+    assert http.calls[0][1] == "https://openapi.aliyundrive.com/oauth/access_token"
+    assert http.calls[1][1] == "https://openapi.aliyundrive.com/adrive/v1.0/user/getDriveInfo"
 
 
 def test_aliyun_resolve_share_normalizes_files_and_recurses():
