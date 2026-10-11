@@ -298,7 +298,7 @@ def test_legacy_persistent_douban_card_factory_is_migrated_safely(tmp_path):
 def test_legacy_quark_card_template_is_registered_for_safe_upgrade():
     # This exact pre-feature template was bundled in the prior release. Registering
     # its blob hash lets the seed migration upgrade it without touching custom files.
-    assert "9c2e605ae0cded760ba778f7e0020b7142226fcb" in (
+    assert "93f21c01135b97dbf772d95cdba4e7d785da96da" in (
         card_plugins._LEGACY_BUNDLED_CARD_BLOBS["quark.py"]
     )
 
