@@ -32,10 +32,19 @@ _LEGACY_BUNDLED_CARD_BLOBS = {
     "tmdb.py": {
         "76292d41d3af54ffbd17fe31de4512427af87b10",
     },
-    # Previous bundled Quark card lacked destination-directory listing. Upgrade only
-    # this exact known template; customized persistent card files remain untouched.
+    # Historical bundled Quark cards that predate destination-directory listing.
+    # These are exact Git blob IDs, so even a stale customized marker can be
+    # corrected safely when the persistent file is byte-for-byte a known template.
     "quark.py": {
         "93f21c01135b97dbf772d95cdba4e7d785da96da",
+        "9c2e605ae0cded760ba778f7e0020b7142226fcb",
+        "8a53bc521ae0a32121ea9f41ebbd08ce75ab5e8f",
+        "c3a8fb618e78110a6a0ddd7c94fdb3b266c375d3",
+        "cdc731caeb8831f53df59467ae758ade36ed50e4",
+        "93ea4dbaec79aeaaae7bd59531af6aebe0f17173",
+        "bbedc5cec19b46be41e4f033396bc81e06c91334",
+        "901eee606dbeeda391c0febb4c8dd45915057a90",
+        "7987df724e95312d6a66258bedffd458cbd94df6",
     },
     "douban.py": {
         "4c601e750bfb312a3d7e028908568965f819d0f6",
@@ -135,13 +144,11 @@ class CardFilePluginManager:
                         destination.write_bytes(source_content)
                         self.logger.info("已更新未修改的内置卡片 %s", filename)
                     marker.write_text(source_blob, encoding="ascii")
-                elif (
-                    destination_blob in legacy_blobs
-                    and not marker_value.startswith("customized:")
-                ):
-                    # A previous release may have written a non-empty marker for
-                    # an older template. Upgrade only when the file bytes match
-                    # an exact known bundled blob; a customized marker always wins.
+                elif destination_blob in legacy_blobs:
+                    # Upgrade only exact known historical bundled bytes. A stale
+                    # customized marker may have been assigned by an older release
+                    # to an unrecognized template; the blob hash is stronger proof
+                    # that this file is not administrator-edited.
                     if destination_blob != source_blob:
                         destination.write_bytes(source_content)
                         self.logger.info("已迁移旧版内置卡片 %s", filename)

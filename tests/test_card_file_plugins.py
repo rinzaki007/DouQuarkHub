@@ -342,7 +342,10 @@ def test_seeded_card_template_preserves_administrator_edits(tmp_path):
     assert persisted.read_text(encoding="utf-8") == "# administrator custom version\n"
 
 
-@pytest.mark.parametrize("marker_value", ["", "stale-bundled-hash"])
+@pytest.mark.parametrize(
+    "marker_value",
+    ["", "stale-bundled-hash", "customized:stale-bundled-hash"],
+)
 def test_seeded_card_template_migrates_known_legacy_copy_with_old_marker(
     tmp_path, monkeypatch, marker_value
 ):
