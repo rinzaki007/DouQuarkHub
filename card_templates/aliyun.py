@@ -16,7 +16,7 @@ from moviesync.clients.http import ApiError, HttpClient
 from moviesync.errors import ConfigValidationError
 
 _API = "https://api.aliyundrive.com"
-_AUTH = "https://auth.aliyundrive.com"
+_OPEN_API = "https://openapi.aliyundrive.com"
 _SHARE_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0.0.0 Safari/537.36",
     "Referer": "https://www.aliyundrive.com/",
@@ -193,7 +193,7 @@ class AliyunDriveStorageCard(StorageTargetCard):
             return self._access_token, str(config.get("default_drive_id") or self._drive_id or "")
         payload = self._request(
             "POST",
-            f"{_AUTH}/v2/account/token",
+            f"{_OPEN_API}/oauth/access_token",
             headers=_SHARE_HEADERS,
             json={
                 "grant_type": "refresh_token",
@@ -224,7 +224,7 @@ class AliyunDriveStorageCard(StorageTargetCard):
             try:
                 user = self._request(
                     "POST",
-                    f"{_API}/v2/user/get",
+                    f"{_OPEN_API}/adrive/v1.0/user/getDriveInfo",
                     headers={**_SHARE_HEADERS, "Authorization": f"Bearer {access_token}"},
                     json={},
                 )
