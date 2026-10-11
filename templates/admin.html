@@ -1288,9 +1288,7 @@
                 const key = String(field.key || "");
                 const type = field.type || "string";
                 const rawValue = config[key] ?? field.default ?? (type === "json" ? {} : "");
-                const value = field.editor === "fid_lines" && rawValue && typeof rawValue === "object" && !Array.isArray(rawValue)
-                    ? Object.entries(rawValue).filter(([, fid]) => String(fid ?? "").trim()).map(([category, fid]) => category + "=" + fid).join("\n")
-                    : rawValue;
+                const value = rawValue;
                 const secret = Boolean(field.secret);
                 const controlType = field.editor === "fid_lines" ? "textarea" : type;
                 const common = 'data-card-field="' + escapeHtml(key) + '" data-card-type="' + escapeHtml(controlType) + '"';
