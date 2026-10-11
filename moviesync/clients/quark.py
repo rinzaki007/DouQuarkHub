@@ -349,8 +349,10 @@ class QuarkClient:
             })
         if not candidates:
             raise RuntimeError("夸克没有返回可用的 HTTPS 视频地址，请确认文件已转存且夸克账号可播放")
+        # Prefer Quark's HLS playlist for browser playback. The playlist's
+        # signed relative segment URLs are handled by the playback proxy.
         selected = next(
-            (item for item in candidates if not item["url"].split("?", 1)[0].lower().endswith(".m3u8")),
+            (item for item in candidates if urlparse(item["url"]).path.lower().endswith(".m3u8")),
             candidates[0],
         )
         return {"file_name": str(detail.get("file_name") or ""), **selected}
