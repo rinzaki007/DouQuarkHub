@@ -21,7 +21,6 @@ from .config_store import ConfigStore
 from .logging_setup import configure_logging, recent_logs
 from .services.metadata import MetadataProviderManager
 from .services.notifications import NotificationManager
-from .services.playback_providers import PlaybackProviderManager
 from .services.resource_sources import ResourceSourceManager
 from .services.search import SearchService
 from .services.storage_targets import StorageTargetManager
@@ -145,15 +144,6 @@ def create_app(
     )
     card_registry.migrate_configs(config_store, logger)
 
-    playback_providers = PlaybackProviderManager(card_registry, config_store, logger)
-    _load_optional_cards(
-        logger,
-        "在线播放",
-        playback_providers.load_plugins,
-        {"config_store": config_store, "logger": logger},
-    )
-
-
     http = HttpClient()
 
     tasks = TaskManager(
@@ -209,7 +199,6 @@ def create_app(
         "card_registry": card_registry,
         "file_card_plugins": file_card_plugins,
         "storage_targets": storage_targets,
-        "playback_providers": playback_providers,
         "http": http,
         "subscriptions": subscriptions,
         "tasks": tasks,
