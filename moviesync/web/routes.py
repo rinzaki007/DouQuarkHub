@@ -839,12 +839,40 @@ def resource_card_config(card_id):
     for key, value in incoming.items():
         field = fields_by_key[key]
         field_type = field.get("type", "string")
+        fid_lines_editor = field.get("editor") == "fid_lines"
         secret = bool(field.get("secret")) or any(marker in key.lower() for marker in sensitive_markers)
         # 密钥字段提交空字符串、null 或纯空白时表示“未修改”，不能覆盖已保存凭据。
         if secret and (
             value is None or (isinstance(value, str) and not value.strip())
         ):
             continue
+
+        # Specialized editors own their wire format. Convert fid_lines text to the
+        # canonical mapping before card validation, so older card files whose
+        # validator still expects a dict remain compatible with the newer textarea.
+        if fid_lines_editor:
+            if isinstance(value, str):
+                parsed_fids = {}
+                for line_number, line in enumerate(value.splitlines(), start=1):
+                    line = line.strip()
+                    if not line:
+                        continue
+                    if "=" not in line:
+                        return _json_error(
+                            f"配置字段「{field.get('label') or key}」第 {line_number} 行格式无效，请使用“分类=FID”"
+                        )
+                    category, fid = (part.strip() for part in line.split("=", 1))
+                    if not category or not fid:
+                        return _json_error(
+                            f"配置字段「{field.get('label') or key}」第 {line_number} 行格式无效，请使用“分类=FID”"
+                        )
+                    if category in parsed_fids:
+                        return _json_error(f"配置字段「{field.get('label') or key}」分类重复：{category}")
+                    parsed_fids[category] = fid
+                value = parsed_fids
+            elif not isinstance(value, dict):
+                return _json_error(f"配置字段「{field.get('label') or key}」必须是文本或对象")
+
         if field_type == "json" and not isinstance(value, (dict, list)):
             return _json_error(f"配置字段「{field.get('label') or key}」必须是 JSON 对象或数组")
         if field_type == "boolean" and not isinstance(value, bool):
@@ -867,7 +895,7 @@ def resource_card_config(card_id):
                 value = int(number_value) if number_value.is_integer() else number_value
             elif not isinstance(value, (int, float)) or not math.isfinite(value):
                 return _json_error(f"配置字段「{field.get('label') or key}」必须是有限数字")
-        if field_type in {"string", "password", "textarea"} and not isinstance(value, str):
+        if field_type in {"string", "password", "textarea"} and not fid_lines_editor and not isinstance(value, str):
             return _json_error(f"配置字段「{field.get('label') or key}」必须是文本")
         merged[key] = value
         persisted_incoming[key] = value
