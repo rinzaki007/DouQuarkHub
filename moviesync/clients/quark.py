@@ -119,6 +119,72 @@ class QuarkClient:
                 return str(item["fid"]), None
         return None, error_message
 
+    def list_drive_files(self, parent_fid: object = "0") -> list[dict[str, Any]]:
+        """列出本人夸克网盘目录，不读取分享链接。"""
+        parent = str(parent_fid or "0").strip()
+        if not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", parent):
+            raise ValueError("目录 FID 格式无效")
+        normalized = []
+        for item in self._list_children(parent):
+            fid = str(item.get("fid") or "").strip()
+            name = str(item.get("file_name") or "").strip()
+            if not fid or not name:
+                continue
+            is_dir = item.get("dir_file") is True or item.get("file_type") == 0
+            is_video = item.get("category") == 1 or name.lower().endswith(VIDEO_EXTENSIONS)
+            normalized.append({
+                "fid": fid, "file_name": name, "is_dir": bool(is_dir),
+                "is_video": bool(not is_dir and is_video),
+                "size": item.get("size") or 0,
+                "updated_at": item.get("updated_at") or item.get("l_updated_at") or 0,
+            })
+        return normalized
+
+    def get_playback_info(self, fid: object) -> dict[str, Any]:
+        """通过夸克转码播放接口解析短时视频地址，不向浏览器暴露 Cookie。"""
+        from urllib.parse import urlparse
+
+        file_id = str(fid or "").strip()
+        if not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", file_id):
+            raise ValueError("文件 FID 格式无效")
+        url = "https://drive.quark.cn/1/clouddrive/file/v2/play/project?pr=ucpro&fr=pc"
+        payload = {
+            "fid": file_id,
+            "resolutions": "low,normal,high,super,2k,4k",
+            "supports": "fmp4_av,m3u8,dolby_vision",
+        }
+        try:
+            response, data = self.http.request_json("POST", url, timeout=12, retries=1, json=payload)
+        except ApiError as exc:
+            raise RuntimeError(f"获取夸克播放地址失败：{exc}") from exc
+        if response.status_code != 200 or data.get("code") != 0:
+            raise RuntimeError("夸克未能生成播放地址，请确认文件已转存且账号可播放")
+        detail = data.get("data") if isinstance(data.get("data"), dict) else {}
+        video_list = detail.get("video_list") if isinstance(detail.get("video_list"), list) else []
+        candidates = []
+        for item in video_list:
+            if not isinstance(item, dict):
+                continue
+            info = item.get("video_info") if isinstance(item.get("video_info"), dict) else {}
+            play_url = str(info.get("url") or "").strip()
+            parsed = urlparse(play_url)
+            if not play_url or parsed.scheme != "https" or not parsed.hostname:
+                continue
+            candidates.append({
+                "url": play_url,
+                "resolution": str(item.get("resolution") or info.get("resolution") or ""),
+                "format": str(info.get("format") or ""),
+                "size": info.get("size") or detail.get("size") or 0,
+                "mime_type": "application/vnd.apple.mpegurl" if parsed.path.lower().endswith(".m3u8") else "video/mp4",
+            })
+        if not candidates:
+            raise RuntimeError("夸克没有返回可用的 HTTPS 视频地址，请确认文件已转存且夸克账号可播放")
+        selected = next(
+            (item for item in candidates if not item["url"].split("?", 1)[0].lower().endswith(".m3u8")),
+            candidates[0],
+        )
+        return {"file_name": str(detail.get("file_name") or ""), **selected}
+
     def get_share_files(
         self,
         pwd_id: object,
