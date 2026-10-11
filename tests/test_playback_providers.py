@@ -84,6 +84,18 @@ def test_quark_client_persists_refreshed_session_cookies_for_followup_requests(m
     assert client.http.headers["Cookie"] == client.get_cookie()
 
 
+def test_quark_playback_error_includes_safe_upstream_status_and_message(monkeypatch):
+    client = QuarkClient("cookie=do-not-log")
+    response = SimpleNamespace(status_code=400)
+    payload = {"code": 31001, "message": "file not ready"}
+    monkeypatch.setattr(client.http, "request_json", lambda *args, **kwargs: (response, payload))
+
+    with pytest.raises(RuntimeError, match=r"HTTP 400.*code=31001.*file not ready") as exc:
+        client.get_playback_info("fid-123")
+
+    assert "do-not-log" not in str(exc.value)
+
+
 def test_quark_playback_parses_https_url_and_rejects_invalid_fid(monkeypatch):
     client = QuarkClient("cookie=test")
     response = SimpleNamespace(status_code=200)
