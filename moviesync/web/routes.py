@@ -621,13 +621,14 @@ def playback_stream():
         _services()["logger"].exception("为在线播放准备视频流失败")
         return _json_error("暂时无法获取视频流，请重新点击视频", 502)
 
+    stream_method = request.method
     forwarded_headers = {}
     range_header = request.headers.get("Range")
     if range_header:
         forwarded_headers["Range"] = range_header
     try:
         upstream = _services()["http"].session.request(
-            request.method,
+            stream_method,
             target,
             headers=forwarded_headers,
             timeout=(5, 30),
@@ -671,7 +672,7 @@ def playback_stream():
 
     headers = {
         "Content-Type": content_type,
-        "Accept-Ranges": upstream.headers.get("Accept-Ranges", "bytes"),
+        "Accept-Ranges": upstream.headers.get("Accept-Ranges") or ("bytes" if upstream.status_code == 206 else "none"),
         "Cache-Control": "no-store",
         "X-Content-Type-Options": "nosniff",
         "Content-Disposition": "inline",
@@ -683,7 +684,7 @@ def playback_stream():
 
     def stream_chunks():
         try:
-            if request.method != "HEAD":
+            if stream_method != "HEAD":
                 for chunk in upstream.iter_content(chunk_size=64 * 1024):
                     if chunk:
                         yield chunk
