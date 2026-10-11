@@ -517,3 +517,54 @@ def create_card(context):
     assert field["editor"] == "fid_lines"
     # The persistent Python card is intentionally left untouched.
     assert '"type": "json"' in (plugin_dir / "quark.py").read_text(encoding="utf-8")
+
+
+def test_legacy_telegram_filename_rules_are_removed_from_form_manifest(tmp_path):
+    plugin_dir = tmp_path / "data-cards"
+    bundled_dir = tmp_path / "bundled-cards"
+    plugin_dir.mkdir()
+    bundled_dir.mkdir()
+
+    legacy_source = '''from moviesync.cards import CardManifest, ResourceSourceCard
+
+class TelegramCard(ResourceSourceCard):
+    manifest = CardManifest(id="telegram", name="Telegram", type="resource_source",
+        config_fields=(
+            {"key": "channels", "label": "资源频道", "type": "json"},
+            {"key": "magic_regex", "label": "文件名识别增强", "type": "json"},
+        ))
+    def search(self, movie, config):
+        return []
+
+def create_card(context):
+    return TelegramCard()
+'''
+    bundled_source = '''from moviesync.cards import CardManifest, ResourceSourceCard
+
+class TelegramCard(ResourceSourceCard):
+    manifest = CardManifest(id="telegram", name="Telegram", type="resource_source",
+        config_fields=(
+            {"key": "channels", "label": "资源频道", "type": "json",
+             "editor": "channel_chips", "default": []},
+        ))
+    def search(self, movie, config):
+        return []
+
+def create_card(context):
+    return TelegramCard()
+'''
+    legacy_path = plugin_dir / "telegram.py"
+    legacy_path.write_text(legacy_source, encoding="utf-8")
+    (bundled_dir / "telegram.py").write_text(bundled_source, encoding="utf-8")
+
+    manager = CardFilePluginManager(
+        plugin_dir, CardRegistry(), logging.getLogger("test-telegram-legacy-ui"), bundled_dir
+    )
+    card = manager.load_file("telegram.py")
+    field_keys = [field["key"] for field in card.manifest.config_fields]
+
+    assert field_keys == ["channels"]
+    assert card.manifest.config_fields[0]["editor"] == "channel_chips"
+    # The legacy card source remains untouched; only its exposed form is migrated.
+    assert '"key": "magic_regex"' in legacy_path.read_text(encoding="utf-8")
+
