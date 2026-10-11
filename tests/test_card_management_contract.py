@@ -717,5 +717,6 @@ def test_fid_lines_editor_renders_as_textarea_even_with_legacy_json_type():
     # Older persisted card manifests can still report category_fids as JSON.
     # The dedicated editor must take precedence and submit a plain text value.
     assert 'const controlType = field.editor === "fid_lines" ? "textarea" : type;' in source
-    assert 'field.editor === "fid_lines" || type === "textarea"' in source
+    assert 'else if (field.editor === "fid_lines")' in source
+    assert source.index('else if (field.editor === "fid_lines")') < source.index('else if (type === "json")')
     assert 'else if (type === "textarea" && field.editor === "fid_lines")' in source
