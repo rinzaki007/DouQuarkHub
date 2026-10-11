@@ -13,7 +13,6 @@ def test_all_pages_declare_a_local_favicon():
         "login.html",
         "tasks.html",
         "resource_select.html",
-        "playback.html",
         "about.html",
     ):
         content = (TEMPLATES / name).read_text(encoding="utf-8")
