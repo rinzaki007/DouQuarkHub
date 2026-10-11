@@ -668,7 +668,7 @@ def test_quark_category_fids_use_simple_text_editor_and_keep_legacy_dict_support
     assert legacy["category_fids"]["电影"] == "123"
     assert legacy["category_fids"]["电视剧"] == ""
 
-    parsed = card.validate_config({"category_fids": "电影=123\\n电视剧=456"})
+    parsed = card.validate_config({"category_fids": "电影=123\n电视剧=456"})
     assert parsed["category_fids"]["电影"] == "123"
     assert parsed["category_fids"]["电视剧"] == "456"
 
