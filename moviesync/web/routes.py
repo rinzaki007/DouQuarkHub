@@ -659,8 +659,23 @@ def playback_stream():
 
     if upstream.status_code not in {200, 206, 416}:
         upstream_status = upstream.status_code
+        # Record only allowlisted response metadata. Never log the signed URL,
+        # query string, cookies, or upstream response body.
+        final_host = urlparse(str(getattr(upstream, "url", "") or "")).hostname or "unknown"
+        safe_headers = {
+            name: str(upstream.headers.get(name) or "")[:120]
+            for name in ("Content-Type", "Server", "Via", "X-Cache", "Accept-Ranges")
+            if upstream.headers.get(name)
+        }
+        _services()["logger"].warning(
+            "视频流上游拒绝请求: status=%s method=%s range=%s host=%s headers=%s",
+            upstream_status,
+            stream_method,
+            "present" if range_header else "absent",
+            final_host,
+            safe_headers,
+        )
         upstream.close()
-        _services()["logger"].warning("视频流上游返回 HTTP %s", upstream_status)
         return Response(
             f"视频源拒绝请求（HTTP {upstream_status}），播放地址可能已过期，请重新点击视频",
             status=502,
