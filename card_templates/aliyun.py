@@ -16,7 +16,7 @@ from moviesync.clients.http import ApiError, HttpClient
 from moviesync.errors import ConfigValidationError
 
 _API = "https://api.aliyundrive.com"
-_OPEN_API = "https://openapi.aliyundrive.com"
+_OPEN_API = "https://openapi.alipan.com"
 _SHARE_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0.0.0 Safari/537.36",
     "Referer": "https://www.aliyundrive.com/",
