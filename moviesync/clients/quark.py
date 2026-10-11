@@ -184,8 +184,15 @@ class QuarkClient:
             response, data = self._request_json("POST", url, timeout=12, retries=1, json=payload)
         except ApiError as exc:
             raise RuntimeError(f"获取夸克播放地址失败：{exc}") from exc
-        if response.status_code != 200 or data.get("code") != 0:
-            raise RuntimeError("夸克未能生成播放地址，请确认文件已转存且账号可播放")
+        if response.status_code != 200 or str(data.get("code")) != "0":
+            # Keep diagnostics useful while avoiding logging cookies, FIDs, or signed URLs.
+            upstream_message = str(data.get("message") or data.get("msg") or "")
+            upstream_message = upstream_message.replace("\r", " ").replace("\n", " ").replace("\t", " ").strip()
+            upstream_message = upstream_message[:160]
+            details = [f"HTTP {response.status_code}", f"code={data.get('code', 'missing')}"]
+            if upstream_message:
+                details.append(f"message={upstream_message}")
+            raise RuntimeError("夸克播放接口拒绝请求（" + ", ".join(details) + "）")
         detail = data.get("data") if isinstance(data.get("data"), dict) else {}
         video_list = detail.get("video_list") if isinstance(detail.get("video_list"), list) else []
         candidates = []
