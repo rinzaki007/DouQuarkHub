@@ -708,6 +708,59 @@ def test_telegram_channels_use_form_editor_and_filename_rules_are_global():
 
 
 
+def test_fid_lines_textarea_saves_through_legacy_object_validator(tmp_path):
+    """The generic API converts textarea lines before calling older card validators."""
+    from moviesync.app import create_app
+    from moviesync.cards import CardManifest, StorageTargetCard
+
+    app = create_app({"MOVIESYNC_DATA_DIR": str(tmp_path)}, start_scheduler=False)
+    services = app.extensions["moviesync"]
+
+    class LegacyQuarkCard(StorageTargetCard):
+        manifest = CardManifest(
+            id="legacy-quark",
+            name="Legacy Quark",
+            type="storage_target",
+            config_fields=(
+                {"key": "category_fids", "label": "分类目录 FID",
+                 "type": "json", "editor": "fid_lines"},
+            ),
+        )
+
+        def validate_config(self, config):
+            value = config.get("category_fids")
+            if not isinstance(value, dict):
+                raise ValueError("分类目录 FID 必须是对象")
+            return {"category_fids": value}
+
+    services["card_registry"].register(LegacyQuarkCard())
+    client = app.test_client()
+    client.post("/api/setup", json={"username": "admin", "password": "password123"})
+    with client.session_transaction() as session:
+        csrf = session["csrf_token"]
+
+    response = client.post(
+        "/api/cards/legacy-quark/config",
+        json={
+            "enabled": True,
+            "config": {"category_fids": "动漫=55a44b99fac641679e1ebf55dcb38be9"},
+        },
+        headers={"X-CSRF-Token": csrf},
+    )
+
+    assert response.status_code == 200
+    assert response.get_json()["success"] is True
+    assert services["config"].get_card_config("legacy-quark")["category_fids"] == {
+        "动漫": "55a44b99fac641679e1ebf55dcb38be9"
+    }
+    # The saved mapping is rendered back to the textarea representation on GET.
+    response = client.get("/api/cards/legacy-quark/config")
+    assert response.status_code == 200
+    assert response.get_json()["config"]["category_fids"] == {
+        "动漫": "55a44b99fac641679e1ebf55dcb38be9"
+    }
+
+
 def test_fid_lines_editor_renders_as_textarea_even_with_legacy_json_type():
     from pathlib import Path
 
