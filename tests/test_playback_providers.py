@@ -68,6 +68,22 @@ def test_playback_provider_manager_dispatches_by_card_contract_and_honors_disabl
         manager.list_files("fake-playback", "0")
 
 
+def test_quark_client_persists_refreshed_session_cookies_for_followup_requests(monkeypatch):
+    client = QuarkClient("foo=old; __pus=old-pus")
+    response = SimpleNamespace(
+        status_code=200,
+        cookies=SimpleNamespace(get_dict=lambda: {"__pus": "new-pus", "__puus": "new-puus"}),
+    )
+    monkeypatch.setattr(client.http, "request_json", lambda *args, **kwargs: (response, {"code": 0}))
+
+    client._request_json("GET", "https://drive.quark.cn/example", timeout=2)
+
+    assert "foo=old" in client.get_cookie()
+    assert "__pus=new-pus" in client.get_cookie()
+    assert "__puus=new-puus" in client.get_cookie()
+    assert client.http.headers["Cookie"] == client.get_cookie()
+
+
 def test_quark_playback_parses_https_url_and_rejects_invalid_fid(monkeypatch):
     client = QuarkClient("cookie=test")
     response = SimpleNamespace(status_code=200)
