@@ -304,7 +304,7 @@ class AliyunDriveStorageCard(StorageTargetCard):
                 }
                 data = self._request(
                     "POST",
-                    f"{_API}/adrive/v2/file/list_by_share",
+                    f"{_API}/v2/file/list",
                     headers={**_SHARE_HEADERS, "x-share-token": share_token},
                     json=body,
                 )
@@ -364,7 +364,7 @@ class AliyunDriveStorageCard(StorageTargetCard):
             for _ in range(20):
                 payload = self._request(
                     "POST",
-                    f"{_API}/adrive/v3/file/list",
+                    f"{_OPEN_API}/adrive/v1.0/openFile/list",
                     headers=headers,
                     json={
                         "drive_id": drive_id,
@@ -399,7 +399,7 @@ class AliyunDriveStorageCard(StorageTargetCard):
         for _ in range(20):
             data = self._request(
                 "POST",
-                f"{_API}/adrive/v3/file/list",
+                f"{_OPEN_API}/adrive/v1.0/openFile/list",
                 headers=headers,
                 json={
                     "drive_id": drive_id,
@@ -419,7 +419,7 @@ class AliyunDriveStorageCard(StorageTargetCard):
                 break
         result = self._request(
             "POST",
-            f"{_API}/adrive/v2/file/create",
+            f"{_OPEN_API}/adrive/v1.0/openFile/create",
             headers=headers,
             json={
                 "drive_id": drive_id,
