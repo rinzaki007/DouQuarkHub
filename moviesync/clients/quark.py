@@ -5,6 +5,7 @@
 """
 from __future__ import annotations
 
+import logging
 import re
 import time
 from typing import Any
@@ -197,6 +198,12 @@ class QuarkClient:
                 or "plf_invalid" in upstream_message.lower()
             )
             if is_transcode_platform_error:
+                # Keep the API failure visible without logging cookies or signed URLs.
+                logging.getLogger(__name__).warning(
+                    "夸克转码接口不可用，尝试原始文件下载回退: code=%s message=%s",
+                    data.get("code", "missing"),
+                    upstream_message[:160] or "无错误说明",
+                )
                 download_url = (
                     "https://drive-pc.quark.cn/1/clouddrive/file/download"
                     "?pr=ucpro&fr=pc&sys=win32&ve=2.5.56&ut=&guid="
