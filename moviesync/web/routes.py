@@ -622,7 +622,20 @@ def playback_stream():
         return _json_error("暂时无法获取视频流，请重新点击视频", 502)
 
     stream_method = request.method
-    forwarded_headers = {}
+    # Signed Quark download URLs may reject requests that look like the default
+    # python-requests client. Use the same browser-style headers as QuarkClient,
+    # while preserving Range and avoiding transparent compression of byte streams.
+    forwarded_headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/131.0.0.0 Safari/537.36"
+        ),
+        "Referer": "https://pan.quark.cn/",
+        "Origin": "https://pan.quark.cn",
+        "Accept": "*/*",
+        "Accept-Encoding": "identity",
+    }
     range_header = request.headers.get("Range")
     if range_header:
         forwarded_headers["Range"] = range_header

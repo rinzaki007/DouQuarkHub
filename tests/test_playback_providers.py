@@ -269,7 +269,13 @@ def test_playback_routes_keep_core_available_without_playback_card(tmp_path, mon
         iter_content=lambda chunk_size: iter([b"video-data"]),
         close=lambda: None,
     )
-    app.extensions["moviesync"]["http"].session.request = lambda *args, **kwargs: upstream
+    upstream_calls = []
+
+    def fake_stream_request(*args, **kwargs):
+        upstream_calls.append((args, kwargs))
+        return upstream
+
+    app.extensions["moviesync"]["http"].session.request = fake_stream_request
     stream_response = client.get(
         "/api/playback/stream?provider_id=fake-playback&fid=video-1",
         headers={"Range": "bytes=0-9"},
@@ -279,6 +285,12 @@ def test_playback_routes_keep_core_available_without_playback_card(tmp_path, mon
     assert stream_response.headers["Content-Range"] == "bytes 0-9/100"
     assert stream_response.headers["Accept-Ranges"] == "bytes"
     assert stream_response.headers["Content-Disposition"] == "inline"
+    assert upstream_calls[0][0][0] == "GET"
+    assert upstream_calls[0][1]["headers"]["User-Agent"].startswith("Mozilla/5.0")
+    assert upstream_calls[0][1]["headers"]["Referer"] == "https://pan.quark.cn/"
+    assert upstream_calls[0][1]["headers"]["Origin"] == "https://pan.quark.cn"
+    assert upstream_calls[0][1]["headers"]["Accept-Encoding"] == "identity"
+    assert upstream_calls[0][1]["headers"]["Range"] == "bytes=0-9"
 
     anonymous = app.test_client()
     assert anonymous.get("/api/playback/providers").status_code == 401
