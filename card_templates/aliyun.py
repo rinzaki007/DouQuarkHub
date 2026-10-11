@@ -63,7 +63,7 @@ class AliyunDriveStorageCard(StorageTargetCard):
         name="阿里云盘",
         version="0.1.0",
         type="storage_target",
-        description="解析阿里云盘分享、浏览目标目录并尝试原生转存；首次接入需实测认证与转存接口",
+        description="使用自有阿里云盘开放平台应用凭据直连认证，解析分享并转存到目标目录；尚需真实账号验证",
         capabilities=(
             "storage.check",
             "storage.accepts.aliyun_share",
