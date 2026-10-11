@@ -1044,6 +1044,7 @@
         const CARD_TYPE_LABELS = {
             resource_source: '资源来源',
             storage_target: '存储目标',
+            playback_provider: '在线播放',
             metadata_provider: '元数据',
             notification: '通知',
             automation: '自动化',
@@ -1061,6 +1062,11 @@
                 title: "转存位置",
                 description: "负责选择网盘、创建目录并保存文件。",
                 icon: "fa-hard-drive",
+            },
+            playback_provider: {
+                title: "在线播放",
+                description: "浏览已转存到本人网盘的视频，并在 MovieSync 页面内播放。",
+                icon: "fa-circle-play",
             },
             metadata_provider: {
                 title: "影视资料",
@@ -1095,6 +1101,9 @@
             "storage.transfer": "转存文件",
             "storage.list": "查看文件",
             "storage.destinations": "选择保存位置",
+            "playback.list_files": "浏览网盘视频",
+            "playback.resolve": "解析播放地址",
+            "playback.health_check": "检查播放连接",
             "metadata.search": "搜索影视",
             "metadata.detail": "查看影视详情",
             "metadata.list": "浏览影视",
@@ -1137,7 +1146,7 @@
                 (groups[type] ||= []).push(card);
             });
 
-            const order = ["resource_source", "storage_target", "metadata_provider", "notification", "automation", "filename_processor", "custom"];
+            const order = ["resource_source", "storage_target", "playback_provider", "metadata_provider", "notification", "automation", "filename_processor", "custom"];
             summary.textContent = "已加载 " + cards.length + " 张卡片 · " + Object.keys(groups).length + " 个能力分类";
 
             container.innerHTML = order.filter(type => groups[type]?.length).map(type => {

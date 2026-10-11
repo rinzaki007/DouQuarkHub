@@ -176,3 +176,15 @@ The built-in Telegram resource source, PanSou resource source, Quark storage tar
 - `douban.py`: Douban metadata lookup and search.
 
 Uninstalling one of these files removes that card from the registry and persistent plugin directory, while other cards and core services continue running. Configuration and history are intentionally retained. Re-upload the same reviewed file to restore it. Shared low-level clients remain platform services injected through the factory context; card-specific behavior stays in the card file.
+
+
+## 在线播放提供方卡片
+
+在线播放由独立的 `PlaybackProviderCard` 实现，卡片类型为 `playback_provider`，至少声明
+`playback.list_files` 与 `playback.resolve` 能力。核心 `PlaybackProviderManager` 统一发现和分发，
+网盘 API 细节留在各自卡片与客户端中。凭据仍由对应存储卡片管理，播放卡片只读取必要的已保存配置，
+不复制或回显 Cookie。
+
+首期夸克播放浏览本人网盘目录并调用夸克转码播放接口，浏览器直接请求上游短时 HTTPS 地址，MovieSync
+不代理视频字节。分享链接、分享口令和分享解析流程不属于首期范围。没有播放卡片、播放卡片被停用或夸克
+配置缺失时，搜索、追剧和转存服务必须继续正常运行。
