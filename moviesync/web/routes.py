@@ -649,10 +649,10 @@ def playback_stream():
         upstream.close()
         _services()["logger"].warning("视频流上游返回 HTTP %s", upstream_status)
         return Response(
-            "视频源拒绝请求（HTTP %s），播放地址可能已过期，请重新点击视频" % upstream_status,
+            f"视频源拒绝请求（HTTP {upstream_status}），播放地址可能已过期，请重新点击视频",
             status=502,
             content_type="text/plain; charset=utf-8",
-            headers={"X-MovieSync-Playback-Error": "upstream_http_%s" % upstream_status},
+            headers={"X-MovieSync-Playback-Error": f"upstream_http_{upstream_status}"},
         )
 
     upstream_type = str(upstream.headers.get("Content-Type") or "").split(";", 1)[0].strip().lower()
