@@ -148,12 +148,31 @@ class QuarkClient:
         return None, error_message
 
     def list_drive_files(self, parent_fid: object = "0") -> list[dict[str, Any]]:
-        """列出本人夸克网盘目录，不读取分享链接。"""
+        """严格读取本人夸克网盘目录；接口失败时抛错，避免把读取失败误报为空目录。"""
         parent = str(parent_fid or "0").strip()
         if not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", parent):
             raise ValueError("目录 FID 格式无效")
+        items: list[dict[str, Any]] = []
+        page = 1
+        while page <= 20:
+            url = (
+                "https://drive.quark.cn/1/clouddrive/file/sort"
+                f"?pr=ucpro&fr=pc&pdir_fid={quote(parent)}&p={page}&num=200"
+            )
+            response, data = self._request_json("GET", url, timeout=6, retries=1)
+            if response.status_code != 200 or data.get("code") != 0:
+                raise RuntimeError("夸克网盘目录读取失败，请检查 Cookie 是否有效")
+            payload = data.get("data")
+            batch = payload.get("list", []) if isinstance(payload, dict) else []
+            if not isinstance(batch, list):
+                raise RuntimeError("夸克网盘返回的目录格式无效")
+            items.extend(item for item in batch if isinstance(item, dict))
+            if len(batch) < 200:
+                break
+            page += 1
+
         normalized = []
-        for item in self._list_children(parent):
+        for item in items:
             fid = str(item.get("fid") or "").strip()
             name = str(item.get("file_name") or "").strip()
             if not fid or not name:
