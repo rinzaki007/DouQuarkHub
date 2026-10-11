@@ -67,7 +67,6 @@ def test_removed_bundled_card_preserves_customized_files(tmp_path, monkeypatch):
     assert (marker_dir / f"{filename}.seeded").read_text(encoding="ascii") == f"customized:{blob}"
 
 
-
 def test_exact_retired_card_upload_without_marker_is_removed(tmp_path, monkeypatch):
     bundled = tmp_path / "bundled"
     plugin_dir = tmp_path / "data" / "cards"
