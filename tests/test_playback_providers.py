@@ -134,6 +134,47 @@ def test_quark_playback_falls_back_to_original_download_on_plf_invalid(monkeypat
     assert "do-not-log" not in repr(info)
 
 
+def test_quark_playback_retries_size_limited_download_with_pc_client_headers(monkeypatch):
+    client = QuarkClient("cookie=do-not-log")
+    transcode_response = SimpleNamespace(status_code=400)
+    transcode_payload = {"code": 14018, "message": "data invalid: [plf_invalid]"}
+    limited_response = SimpleNamespace(status_code=400)
+    limited_payload = {"code": 23018, "message": "download file size limit"}
+    pc_response = SimpleNamespace(status_code=200)
+    pc_payload = {
+        "code": 0,
+        "data": [{
+            "file_name": "large-video.mp4",
+            "size": 987654321,
+            "download_url": "https://download.example/large-video.mp4?sign=temporary",
+        }],
+    }
+    calls = []
+
+    def fake_request(method, url, **kwargs):
+        calls.append((method, url, kwargs))
+        if "file/v2/play/project" in url:
+            return transcode_response, transcode_payload
+        if "ve=2.5.56" in url:
+            return limited_response, limited_payload
+        return pc_response, pc_payload
+
+    monkeypatch.setattr(client.http, "request_json", fake_request)
+
+    info = client.get_playback_info("fid-123")
+
+    assert info["url"] == "https://download.example/large-video.mp4?sign=temporary"
+    assert info["file_name"] == "large-video.mp4"
+    assert info["size"] == 987654321
+    assert len(calls) == 3
+    assert calls[2][1].endswith("sys=win32&ve=6.9.7.761")
+    assert calls[2][2]["headers"]["User-Agent"].endswith(
+        "QuarkCloudDrivePC/6.9.7.761 quark-cloud-drive/2.5.40"
+    )
+    assert calls[2][2]["json"] == {"fids": ["fid-123"]}
+    assert "do-not-log" not in repr(info)
+
+
 def test_quark_playback_does_not_fallback_for_unrelated_api_errors(monkeypatch):
     client = QuarkClient("cookie=do-not-log")
     response = SimpleNamespace(status_code=400)
