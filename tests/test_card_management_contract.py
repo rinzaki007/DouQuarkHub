@@ -655,13 +655,14 @@ def test_builtin_metadata_provider_can_be_disabled_before_required_config_is_set
 
 
 
-def test_quark_category_fids_use_simple_text_editor_and_keep_legacy_dict_support():
+def test_quark_category_fids_use_four_structured_inputs_and_keep_legacy_support():
     from card_templates.quark import QuarkStorageCard
 
     fields = {field["key"]: field for field in QuarkStorageCard.manifest.config_fields}
     category_fids = fields["category_fids"]
-    assert category_fids["type"] == "textarea"
-    assert category_fids["editor"] == "fid_lines"
+    assert category_fids["type"] == "json"
+    assert category_fids["editor"] == "object_fields"
+    assert [field["key"] for field in category_fids["item_fields"]] == ["动漫", "电影", "电视剧", "综艺"]
 
     card = object.__new__(QuarkStorageCard)
     legacy = card.validate_config({"category_fids": {"电影": "123"}})
@@ -761,18 +762,15 @@ def test_fid_lines_textarea_saves_through_legacy_object_validator(tmp_path):
     }
 
 
-def test_fid_lines_editor_renders_as_textarea_even_with_legacy_json_type():
+def test_quark_category_fids_render_as_structured_object_inputs():
     from pathlib import Path
 
     admin_template = Path(__file__).resolve().parents[1] / "templates" / "admin.html"
     source = admin_template.read_text(encoding="utf-8")
 
-    # Older persisted card manifests can still report category_fids as JSON.
-    # The dedicated editor must take precedence and submit a plain text value.
-    assert 'const controlType = field.editor === "fid_lines" ? "textarea" : type;' in source
-    assert 'else if (field.editor === "fid_lines")' in source
-    assert source.index('else if (field.editor === "fid_lines")') < source.index('else if (type === "json")')
-    assert 'else if (type === "textarea" && field.editor === "fid_lines")' in source
+    assert 'else if (controlType === "json" && field.editor === "object_fields")' in source
+    assert 'data-card-structured-object="' in source
+    assert 'field.editor === "fid_lines" && rawValue' not in source
 
 
 
