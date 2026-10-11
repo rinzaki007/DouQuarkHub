@@ -53,11 +53,38 @@ class QuarkClient:
         headers = {**QUARK_HEADERS, "Cookie": cookie}
         self.http = HttpClient(headers)
 
+    def _request_json(self, *args, **kwargs):
+        """Make refreshed Quark session cookies available to subsequent API calls."""
+        response, data = self.http.request_json(*args, **kwargs)
+        response_cookies = getattr(response, "cookies", None)
+        get_dict = getattr(response_cookies, "get_dict", None)
+        if callable(get_dict):
+            refreshed = get_dict()
+            if isinstance(refreshed, dict):
+                updates = {key: str(refreshed[key]) for key in ("__pus", "__puus") if key in refreshed}
+                if updates:
+                    pairs = {}
+                    for part in self.cookie.split(";"):
+                        name, sep, value = part.strip().partition("=")
+                        if sep and name:
+                            pairs[name] = value
+                    pairs.update(updates)
+                    self.cookie = "; ".join(f"{name}={value}" for name, value in pairs.items())
+                    self.http.headers["Cookie"] = self.cookie
+                    session = getattr(getattr(self.http, "_local", None), "session", None)
+                    if session is not None:
+                        session.headers["Cookie"] = self.cookie
+        return response, data
+
+    def get_cookie(self) -> str:
+        """Return the current Cookie header, including refreshed Quark session values."""
+        return self.cookie
+
     def check_cookie_valid(self) -> bool:
         if not self.cookie:
             return False
         try:
-            response, data = self.http.request_json(
+            response, data = self._request_json(
                 "GET",
                 "https://drive.quark.cn/1/clouddrive/file/sort?pr=ucpro&fr=pc&pdir_fid=0&num=1",
                 timeout=6,
@@ -76,7 +103,7 @@ class QuarkClient:
                 f"?pr=ucpro&fr=pc&pdir_fid={quote(str(parent_fid))}&p={page}&num=200"
             )
             try:
-                response, data = self.http.request_json("GET", url, timeout=6, retries=1)
+                response, data = self._request_json("GET", url, timeout=6, retries=1)
             except ApiError:
                 break
             if response.status_code != 200 or data.get("code") != 0:
@@ -103,7 +130,7 @@ class QuarkClient:
         payload = {"pdir_fid": parent_fid, "file_name": folder_name, "dir_init_lock": False, "dir_path": ""}
         error_message = "创建目录失败"
         try:
-            response, data = self.http.request_json("POST", url, timeout=8, retries=0, json=payload)
+            response, data = self._request_json("POST", url, timeout=8, retries=0, json=payload)
             if response.status_code == 200 and data.get("code") == 0:
                 obj = data.get("data") or {}
                 fid = obj.get("fid") or obj.get("file_id") or data.get("fid")
@@ -154,7 +181,7 @@ class QuarkClient:
             "supports": "fmp4_av,m3u8,dolby_vision",
         }
         try:
-            response, data = self.http.request_json("POST", url, timeout=12, retries=1, json=payload)
+            response, data = self._request_json("POST", url, timeout=12, retries=1, json=payload)
         except ApiError as exc:
             raise RuntimeError(f"获取夸克播放地址失败：{exc}") from exc
         if response.status_code != 200 or data.get("code") != 0:
@@ -202,7 +229,7 @@ class QuarkClient:
 
         token_url = "https://drive.quark.cn/1/clouddrive/share/sharepage/token"
         try:
-            response, data = self.http.request_json(
+            response, data = self._request_json(
                 "POST",
                 token_url,
                 timeout=8,
@@ -251,7 +278,7 @@ class QuarkClient:
                 )
 
                 try:
-                    response, payload = self.http.request_json(
+                    response, payload = self._request_json(
                         "GET",
                         url,
                         timeout=8,
@@ -346,7 +373,7 @@ class QuarkClient:
             "to_pdir_fid": target_fid,
         }
         try:
-            response, data = self.http.request_json("POST", url, timeout=10, retries=0, json=payload)
+            response, data = self._request_json("POST", url, timeout=10, retries=0, json=payload)
             if response.status_code == 200 and data.get("code") == 0:
                 return True, "转存成功"
             return False, str(data.get("message") or f"转存失败（HTTP {response.status_code}）")
