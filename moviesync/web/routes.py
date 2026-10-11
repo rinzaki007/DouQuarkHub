@@ -159,6 +159,11 @@ def index():
     )
 
 
+@pages.get("/playback")
+def playback():
+    return render_template("playback.html")
+
+
 @pages.get("/tasks")
 def tasks():
     return render_template(
@@ -536,6 +541,58 @@ def resource_sources_health():
             "resource_sources": _services()["resource_sources"].get_status(),
         }
     )
+
+
+@api.get("/playback/providers")
+def playback_providers():
+    manager = _services().get("playback_providers")
+    if manager is None:
+        return jsonify({"success": True, "providers": []})
+    try:
+        return jsonify({"success": True, "providers": manager.list_providers()})
+    except Exception:
+        _services()["logger"].exception("读取在线播放卡片失败")
+        return jsonify({"success": True, "providers": [], "message": "在线播放卡片暂不可用"})
+
+
+@api.get("/playback/files")
+def playback_files():
+    manager = _services().get("playback_providers")
+    if manager is None:
+        return _json_error("在线播放功能暂不可用", 503)
+    provider_id = str(request.args.get("provider_id") or "").strip()
+    try:
+        parent_fid = _normalize_fid(request.args.get("parent_fid", "0"))
+        files = manager.list_files(provider_id, parent_fid)
+    except LookupError as exc:
+        return _json_error(str(exc), 404)
+    except ValueError as exc:
+        return _json_error(str(exc))
+    except Exception:
+        _services()["logger"].exception("读取网盘视频目录失败")
+        return _json_error("读取网盘目录失败，请检查夸克卡片配置后重试", 502)
+    return jsonify({"success": True, "provider_id": provider_id, "parent_fid": parent_fid, "files": files})
+
+
+@api.get("/playback/resolve")
+def playback_resolve():
+    manager = _services().get("playback_providers")
+    if manager is None:
+        return _json_error("在线播放功能暂不可用", 503)
+    provider_id = str(request.args.get("provider_id") or "").strip()
+    try:
+        fid = _normalize_fid(request.args.get("fid", ""), default="")
+        if not fid:
+            return _json_error("文件 FID 不能为空")
+        info = manager.resolve_playback(provider_id, fid)
+    except LookupError as exc:
+        return _json_error(str(exc), 404)
+    except ValueError as exc:
+        return _json_error(str(exc))
+    except Exception:
+        _services()["logger"].exception("解析网盘视频播放地址失败")
+        return _json_error("暂时无法获取播放地址，请确认视频已转存到自己的夸克网盘", 502)
+    return jsonify({"success": True, "provider_id": provider_id, "playback": info})
 
 
 @api.get("/storage-targets")
