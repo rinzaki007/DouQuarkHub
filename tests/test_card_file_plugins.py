@@ -342,7 +342,10 @@ def test_seeded_card_template_preserves_administrator_edits(tmp_path):
     assert persisted.read_text(encoding="utf-8") == "# administrator custom version\n"
 
 
-def test_seeded_card_template_migrates_known_legacy_copy_with_empty_marker(tmp_path, monkeypatch):
+@pytest.mark.parametrize("marker_value", ["", "stale-bundled-hash"])
+def test_seeded_card_template_migrates_known_legacy_copy_with_old_marker(
+    tmp_path, monkeypatch, marker_value
+):
     bundled_dir = tmp_path / "bundled"
     bundled_dir.mkdir()
     source = bundled_dir / "demo.py"
@@ -353,7 +356,7 @@ def test_seeded_card_template_migrates_known_legacy_copy_with_empty_marker(tmp_p
     persisted = plugin_dir / "demo.py"
     old_content = b"# known legacy bundled version\n"
     persisted.write_bytes(old_content)
-    (plugin_dir / ".seeded" / "demo.py.seeded").write_text("", encoding="ascii")
+    (plugin_dir / ".seeded" / "demo.py.seeded").write_text(marker_value, encoding="ascii")
     monkeypatch.setitem(
         card_plugins._LEGACY_BUNDLED_CARD_BLOBS,
         "demo.py",
