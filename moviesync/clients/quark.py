@@ -175,11 +175,11 @@ class QuarkClient:
         file_id = str(fid or "").strip()
         if not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", file_id):
             raise ValueError("文件 FID 格式无效")
-        url = "https://drive.quark.cn/1/clouddrive/file/v2/play/project?pr=ucpro&fr=pc"
+        url = "https://drive.quark.cn/1/clouddrive/file/v2/play/project?pr=ucpro&fr=pc&uc_param_str="
         payload = {
             "fid": file_id,
             "resolutions": "low,normal,high,super,2k,4k",
-            "supports": "fmp4_av,m3u8,dolby_vision",
+            "supports": "fmp4,m3u8",
         }
         try:
             response, data = self._request_json("POST", url, timeout=12, retries=1, json=payload)
