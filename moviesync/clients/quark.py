@@ -178,7 +178,7 @@ class QuarkClient:
         url = "https://drive.quark.cn/1/clouddrive/file/v2/play/project?pr=ucpro&fr=pc&uc_param_str="
         payload = {
             "fid": file_id,
-            "resolutions": "low,normal,high,super,2k,4k",
+            "resolutions": "normal,low,high,super,2k,4k",
             "supports": "fmp4,m3u8",
         }
         try:
