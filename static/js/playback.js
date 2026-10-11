@@ -102,7 +102,7 @@ async function playFile(file) {
         const streamUrl = "/api/playback/stream?provider_id=" + encodeURIComponent(state.providerId)
             + "&fid=" + encodeURIComponent(file.fid);
         const isHls = String(playback.mime_type || "").toLowerCase().includes("mpegurl")
-            || /\\.m3u8(?:$|\\?)/i.test(playback.url);
+            || /\.m3u8(?:$|\?)/i.test(playback.url);
         if (isHls && window.Hls && window.Hls.isSupported()) {
             const hls = new window.Hls({
                 enableWorker: true,
