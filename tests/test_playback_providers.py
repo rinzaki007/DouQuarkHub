@@ -5,10 +5,10 @@ from types import SimpleNamespace
 import pytest
 
 from moviesync.app import create_app
+from moviesync.card_plugins import CardFilePluginManager
 from moviesync.cards import CardManifest, CardRegistry, PlaybackProviderCard
 from moviesync.clients.quark import QuarkClient
 from moviesync.services.playback_providers import PlaybackProviderManager
-from moviesync.card_plugins import CardFilePluginManager
 
 
 class FakePlaybackCard(PlaybackProviderCard):
