@@ -228,6 +228,7 @@ class DoubanClient:
             f"https://movie.douban.com/j/subject_suggest?q={quote(query)}",
             timeout=8,
             retries=1,
+            allow_non_dict=True,
         )
 
         if response.status_code != 200 or not isinstance(payload, list):
