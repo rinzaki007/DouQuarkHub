@@ -306,6 +306,19 @@ class CardFilePluginManager:
                             field[key] = canonical[key]
                             changed = True
                 merged_fields.append(field)
+
+            # Filename normalization now belongs to its own optional card. Older
+            # Telegram manifests may still expose this retired field; hide it from
+            # the Telegram form without touching the user's saved config or code.
+            if card.card_id == "telegram":
+                filtered_fields = [
+                    field for field in merged_fields
+                    if str(field.get("key") or "") != "magic_regex"
+                ]
+                if len(filtered_fields) != len(merged_fields):
+                    merged_fields = filtered_fields
+                    changed = True
+
             if changed:
                 card.manifest = replace(card.manifest, config_fields=tuple(merged_fields))
                 self.logger.info(

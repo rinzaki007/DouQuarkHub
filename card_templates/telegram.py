@@ -85,21 +85,6 @@ class TelegramResourceSource(ResourceSourceCard):
         """验证 Telegram 频道与文件名正则，统一通用配置和旧接口规则。"""
         normalized = super().validate_config(config)
         normalized["channels"] = _normalize_channels(normalized.get("channels", []))
-        magic_regex = normalized.get("magic_regex", {})
-        if magic_regex is None:
-            magic_regex = {}
-        if not isinstance(magic_regex, dict):
-            raise ConfigValidationError("magic_regex 必须是 JSON 对象")
-        pattern = str(magic_regex.get("pattern") or "").strip()
-        replacement = str(magic_regex.get("replace") or "")
-        if len(pattern) > 1000 or len(replacement) > 200:
-            raise ConfigValidationError("文件名正则或替换规则过长")
-        try:
-            if pattern:
-                re.compile(pattern)
-        except re.error as exc:
-            raise ConfigValidationError(f"文件名正则无效：{exc}") from exc
-        normalized["magic_regex"] = {"pattern": pattern, "replace": replacement}
         return normalized
 
     def search(self, movie: object, config: dict) -> list[dict[str, Any]]:
