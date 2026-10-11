@@ -185,10 +185,81 @@ class QuarkClient:
         except ApiError as exc:
             raise RuntimeError(f"获取夸克播放地址失败：{exc}") from exc
         if response.status_code != 200 or str(data.get("code")) != "0":
-            # Keep diagnostics useful while avoiding logging cookies, FIDs, or signed URLs.
+            # Quark's current PC transcode endpoint can reject valid browser-cookie
+            # sessions with 14018/plf_invalid. Fall back to its authenticated
+            # original-file download URL instead of failing playback outright.
             upstream_message = str(data.get("message") or data.get("msg") or "")
             upstream_message = upstream_message.replace("\r", " ").replace("\n", " ").replace("\t", " ").strip()
             upstream_message = upstream_message[:160]
+            is_transcode_platform_error = (
+                str(data.get("code")) == "14018"
+                or "plf_invalid" in upstream_message.lower()
+            )
+            if is_transcode_platform_error:
+                download_url = (
+                    "https://drive-pc.quark.cn/1/clouddrive/file/download"
+                    "?pr=ucpro&fr=pc&sys=win32&ve=2.5.56&ut=&guid="
+                )
+                try:
+                    download_response, download_data = self._request_json(
+                        "POST",
+                        download_url,
+                        timeout=12,
+                        retries=1,
+                        json={"fids": [file_id]},
+                    )
+                except ApiError as exc:
+                    raise RuntimeError(f"夸克转码不可用，获取原始视频地址失败：{exc}") from exc
+
+                download_items = download_data.get("data")
+                download_item = (
+                    download_items[0]
+                    if isinstance(download_items, list)
+                    and download_items
+                    and isinstance(download_items[0], dict)
+                    else {}
+                )
+                original_url = str(download_item.get("download_url") or "").strip()
+                parsed_url = urlparse(original_url)
+                if (
+                    download_response.status_code == 200
+                    and str(download_data.get("code")) == "0"
+                    and parsed_url.scheme == "https"
+                    and parsed_url.hostname
+                ):
+                    file_name = str(download_item.get("file_name") or "")
+                    suffix = file_name.rsplit(".", 1)[-1].lower() if "." in file_name else ""
+                    mime_type = {
+                        "m3u8": "application/vnd.apple.mpegurl",
+                        "mp4": "video/mp4",
+                        "m4v": "video/mp4",
+                        "mov": "video/quicktime",
+                        "webm": "video/webm",
+                    }.get(suffix, "video/mp4")
+                    return {
+                        "url": original_url,
+                        "file_name": file_name,
+                        "resolution": "原始文件",
+                        "format": suffix or "original",
+                        "size": download_item.get("size") or 0,
+                        "mime_type": mime_type,
+                    }
+
+                download_message = str(
+                    download_data.get("message") or download_data.get("msg") or ""
+                ).replace("\r", " ").replace("\n", " ").replace("\t", " ").strip()[:160]
+                details = [
+                    f"HTTP {download_response.status_code}",
+                    f"code={download_data.get('code', 'missing')}",
+                ]
+                if download_message:
+                    details.append(f"message={download_message}")
+                raise RuntimeError(
+                    "夸克转码地址不可用，原始视频地址获取失败（"
+                    + ", ".join(details)
+                    + "）"
+                )
+
             details = [f"HTTP {response.status_code}", f"code={data.get('code', 'missing')}"]
             if upstream_message:
                 details.append(f"message={upstream_message}")
