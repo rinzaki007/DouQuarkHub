@@ -705,3 +705,17 @@ def test_telegram_channels_use_form_editor_and_filename_rules_are_global():
     assert "magic_regex" not in fields
     assert FilenameRecognitionCard.manifest.type == "filename_processor"
     assert global_fields["magic_regex"]["editor"] == "object_fields"
+
+
+
+def test_fid_lines_editor_renders_as_textarea_even_with_legacy_json_type():
+    from pathlib import Path
+
+    admin_template = Path(__file__).resolve().parents[1] / "templates" / "admin.html"
+    source = admin_template.read_text(encoding="utf-8")
+
+    # Older persisted card manifests can still report category_fids as JSON.
+    # The dedicated editor must take precedence and submit a plain text value.
+    assert 'const controlType = field.editor === "fid_lines" ? "textarea" : type;' in source
+    assert 'field.editor === "fid_lines" || type === "textarea"' in source
+    assert 'else if (type === "textarea" && field.editor === "fid_lines")' in source
