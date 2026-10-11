@@ -8,7 +8,6 @@ from __future__ import annotations
 import math
 import secrets
 from functools import wraps
-from urllib.parse import quote, urljoin, urlparse
 
 from flask import (
     Blueprint,
@@ -36,55 +35,6 @@ def _json_error(message: str, status: int = 400):
             "message": message,
         }
     ), status
-
-def _trusted_quark_media_url(value: str) -> bool:
-    """Allow only Quark's own HLS media paths for the segment proxy."""
-    try:
-        parsed = urlparse(str(value or "").strip())
-        host = (parsed.hostname or "").lower()
-        return (
-            parsed.scheme == "https"
-            and not parsed.username
-            and not parsed.password
-            and (host == "drive.quark.cn" or host.endswith(".drive.quark.cn"))
-            and parsed.port in (None, 443)
-            and parsed.path.startswith("/qv/")
-        )
-    except (TypeError, ValueError):
-        return False
-
-
-def _hls_proxy_url(upstream_url: str) -> str:
-    return "/api/playback/hls-segment?url=" + quote(upstream_url, safe="")
-
-
-def _rewrite_hls_playlist(body: str, playlist_url: str) -> str:
-    """Rewrite HLS segment/key/map references through MovieSync without logging signatures."""
-    import re
-
-    def rewrite_uri(raw_uri: str) -> str:
-        absolute = urljoin(playlist_url, raw_uri.strip())
-        if not _trusted_quark_media_url(absolute):
-            return raw_uri
-        return _hls_proxy_url(absolute)
-
-    rewritten = []
-    for line in body.splitlines():
-        stripped = line.strip()
-        if not stripped:
-            rewritten.append(line)
-        elif stripped.startswith("#"):
-            # HLS tags such as EXT-X-KEY and EXT-X-MAP can carry URI="...".
-            line = re.sub(
-                r'URI="([^"]+)"',
-                lambda match: 'URI="' + rewrite_uri(match.group(1)) + '"',
-                line,
-            )
-            rewritten.append(line)
-        else:
-            rewritten.append(rewrite_uri(stripped))
-    return "\n".join(rewritten) + ("\n" if body.endswith("\n") else "")
-
 
 def _normalize_fid(
     value: object,
@@ -205,11 +155,6 @@ def index():
     return render_template(
         "index.html"
     )
-
-
-@pages.get("/playback")
-def playback():
-    return render_template("playback.html")
 
 
 @pages.get("/tasks")
@@ -591,304 +536,6 @@ def resource_sources_health():
     )
 
 
-@api.get("/playback/providers")
-def playback_providers():
-    manager = _services().get("playback_providers")
-    if manager is None:
-        return jsonify({"success": True, "providers": []})
-    try:
-        return jsonify({"success": True, "providers": manager.list_providers()})
-    except Exception:
-        _services()["logger"].exception("读取在线播放卡片失败")
-        return jsonify({"success": True, "providers": [], "message": "在线播放卡片暂不可用"})
-
-
-@api.get("/playback/files")
-def playback_files():
-    manager = _services().get("playback_providers")
-    if manager is None:
-        return _json_error("在线播放功能暂不可用", 503)
-    provider_id = str(request.args.get("provider_id") or "").strip()
-    try:
-        parent_fid = _normalize_fid(request.args.get("parent_fid", "0"))
-        files = manager.list_files(provider_id, parent_fid)
-    except LookupError as exc:
-        return _json_error(str(exc), 404)
-    except ValueError as exc:
-        return _json_error(str(exc))
-    except Exception:
-        _services()["logger"].exception("读取网盘视频目录失败")
-        return _json_error("读取网盘目录失败，请检查夸克卡片配置后重试", 502)
-    return jsonify({"success": True, "provider_id": provider_id, "parent_fid": parent_fid, "files": files})
-
-
-@api.get("/playback/resolve")
-def playback_resolve():
-    manager = _services().get("playback_providers")
-    if manager is None:
-        return _json_error("在线播放功能暂不可用", 503)
-    provider_id = str(request.args.get("provider_id") or "").strip()
-    try:
-        fid = _normalize_fid(request.args.get("fid", ""), default="")
-        if not fid:
-            return _json_error("文件 FID 不能为空")
-        info = manager.resolve_playback(provider_id, fid)
-    except LookupError as exc:
-        return _json_error(str(exc), 404)
-    except ValueError as exc:
-        return _json_error(str(exc))
-    except Exception:
-        _services()["logger"].exception("解析网盘视频播放地址失败")
-        return _json_error("暂时无法获取播放地址，请确认视频已转存到自己的夸克网盘", 502)
-    return jsonify({"success": True, "provider_id": provider_id, "playback": info})
-
-
-
-@api.route("/playback/stream", methods=["GET", "HEAD"])
-def playback_stream():
-    """Proxy short-lived provider URLs while preserving HTTP Range semantics for HTML5 video."""
-    manager = _services().get("playback_providers")
-    if manager is None:
-        return _json_error("在线播放功能暂不可用", 503)
-
-    provider_id = str(request.args.get("provider_id") or "").strip()
-    try:
-        fid = _normalize_fid(request.args.get("fid", ""), default="")
-        if not fid:
-            return _json_error("文件 FID 不能为空")
-        info = manager.resolve_playback(provider_id, fid)
-        target = str(info.get("url") or "").strip()
-        parsed = urlparse(target)
-        if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password:
-            return _json_error("播放卡片未返回有效的 HTTPS 地址", 502)
-    except LookupError as exc:
-        return _json_error(str(exc), 404)
-    except ValueError as exc:
-        return _json_error(str(exc))
-    except Exception:
-        _services()["logger"].exception("为在线播放准备视频流失败")
-        return _json_error("暂时无法获取视频流，请重新点击视频", 502)
-
-    stream_method = request.method
-    # Signed Quark download URLs may reject requests that look like the default
-    # python-requests client. Use the same browser-style headers as QuarkClient,
-    # while preserving Range and avoiding transparent compression of byte streams.
-    forwarded_headers = {
-        "User-Agent": (
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/131.0.0.0 Safari/537.36"
-        ),
-        "Referer": "https://pan.quark.cn/",
-        "Origin": "https://pan.quark.cn",
-        "Accept": "*/*",
-        "Accept-Encoding": "identity",
-    }
-    range_header = request.headers.get("Range")
-    if range_header:
-        forwarded_headers["Range"] = range_header
-    try:
-        upstream = _services()["http"].session.request(
-            stream_method,
-            target,
-            headers=forwarded_headers,
-            timeout=(5, 30),
-            stream=True,
-            allow_redirects=True,
-        )
-    except Exception:
-        _services()["logger"].warning("请求视频流上游失败", exc_info=True)
-        return Response(
-            "视频源暂时无法连接，请重新点击视频",
-            status=502,
-            content_type="text/plain; charset=utf-8",
-            headers={"X-MovieSync-Playback-Error": "upstream_unreachable"},
-        )
-
-    if upstream.status_code not in {200, 206, 416}:
-        upstream_status = upstream.status_code
-        # Record only allowlisted response metadata. Never log the signed URL,
-        # query string, cookies, or upstream response body.
-        final_host = urlparse(str(getattr(upstream, "url", "") or "")).hostname or "unknown"
-        safe_headers = {
-            name: str(upstream.headers.get(name) or "")[:120]
-            for name in ("Content-Type", "Server", "Via", "X-Cache", "Accept-Ranges")
-            if upstream.headers.get(name)
-        }
-        _services()["logger"].warning(
-            "视频流上游拒绝请求: status=%s method=%s range=%s host=%s headers=%s",
-            upstream_status,
-            stream_method,
-            "present" if range_header else "absent",
-            final_host,
-            safe_headers,
-        )
-        upstream.close()
-        return Response(
-            f"视频源拒绝请求（HTTP {upstream_status}），播放地址可能已过期，请重新点击视频",
-            status=502,
-            content_type="text/plain; charset=utf-8",
-            headers={"X-MovieSync-Playback-Error": f"upstream_http_{upstream_status}"},
-        )
-
-    upstream_type = str(upstream.headers.get("Content-Type") or "").split(";", 1)[0].strip().lower()
-    if urlparse(target).path.lower().endswith(".m3u8") or upstream_type in {
-        "application/vnd.apple.mpegurl",
-        "application/x-mpegurl",
-        "audio/mpegurl",
-    }:
-        try:
-            playlist_bytes = b"".join(upstream.iter_content(chunk_size=16 * 1024))
-            playlist_text = playlist_bytes.decode("utf-8-sig")
-            rewritten_playlist = _rewrite_hls_playlist(playlist_text, str(getattr(upstream, "url", "") or target))
-        except (UnicodeDecodeError, ValueError):
-            upstream.close()
-            return Response(
-                "夸克返回的 HLS 播放列表无法解析，请重新点击视频",
-                status=502,
-                content_type="text/plain; charset=utf-8",
-            )
-        finally:
-            upstream.close()
-        return Response(
-            rewritten_playlist,
-            status=upstream.status_code,
-            content_type="application/vnd.apple.mpegurl; charset=utf-8",
-            headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"},
-        )
-    playback_type = str(info.get("mime_type") or "").strip().lower()
-    if upstream_type.startswith("video/") or upstream_type in {
-        "application/vnd.apple.mpegurl",
-        "application/x-mpegurl",
-    }:
-        content_type = upstream_type
-    elif playback_type.startswith("video/") or playback_type in {
-        "application/vnd.apple.mpegurl",
-        "application/x-mpegurl",
-    }:
-        content_type = playback_type
-    else:
-        content_type = "application/octet-stream"
-
-    headers = {
-        "Content-Type": content_type,
-        "Accept-Ranges": upstream.headers.get("Accept-Ranges") or ("bytes" if upstream.status_code == 206 else "none"),
-        "Cache-Control": "no-store",
-        "X-Content-Type-Options": "nosniff",
-        "Content-Disposition": "inline",
-    }
-    for name in ("Content-Length", "Content-Range", "Last-Modified", "ETag"):
-        value = upstream.headers.get(name)
-        if value:
-            headers[name] = value
-
-    def stream_chunks():
-        try:
-            if stream_method != "HEAD":
-                for chunk in upstream.iter_content(chunk_size=64 * 1024):
-                    if chunk:
-                        yield chunk
-        finally:
-            upstream.close()
-
-    return Response(stream_chunks(), status=upstream.status_code, headers=headers, direct_passthrough=True)
-
-@api.route("/playback/hls-segment", methods=["GET", "HEAD"])
-def playback_hls_segment():
-    """Proxy one signed HLS segment after strict Quark-host/path validation."""
-    target = str(request.args.get("url") or "").strip()
-    if not _trusted_quark_media_url(target):
-        return _json_error("HLS 分片地址无效或不受支持", 400)
-
-    forwarded_headers = {
-        "User-Agent": (
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/131.0.0.0 Safari/537.36"
-        ),
-        "Referer": "https://pan.quark.cn/",
-        "Origin": "https://pan.quark.cn",
-        "Accept": "*/*",
-        "Accept-Encoding": "identity",
-    }
-    segment_method = request.method
-    range_header = request.headers.get("Range")
-    if range_header:
-        forwarded_headers["Range"] = range_header
-    try:
-        upstream = _services()["http"].session.request(
-            segment_method,
-            target,
-            headers=forwarded_headers,
-            timeout=(5, 30),
-            stream=True,
-            allow_redirects=False,
-        )
-    except Exception:
-        _services()["logger"].warning("请求 HLS 分片上游失败", exc_info=True)
-        return Response(
-            "视频分片暂时无法连接，请重新点击视频",
-            status=502,
-            content_type="text/plain; charset=utf-8",
-        )
-
-    if upstream.status_code not in {200, 206, 416}:
-        status_code = upstream.status_code
-        safe_type = str(upstream.headers.get("Content-Type") or "")[:120]
-        _services()["logger"].warning(
-            "HLS 分片上游拒绝请求: status=%s range=%s content_type=%s",
-            status_code,
-            "present" if range_header else "absent",
-            safe_type,
-        )
-        upstream.close()
-        return Response("视频分片请求失败，请重新点击视频", status=502, content_type="text/plain; charset=utf-8")
-
-    segment_type = str(upstream.headers.get("Content-Type") or "").split(";", 1)[0].strip().lower()
-    if urlparse(target).path.lower().endswith(".m3u8") or segment_type in {
-        "application/vnd.apple.mpegurl",
-        "application/x-mpegurl",
-        "audio/mpegurl",
-    }:
-        try:
-            nested_bytes = b"".join(upstream.iter_content(chunk_size=16 * 1024))
-            nested_text = nested_bytes.decode("utf-8-sig")
-            rewritten_nested = _rewrite_hls_playlist(nested_text, str(getattr(upstream, "url", "") or target))
-        except (UnicodeDecodeError, ValueError):
-            upstream.close()
-            return Response("夸克返回的 HLS 子播放列表无法解析", status=502, content_type="text/plain; charset=utf-8")
-        finally:
-            upstream.close()
-        return Response(
-            rewritten_nested,
-            status=upstream.status_code,
-            content_type="application/vnd.apple.mpegurl; charset=utf-8",
-            headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"},
-        )
-
-    headers = {
-        "Content-Type": upstream.headers.get("Content-Type") or "video/mp2t",
-        "Cache-Control": "no-store",
-        "Content-Disposition": "inline",
-        "X-Content-Type-Options": "nosniff",
-    }
-    for name in ("Content-Length", "Content-Range", "Accept-Ranges", "Last-Modified", "ETag"):
-        value = upstream.headers.get(name)
-        if value:
-            headers[name] = value
-
-    def segment_chunks():
-        try:
-            if segment_method != "HEAD":
-                for chunk in upstream.iter_content(chunk_size=64 * 1024):
-                    if chunk:
-                        yield chunk
-        finally:
-            upstream.close()
-
-    return Response(segment_chunks(), status=upstream.status_code, headers=headers, direct_passthrough=True)
-
-
 @api.get("/storage-targets")
 def storage_targets():
     manager = _services()["storage_targets"]
@@ -909,6 +556,30 @@ def storage_target_destinations(target_id):
         "destinations": manager.destination_options(target_id),
     })
 
+
+
+@api.get("/storage-targets/<target_id>/files")
+def storage_target_files(target_id):
+    """列出存储目标指定目录中的文件；仅支持显式声明该能力的卡片。"""
+    manager = _services()["storage_targets"]
+    card = manager.get(str(target_id or "").strip())
+    if card is None:
+        return _json_error("这个转存位置尚未加载或已停用", 404)
+    capabilities = set(getattr(card, "capabilities", ()) or ())
+    list_destination_files = getattr(card, "list_destination_files", None)
+    if "storage.list_destination_files" not in capabilities or not callable(list_destination_files):
+        return _json_error("这个存储卡片暂不支持查看网盘目录", 501)
+    try:
+        parent_fid = _normalize_fid(request.args.get("parent_fid", "0"))
+        files = list_destination_files(parent_fid)
+        if not isinstance(files, list):
+            raise TypeError("目录列表格式无效")
+    except ValueError as exc:
+        return _json_error(str(exc))
+    except Exception:
+        _services()["logger"].exception("读取存储目标目录失败: %s", target_id)
+        return _json_error("读取网盘目录失败，请稍后刷新重试", 502)
+    return jsonify({"success": True, "target_id": target_id, "parent_fid": parent_fid, "files": files})
 
 
 @api.post("/storage-targets/default")
