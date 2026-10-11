@@ -15,7 +15,7 @@ _FID_RE = re.compile(r"^[A-Za-z0-9_-]{1,128}$")
 
 class QuarkPlaybackCard(PlaybackProviderCard):
     manifest = CardManifest(
-        id="quark-playback",
+        id="quark_playback",
         name="夸克在线播放",
         type="playback_provider",
         description="浏览本人夸克网盘目录并在 MovieSync 页面内播放视频",
