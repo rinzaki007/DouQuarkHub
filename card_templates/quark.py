@@ -64,14 +64,32 @@ class QuarkStorageCard(StorageTargetCard):
             {
                 "key": "category_fids",
                 "label": "分类目录 FID",
-                "type": "textarea",
-                "editor": "fid_lines",
-                "default": "",
-                "placeholder": "电影=123\n电视剧=456",
-                "description": (
-                    "每行填写一个分类和目录 FID，格式为“分类=FID”。"
-                    "可只填写需要的分类；留空表示使用默认目录。"
+                "type": "json",
+                "editor": "object_fields",
+                "default": {},
+                "item_fields": (
+                    {
+                        "key": "动漫",
+                        "label": "动漫目录 FID",
+                        "placeholder": "请输入动漫目录 FID",
+                    },
+                    {
+                        "key": "电影",
+                        "label": "电影目录 FID",
+                        "placeholder": "请输入电影目录 FID",
+                    },
+                    {
+                        "key": "电视剧",
+                        "label": "电视剧目录 FID",
+                        "placeholder": "请输入电视剧目录 FID",
+                    },
+                    {
+                        "key": "综艺",
+                        "label": "综艺目录 FID",
+                        "placeholder": "请输入综艺目录 FID",
+                    },
                 ),
+                "description": "四个分类分别填写目录 FID；留空的分类会使用默认目录。",
             },
         ),
     )
@@ -80,16 +98,35 @@ class QuarkStorageCard(StorageTargetCard):
         self.config_store = config_store
 
     def validate_config(self, config: dict[str, Any]) -> dict[str, Any]:
-        """验证夸克目录配置，兼容旧版对象配置与新版文本输入。"""
+        """验证夸克目录配置，并兼容旧版“分类=FID”文本。"""
         incoming = dict(config) if isinstance(config, dict) else config
-        if isinstance(incoming, dict) and isinstance(incoming.get("category_fids"), dict):
-            # 旧版持久化配置使用对象；先转成文本，让通用字段校验继续保持严格。
+        if isinstance(incoming, dict):
             incoming = dict(incoming)
-            incoming["category_fids"] = "\n".join(
-                f"{category}={fid}"
-                for category, fid in incoming["category_fids"].items()
-                if str(fid or "").strip()
-            )
+            category_fids = incoming.get("category_fids", {})
+            if category_fids is None or category_fids == "":
+                category_fids = {}
+            # 兼容旧版前端提交的多行文本，统一转换为对象后再做字段校验。
+            if isinstance(category_fids, str):
+                parsed: dict[str, str] = {}
+                for line_number, line in enumerate(category_fids.splitlines(), start=1):
+                    line = line.strip()
+                    if not line:
+                        continue
+                    if "=" not in line:
+                        raise ConfigValidationError(
+                            f"分类目录 FID 第 {line_number} 行格式无效，请使用“分类=FID”"
+                        )
+                    category, fid = (part.strip() for part in line.split("=", 1))
+                    if not category or not fid:
+                        raise ConfigValidationError(
+                            f"分类目录 FID 第 {line_number} 行格式无效，请使用“分类=FID”"
+                        )
+                    if category in parsed:
+                        raise ConfigValidationError(f"分类目录重复：{category}")
+                    parsed[category] = fid
+                category_fids = parsed
+            incoming["category_fids"] = category_fids
+
         normalized = super().validate_config(incoming)
         normalized["default_fid"] = _normalize_fid(
             normalized.get("default_fid", "0"), "cards.quark.config.default_fid"
@@ -97,23 +134,8 @@ class QuarkStorageCard(StorageTargetCard):
         category_fids = normalized.get("category_fids", {})
         if category_fids is None or category_fids == "":
             category_fids = {}
-        if isinstance(category_fids, str):
-            parsed_category_fids: dict[str, str] = {}
-            for line_number, line in enumerate(category_fids.splitlines(), start=1):
-                line = line.strip()
-                if not line:
-                    continue
-                if "=" not in line:
-                    raise ConfigValidationError(
-                        f"分类目录 FID 第 {line_number} 行格式无效，请使用“分类=FID”"
-                    )
-                category, fid = (part.strip() for part in line.split("=", 1))
-                if category in parsed_category_fids:
-                    raise ConfigValidationError(f"分类目录重复：{category}")
-                parsed_category_fids[category] = fid
-            category_fids = parsed_category_fids
         if not isinstance(category_fids, dict):
-            raise ConfigValidationError("Quark 分类目录 FID 必须是文本或对象")
+            raise ConfigValidationError("分类目录 FID 必须是对象")
         unknown = set(category_fids) - set(_CATEGORY_FID_KEYS)
         if unknown:
             raise ConfigValidationError("未知分类目录: " + ", ".join(sorted(map(str, unknown))))
