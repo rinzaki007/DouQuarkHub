@@ -77,17 +77,6 @@ moviesync/services/resource_sources.py
 
 这意味着 Telegram 即使未来不可用，也不会影响 MovieSync 的整体架构；只需要增加或替换一个资源源实现即可。
 
-### 阿里云盘卡片的认证说明
-
-阿里云盘卡片采用 MovieSync 直接调用阿里云盘接口的方式，不要求安装或运行 OpenList，也不把网盘挂载为系统目录。
-
-- 配置你自己在阿里云盘开放平台创建的应用 **App ID** 和 **App Secret**。
-- 填写由同一组应用凭据完成授权后取得的 **Refresh Token**。卡片会用这组凭据向阿里云盘认证接口刷新访问令牌，并在上游轮换 Refresh Token 时保存新值。
-- **不要使用 OpenList 内置应用密钥生成的 Refresh Token**：OpenList 文档说明，这类令牌与其驱动/授权方式绑定，不能视为 MovieSync 直连 API 的通用凭据。
-- 目前代码和模拟测试覆盖了直连刷新令牌的请求结构，但尚未使用真实账号验证授权、目录读取与实际转存；配置页面的“连接检查”成功后，也仍应先用少量文件验证真实转存结果。
-
-阿里云盘开放平台的应用申请和授权权限受平台规则限制。如果无法取得自有应用凭据，MovieSync 不会悄悄回退到 OpenList 的在线续期服务，也不会把认证失败伪装成转存成功。
-
 ### 存储卡片扩展约定
 
 - 资源来源优先输出通用的 `resource_id` 与 `resource_type`；旧的 `pwd_id` 仍会兼容，但新卡片不需要伪造这个夸克字段。
@@ -97,7 +86,7 @@ moviesync/services/resource_sources.py
 - 资源类型不兼容时会阻止提交。只有网盘卡片确实实现了跨平台搬运能力并明确声明支持时，才可以接收其他平台的分享。
 
 
-> PanSou API 已随 MovieSync Docker 镜像一起启动；默认地址为容器内的 `http://127.0.0.1:8888`。无需单独部署 PanSou。若已有自己的 PanSou 服务，仍可在 PanSou 卡片里改用外部地址。搜索时会根据所选存储卡片声明的 `storage.accepts.<resource_type>` 能力映射到 PanSou 的 `cloud_types`（例如阿里云盘 `aliyun`、百度网盘 `baidu`、夸克 `quark`）；切换存储卡片后会重新搜索，不会继续沿用上一个网盘的结果。
+> PanSou API 已随 MovieSync Docker 镜像一起启动；默认地址为容器内的 `http://127.0.0.1:8888`。无需单独部署 PanSou。若已有自己的 PanSou 服务，仍可在 PanSou 卡片里改用外部地址。搜索时会根据当前已安装存储卡片声明的 `storage.accepts.<resource_type>` 能力映射到 PanSou 的 `cloud_types`；切换存储卡片后会重新搜索，不会继续沿用上一个网盘的结果。未安装对应存储卡片时，不会把该网盘分享当成可转存资源。
 
 ## 🩺 资源源健康状态
 

@@ -39,6 +39,12 @@ _LEGACY_BUNDLED_CARD_BLOBS = {
     },
 }
 
+# Exact historical bundled file versions that should be retired on upgrade.
+# Only these known built-in copies are removed; customized/user-installed cards stay intact.
+_RETIRED_BUNDLED_CARD_BLOBS = {
+    "aliyun.py": {"504fe978f795cd825544ffb2abefc49b2def9a55"},
+}
+
 
 def _git_blob_sha(content: bytes) -> str:
     """Return the Git blob object ID for exact-byte version comparisons."""
@@ -141,6 +147,46 @@ class CardFilePluginManager:
                 self.logger.exception("升级内置卡片文件 %s 失败", filename)
 
             self._migrate_legacy_builtin_card(filename, destination)
+
+        # Remove obsolete bundled cards only when their persistent copy is known
+        # to be an unmodified bundled version. Never delete unknown or customized
+        # Python files from the administrator's data directory.
+        bundled_filenames = {
+            source.name
+            for source in bundled_dir.glob("*.py")
+            if _PLUGIN_FILE_RE.fullmatch(source.name)
+        }
+        retired_filenames = set(_RETIRED_BUNDLED_CARD_BLOBS)
+        marked_filenames = {
+            marker.name.removesuffix(".seeded")
+            for marker in marker_dir.glob("*.py.seeded")
+        }
+        for filename in sorted(retired_filenames | marked_filenames):
+            if filename in bundled_filenames:
+                continue
+            try:
+                self.validate_filename(filename)
+            except ValueError:
+                continue
+            destination = self.plugin_dir / filename
+            marker = marker_dir / f"{filename}.seeded"
+            try:
+                marker_value = marker.read_text(encoding="ascii").strip() if marker.is_file() else ""
+                if not destination.is_file():
+                    marker.unlink(missing_ok=True)
+                    continue
+                destination_blob = _git_blob_sha(destination.read_bytes())
+                known_retired_blob = destination_blob in _RETIRED_BUNDLED_CARD_BLOBS.get(filename, set())
+                is_unmodified_bundled = marker_value == destination_blob or (
+                    not marker_value and known_retired_blob
+                )
+                if not is_unmodified_bundled:
+                    continue
+                destination.unlink()
+                marker.unlink(missing_ok=True)
+                self.logger.info("已卸载已从内置模板移除且未修改的卡片 %s", filename)
+            except OSError:
+                self.logger.exception("清理已移除的内置卡片 %s 失败", filename)
 
     def _migrate_legacy_builtin_card(self, filename: str, destination: Path) -> None:
         """Apply narrowly-scoped upgrades without replacing administrator card files."""
