@@ -469,10 +469,48 @@ function renderTaskDetail(task) {
         '<div class="rounded-xl border border-slate-800 bg-slate-950 p-4"><div class="text-[10px] text-slate-500">执行统计</div><div class="mt-2 space-y-1 text-[11px] text-slate-300"><div>成功：' + Number(task.success_count || 0) + '</div><div>跳过：' + Number(task.skipped_count || 0) + '</div><div>失败：' + Number(task.failed_count || 0) + '</div></div></div>' +
         '</div>' +
         '<div class="rounded-xl border border-slate-800 bg-slate-950 p-4"><div class="text-xs font-semibold text-slate-200">当前状态</div><div class="mt-2 text-[11px] leading-5 ' + (task.status === 'failed' ? 'text-rose-400' : 'text-slate-400') + '">' + escapeTask(task.message || '') + '</div></div>' +
+        (task.type === 'transfer' && task.status === 'success' && task.storage_target_id ? '<section id="task-destination-files" class="rounded-xl border border-emerald-900/60 bg-slate-950 p-4"><div class="flex flex-wrap items-center justify-between gap-2"><div><div class="text-xs font-semibold text-slate-200"><i class="fa-solid fa-folder-open mr-1 text-emerald-400"></i>转存目录文件</div><div class="mt-1 text-[10px] text-slate-500">以下列表来自目标网盘，可用于核对转存结果。</div></div><div class="flex gap-2"><button type="button" onclick="loadTaskDestinationFiles()" class="rounded-lg border border-slate-700 px-3 py-2 text-[10px] text-slate-300 hover:bg-slate-800"><i class="fa-solid fa-rotate mr-1"></i>刷新</button><a href="https://pan.quark.cn/" target="_blank" rel="noopener noreferrer" class="rounded-lg bg-amber-600 px-3 py-2 text-[10px] font-medium text-white hover:bg-amber-500"><i class="fa-solid fa-arrow-up-right-from-square mr-1"></i>打开夸克</a></div></div><div id="task-destination-files-body" class="mt-3 text-[11px] text-slate-500">正在读取网盘目录…</div></section>' : '') +
         '<details class="rounded-xl border border-slate-800 bg-slate-950 p-4"><summary class="cursor-pointer text-xs font-semibold text-slate-300">执行日志</summary><div class="mt-3 space-y-2">' +
         (task.events || []).map(e => '<div class="flex gap-3 text-[11px]"><span class="shrink-0 font-mono text-slate-600">' + new Date(Number(e.at || 0)*1000).toLocaleTimeString() + '</span><span class="' + (e.level === 'error' ? 'text-rose-400' : e.level === 'success' ? 'text-emerald-400' : 'text-slate-400') + '">' + escapeTask(e.message) + '</span></div>').join('') +
         '</div></details>' +
         (task.status === 'failed' && task.type === 'transfer' && !task.recovery_uncertain ? '<button onclick="retryTask(\'' + escapeTask(task.id) + '\'); closeTaskDetail()" class="w-full rounded-xl bg-amber-600 px-4 py-3 text-xs font-medium text-white hover:bg-amber-500"><i class="fa-solid fa-rotate-right mr-1"></i>失败重试</button>' : '');
+    if (task.type === 'transfer' && task.status === 'success' && task.storage_target_id) {
+        window.currentDestinationTask = {targetId: task.storage_target_id, parentFid: task.target_fid || '0'};
+        loadTaskDestinationFiles();
+    }
+}
+
+
+async function loadTaskDestinationFiles() {
+    const task = window.currentDestinationTask;
+    const body = document.getElementById('task-destination-files-body');
+    if (!task || !body) return;
+    body.innerHTML = '<div class="py-3 text-slate-500"><i class="fa-solid fa-spinner fa-spin mr-2"></i>正在读取网盘目录…</div>';
+    try {
+        const query = new URLSearchParams({parent_fid: String(task.parentFid || '0')});
+        const response = await apiFetchTask('/api/storage-targets/' + encodeURIComponent(task.targetId) + '/files?' + query.toString());
+        const result = await response.json();
+        if (!response.ok || !result.success) throw new Error(result.message || '读取网盘目录失败');
+        const files = Array.isArray(result.files) ? result.files : [];
+        if (!files.length) {
+            body.innerHTML = '<div class="rounded-lg border border-dashed border-slate-800 px-3 py-5 text-center text-slate-500">目录暂时没有显示文件。夸克目录可能尚未刷新，请稍后点击“刷新”再核对。</div>';
+            return;
+        }
+        body.innerHTML = '<div class="mb-2 flex items-center justify-between text-[10px] text-slate-500"><span>当前目录 ' + files.length + ' 项</span><span>仅展示当前目录</span></div><div class="max-h-72 space-y-1 overflow-y-auto">' +
+            files.map(file => '<div class="flex items-center gap-3 rounded-lg border border-slate-800/70 bg-slate-900/50 px-3 py-2"><i class="fa-solid ' + (file.is_dir ? 'fa-folder text-amber-400' : file.is_video ? 'fa-file-video text-emerald-400' : 'fa-file text-slate-400') + ' w-4 shrink-0"></i><span class="min-w-0 flex-1 break-all text-slate-200">' + escapeTask(file.file_name || '未命名文件') + '</span><span class="shrink-0 text-[10px] text-slate-500">' + (file.is_dir ? '文件夹' : formatTaskFileSize(file.size)) + '</span></div>').join('') +
+            '</div>';
+    } catch (error) {
+        body.innerHTML = '<div class="rounded-lg border border-rose-900/50 bg-rose-950/20 px-3 py-4 text-rose-300">' + escapeTask(error.message || '读取网盘目录失败') + '<div class="mt-1 text-[10px] text-rose-400/80">转存任务状态不受影响，可稍后重新刷新目录。</div></div>';
+    }
+}
+
+function formatTaskFileSize(value) {
+    const size = Number(value || 0);
+    if (!Number.isFinite(size) || size <= 0) return '大小未知';
+    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    let amount = size, unit = 0;
+    while (amount >= 1024 && unit < units.length - 1) { amount /= 1024; unit++; }
+    return amount.toFixed(unit === 0 ? 0 : 1) + ' ' + units[unit];
 }
 
 function renderHistory() {
