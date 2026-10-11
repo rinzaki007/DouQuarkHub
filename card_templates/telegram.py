@@ -70,7 +70,7 @@ class TelegramResourceSource(ResourceSourceCard):
                 ),
                 "default": [],
                 "description": (
-                    "点击“添加频道”，每行填写一个公开频道用户名，不需要输入 @。"
+                    "添加后会以紧凑卡片显示，可直接删除；填写公开频道用户名时不需要输入 @。"
                     "频道列表留空时不会搜索 Telegram 资源。"
                 ),
             },
