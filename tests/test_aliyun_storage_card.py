@@ -115,8 +115,8 @@ def test_aliyun_login_uses_open_api_to_discover_default_drive_id():
     access_token, drive_id = card._ensure_login()
     assert access_token == "access"
     assert drive_id == "drive-from-open-api"
-    assert http.calls[0][1] == "https://openapi.aliyundrive.com/oauth/access_token"
-    assert http.calls[1][1] == "https://openapi.aliyundrive.com/adrive/v1.0/user/getDriveInfo"
+    assert http.calls[0][1] == "https://openapi.alipan.com/oauth/access_token"
+    assert http.calls[1][1] == "https://openapi.alipan.com/adrive/v1.0/user/getDriveInfo"
 
 
 def test_aliyun_resolve_share_normalizes_files_and_recurses():
