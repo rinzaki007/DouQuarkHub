@@ -140,6 +140,8 @@ def test_quark_playback_retries_size_limited_download_with_pc_client_headers(mon
     transcode_payload = {"code": 14018, "message": "data invalid: [plf_invalid]"}
     limited_response = SimpleNamespace(status_code=400)
     limited_payload = {"code": 23018, "message": "download file size limit"}
+    token_response = SimpleNamespace(status_code=200)
+    token_payload = {"code": 0, "data": {"token": "temporary-token"}}
     pc_response = SimpleNamespace(status_code=200)
     pc_payload = {
         "code": 0,
@@ -157,6 +159,8 @@ def test_quark_playback_retries_size_limited_download_with_pc_client_headers(mon
             return transcode_response, transcode_payload
         if "ve=2.5.56" in url:
             return limited_response, limited_payload
+        if "acquire_dl_token" in url:
+            return token_response, token_payload
         return pc_response, pc_payload
 
     monkeypatch.setattr(client.http, "request_json", fake_request)
@@ -166,12 +170,17 @@ def test_quark_playback_retries_size_limited_download_with_pc_client_headers(mon
     assert info["url"] == "https://download.example/large-video.mp4?sign=temporary"
     assert info["file_name"] == "large-video.mp4"
     assert info["size"] == 987654321
-    assert len(calls) == 3
-    assert calls[2][1].endswith("sys=win32&ve=6.9.7.761")
-    assert calls[2][2]["headers"]["User-Agent"].endswith(
+    assert len(calls) == 4
+    assert "acquire_dl_token" in calls[2][1]
+    assert calls[3][1].endswith("sys=win32&ve=6.9.7.761")
+    assert calls[3][2]["headers"]["User-Agent"].endswith(
         "QuarkCloudDrivePC/6.9.7.761 quark-cloud-drive/2.5.40"
     )
-    assert calls[2][2]["json"] == {"fids": ["fid-123"]}
+    assert calls[3][2]["json"] == {
+        "fids": ["fid-123"],
+        "speedup_session": "",
+        "token": "temporary-token",
+    }
     assert "do-not-log" not in repr(info)
 
 
