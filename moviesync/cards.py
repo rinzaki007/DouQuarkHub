@@ -24,7 +24,6 @@ CARD_ID_RE = re.compile(r"^[a-z0-9][a-z0-9._-]{0,63}$")
 CARD_TYPES = {
     "resource_source",
     "storage_target",
-    "playback_provider",
     "metadata_provider",
     "notification",
     "automation",
@@ -334,23 +333,6 @@ class ResourceSourceCard(Card):
     def search_channel(self, channel: object, title: str, config: dict) -> list[dict[str, Any]]:
         """在指定资源源频道中搜索资源；没有频道级能力的卡片返回空列表。"""
         return []
-
-
-class PlaybackProviderCard(Card):
-    """统一在线播放能力接口；每个网盘以独立卡片实现。"""
-
-    manifest = CardManifest(
-        id="unknown.playback",
-        name="未命名播放提供方",
-        type="playback_provider",
-        capabilities=("playback.list_files", "playback.resolve"),
-    )
-
-    def list_files(self, parent_fid: str = "0") -> list[dict[str, Any]]:
-        raise NotImplementedError
-
-    def resolve_playback(self, fid: str) -> dict[str, Any]:
-        raise NotImplementedError
 
 
 class StorageTargetCard(Card):
