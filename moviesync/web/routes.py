@@ -810,12 +810,13 @@ def playback_hls_segment():
         "Accept": "*/*",
         "Accept-Encoding": "identity",
     }
+    segment_method = request.method
     range_header = request.headers.get("Range")
     if range_header:
         forwarded_headers["Range"] = range_header
     try:
         upstream = _services()["http"].session.request(
-            request.method,
+            segment_method,
             target,
             headers=forwarded_headers,
             timeout=(5, 30),
@@ -855,7 +856,7 @@ def playback_hls_segment():
 
     def segment_chunks():
         try:
-            if request.method != "HEAD":
+            if segment_method != "HEAD":
                 for chunk in upstream.iter_content(chunk_size=64 * 1024):
                     if chunk:
                         yield chunk
