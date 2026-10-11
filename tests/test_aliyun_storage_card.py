@@ -142,6 +142,8 @@ def test_aliyun_resolve_share_normalizes_files_and_recurses():
     assert result["token"] == "share-token"
     assert [item["fid"] for item in result["files"]] == ["video-2", "video-1"]
     assert result["files"][0]["file_name"] == "S01E02.mkv"
+    assert http.calls[1][1] == "https://api.aliyundrive.com/v2/file/list"
+    assert http.calls[2][1] == "https://api.aliyundrive.com/v2/file/list"
 
 
 def test_aliyun_card_reports_missing_share_id_without_network_calls():
