@@ -1262,6 +1262,7 @@ def transfer_selected():
         "candidate": candidate,
         "target_fid": target_fid,
         "storage_target_id": storage_target_id,
+        "destination_listing_supported": "storage.list_destination_files" in set(getattr(storage_target, "capabilities", ()) or ()),
     }
 
     # 任务在线程池中异步执行，后台线程没有 Flask 的默认请求上下文。
