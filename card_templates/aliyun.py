@@ -74,14 +74,32 @@ class AliyunDriveStorageCard(StorageTargetCard):
         ),
         config_fields=(
             {
+                "key": "client_id",
+                "label": "阿里云盘开放平台 App ID",
+                "type": "string",
+                "secret": False,
+                "required": False,
+                "max_length": 512,
+                "description": "填写你自己在阿里云盘开放平台创建的应用 ID。不要使用 OpenList 内置密钥获取的令牌。",
+            },
+            {
+                "key": "client_secret",
+                "label": "阿里云盘开放平台 App Secret",
+                "type": "password",
+                "secret": True,
+                "required": False,
+                "max_length": 2048,
+                "description": "与 App ID 配套的应用密钥。凭据仅保存在本地配置中，不会回显。",
+            },
+            {
                 "key": "refresh_token",
                 "label": "阿里云盘 Refresh Token",
                 "type": "password",
                 "secret": True,
                 "required": False,
                 "max_length": 4096,
-                "placeholder": "登录阿里云盘后获取；留空则保留已保存的值",
-                "description": "优先使用可续期的 Refresh Token，而不是整段浏览器 Cookie。凭据不会回显。",
+                "placeholder": "使用上述自有应用完成授权后填写",
+                "description": "必须由同一组自有 App ID / App Secret 获取；OpenList 内置密钥生成的 Token 不保证可供 MovieSync 使用。",
             },
             {
                 "key": "default_drive_id",
@@ -109,6 +127,8 @@ class AliyunDriveStorageCard(StorageTargetCard):
         self._access_token = ""
         self._access_expires_at = 0.0
         self._refresh_token = ""
+        self._client_id = ""
+        self._client_secret = ""
         self._drive_id = ""
 
     def _config(self) -> dict[str, Any]:
@@ -120,13 +140,16 @@ class AliyunDriveStorageCard(StorageTargetCard):
 
     def validate_config(self, config: dict[str, Any]) -> dict[str, Any]:
         normalized = super().validate_config(config)
+        normalized["client_id"] = str(normalized.get("client_id") or "").strip()
+        normalized["client_secret"] = str(normalized.get("client_secret") or "").strip()
         normalized["refresh_token"] = str(normalized.get("refresh_token") or "").strip()
         normalized["default_drive_id"] = str(normalized.get("default_drive_id") or "").strip()
         normalized["default_folder_id"] = _folder_id(normalized.get("default_folder_id") or "root")
         return normalized
 
     def is_configured(self, config: dict[str, Any]) -> bool:
-        return bool(str((config or {}).get("refresh_token") or "").strip())
+        saved = config or {}
+        return all(str(saved.get(key) or "").strip() for key in ("client_id", "client_secret", "refresh_token"))
 
     def _request(self, method: str, url: str, *, headers=None, json=None, params=None, timeout=12):
         try:
@@ -151,18 +174,33 @@ class AliyunDriveStorageCard(StorageTargetCard):
             raise RuntimeError(f"阿里云盘请求失败（HTTP {response.status_code}，{code or message or '上游错误'}）")
         return payload
 
-    def _ensure_login(self) -> tuple[str, str]:
-        config = self._config()
+    def _ensure_login(self, config_override: dict[str, Any] | None = None) -> tuple[str, str]:
+        config = config_override if isinstance(config_override, dict) else self._config()
+        client_id = str(config.get("client_id") or "").strip()
+        client_secret = str(config.get("client_secret") or "").strip()
         refresh_token = str(config.get("refresh_token") or "").strip()
+        if not client_id or not client_secret:
+            raise RuntimeError("请配置自己的阿里云盘开放平台 App ID 和 App Secret；不支持直接使用 OpenList 内置密钥生成的 Token")
         if not refresh_token:
             raise RuntimeError("尚未配置阿里云盘 Refresh Token")
-        if self._access_token and self._access_expires_at > time.time() + 60 and self._refresh_token == refresh_token:
+        if (
+            self._access_token
+            and self._access_expires_at > time.time() + 60
+            and self._refresh_token == refresh_token
+            and self._client_id == client_id
+            and self._client_secret == client_secret
+        ):
             return self._access_token, str(config.get("default_drive_id") or self._drive_id or "")
         payload = self._request(
             "POST",
             f"{_AUTH}/v2/account/token",
             headers=_SHARE_HEADERS,
-            json={"grant_type": "refresh_token", "refresh_token": refresh_token},
+            json={
+                "grant_type": "refresh_token",
+                "refresh_token": refresh_token,
+                "client_id": client_id,
+                "client_secret": client_secret,
+            },
         )
         access_token = str(payload.get("access_token") or "").strip()
         if not access_token:
@@ -176,7 +214,7 @@ class AliyunDriveStorageCard(StorageTargetCard):
             saver = getattr(self.config_store, "save_card_config", None)
             if callable(saver):
                 try:
-                    saver(self.card_id, {"refresh_token": rotated_refresh})
+                    saver(self.card_id, {**config, "refresh_token": rotated_refresh})
                 except Exception:
                     # Keep this operation usable; the next authentication attempt
                     # will explain if the upstream invalidated the previous token.
@@ -196,6 +234,8 @@ class AliyunDriveStorageCard(StorageTargetCard):
         self._access_token = access_token
         self._access_expires_at = time.time() + expires_in
         self._refresh_token = rotated_refresh or refresh_token
+        self._client_id = client_id
+        self._client_secret = client_secret
         self._drive_id = drive_id
         return access_token, drive_id
 
@@ -207,12 +247,13 @@ class AliyunDriveStorageCard(StorageTargetCard):
 
     def check(self, config: dict | None = None) -> dict[str, Any]:
         saved = config if isinstance(config, dict) else self._config()
-        if not str(saved.get("refresh_token") or "").strip():
-            return {"status": "unconfigured", "message": "尚未配置阿里云盘 Refresh Token"}
+        if not self.is_configured(saved):
+            return {
+                "status": "unconfigured",
+                "message": "请配置自有应用的 App ID、App Secret 和 Refresh Token；OpenList 内置密钥 Token 不适用于此直连模式",
+            }
         try:
-            # check() receives an explicit config from the UI; the config store is
-            # the source of truth for API calls, so validate that the saved value exists.
-            self._ensure_login()
+            self._ensure_login(saved)
             return {"status": "healthy", "message": "阿里云盘认证成功"}
         except Exception as exc:
             return {"status": "unavailable", "message": str(exc)[:240]}
