@@ -8,7 +8,7 @@ from __future__ import annotations
 import math
 import secrets
 from functools import wraps
-from urllib.parse import urlparse
+from urllib.parse import quote, urljoin, urlparse
 
 from flask import (
     Blueprint,
@@ -36,6 +36,53 @@ def _json_error(message: str, status: int = 400):
             "message": message,
         }
     ), status
+
+def _trusted_quark_media_url(value: str) -> bool:
+    """Allow only Quark's own HLS media paths for the segment proxy."""
+    try:
+        parsed = urlparse(str(value or "").strip())
+        host = (parsed.hostname or "").lower()
+        return (
+            parsed.scheme == "https"
+            and not parsed.username
+            and not parsed.password
+            and (host == "drive.quark.cn" or host.endswith(".drive.quark.cn"))
+            and parsed.path.startswith("/qv/")
+        )
+    except (TypeError, ValueError):
+        return False
+
+
+def _hls_proxy_url(upstream_url: str) -> str:
+    return "/api/playback/hls-segment?url=" + quote(upstream_url, safe="")
+
+
+def _rewrite_hls_playlist(body: str, playlist_url: str) -> str:
+    """Rewrite HLS segment/key/map references through MovieSync without logging signatures."""
+    import re
+
+    def rewrite_uri(raw_uri: str) -> str:
+        absolute = urljoin(playlist_url, raw_uri.strip())
+        if not _trusted_quark_media_url(absolute):
+            return raw_uri
+        return _hls_proxy_url(absolute)
+
+    rewritten = []
+    for line in body.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            rewritten.append(line)
+        elif stripped.startswith("#"):
+            # HLS tags such as EXT-X-KEY and EXT-X-MAP can carry URI="...".
+            line = re.sub(
+                r'URI="([^"]+)"',
+                lambda match: 'URI="' + rewrite_uri(match.group(1)) + '"',
+                line,
+            )
+            rewritten.append(line)
+        else:
+            rewritten.append(rewrite_uri(stripped))
+    return "\n".join(rewritten) + ("\n" if body.endswith("\n") else "")
 
 
 def _normalize_fid(
@@ -684,6 +731,30 @@ def playback_stream():
         )
 
     upstream_type = str(upstream.headers.get("Content-Type") or "").split(";", 1)[0].strip().lower()
+    if urlparse(target).path.lower().endswith(".m3u8") or upstream_type in {
+        "application/vnd.apple.mpegurl",
+        "application/x-mpegurl",
+        "audio/mpegurl",
+    }:
+        try:
+            playlist_bytes = b"".join(upstream.iter_content(chunk_size=16 * 1024))
+            playlist_text = playlist_bytes.decode("utf-8-sig")
+            rewritten_playlist = _rewrite_hls_playlist(playlist_text, str(getattr(upstream, "url", "") or target))
+        except (UnicodeDecodeError, ValueError):
+            upstream.close()
+            return Response(
+                "夸克返回的 HLS 播放列表无法解析，请重新点击视频",
+                status=502,
+                content_type="text/plain; charset=utf-8",
+            )
+        finally:
+            upstream.close()
+        return Response(
+            rewritten_playlist,
+            status=upstream.status_code,
+            content_type="application/vnd.apple.mpegurl; charset=utf-8",
+            headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"},
+        )
     playback_type = str(info.get("mime_type") or "").strip().lower()
     if upstream_type.startswith("video/") or upstream_type in {
         "application/vnd.apple.mpegurl",
@@ -720,6 +791,79 @@ def playback_stream():
             upstream.close()
 
     return Response(stream_chunks(), status=upstream.status_code, headers=headers, direct_passthrough=True)
+
+@api.route("/playback/hls-segment", methods=["GET", "HEAD"])
+def playback_hls_segment():
+    """Proxy one signed HLS segment after strict Quark-host/path validation."""
+    target = str(request.args.get("url") or "").strip()
+    if not _trusted_quark_media_url(target):
+        return _json_error("HLS 分片地址无效或不受支持", 400)
+
+    forwarded_headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/131.0.0.0 Safari/537.36"
+        ),
+        "Referer": "https://pan.quark.cn/",
+        "Origin": "https://pan.quark.cn",
+        "Accept": "*/*",
+        "Accept-Encoding": "identity",
+    }
+    range_header = request.headers.get("Range")
+    if range_header:
+        forwarded_headers["Range"] = range_header
+    try:
+        upstream = _services()["http"].session.request(
+            request.method,
+            target,
+            headers=forwarded_headers,
+            timeout=(5, 30),
+            stream=True,
+            allow_redirects=False,
+        )
+    except Exception:
+        _services()["logger"].warning("请求 HLS 分片上游失败", exc_info=True)
+        return Response(
+            "视频分片暂时无法连接，请重新点击视频",
+            status=502,
+            content_type="text/plain; charset=utf-8",
+        )
+
+    if upstream.status_code not in {200, 206, 416}:
+        status_code = upstream.status_code
+        safe_type = str(upstream.headers.get("Content-Type") or "")[:120]
+        _services()["logger"].warning(
+            "HLS 分片上游拒绝请求: status=%s range=%s content_type=%s",
+            status_code,
+            "present" if range_header else "absent",
+            safe_type,
+        )
+        upstream.close()
+        return Response("视频分片请求失败，请重新点击视频", status=502, content_type="text/plain; charset=utf-8")
+
+    headers = {
+        "Content-Type": upstream.headers.get("Content-Type") or "video/mp2t",
+        "Cache-Control": "no-store",
+        "Content-Disposition": "inline",
+        "X-Content-Type-Options": "nosniff",
+    }
+    for name in ("Content-Length", "Content-Range", "Accept-Ranges", "Last-Modified", "ETag"):
+        value = upstream.headers.get(name)
+        if value:
+            headers[name] = value
+
+    def segment_chunks():
+        try:
+            if request.method != "HEAD":
+                for chunk in upstream.iter_content(chunk_size=64 * 1024):
+                    if chunk:
+                        yield chunk
+        finally:
+            upstream.close()
+
+    return Response(segment_chunks(), status=upstream.status_code, headers=headers, direct_passthrough=True)
+
 
 @api.get("/storage-targets")
 def storage_targets():
