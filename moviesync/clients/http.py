@@ -37,8 +37,8 @@ class HttpClient:
         *,
         timeout: float,
         retries: int = 1,
-        **kwargs: Any,
         allow_non_dict: bool = False,
+        **kwargs: Any,
     ) -> tuple[requests.Response, Any]:
         last_error: Exception | None = None
         for attempt in range(retries + 1):
