@@ -86,6 +86,10 @@ async function playFile(file) {
     title.textContent = file.file_name || "正在播放";
     status.textContent = "正在向夸克申请播放地址…";
     player.pause();
+    if (window.movieSyncHls) {
+        window.movieSyncHls.destroy();
+        window.movieSyncHls = null;
+    }
     player.removeAttribute("src");
     player.load();
     try {
@@ -97,8 +101,27 @@ async function playFile(file) {
         // return an inline video response instead of a browser download attachment.
         const streamUrl = "/api/playback/stream?provider_id=" + encodeURIComponent(state.providerId)
             + "&fid=" + encodeURIComponent(file.fid);
-        player.src = streamUrl;
-        player.load();
+        const isHls = String(playback.mime_type || "").toLowerCase().includes("mpegurl")
+            || /\\.m3u8(?:$|\\?)/i.test(playback.url);
+        if (isHls && window.Hls && window.Hls.isSupported()) {
+            const hls = new window.Hls({
+                enableWorker: true,
+                lowLatencyMode: false,
+                backBufferLength: 30
+            });
+            window.movieSyncHls = hls;
+            hls.on(window.Hls.Events.ERROR, (_event, data) => {
+                if (data && data.fatal) {
+                    status.textContent = "HLS 视频流加载失败（" + String(data.type || "媒体错误") + "），请重新点击视频；若持续失败，请检查夸克播放地址是否过期。";
+                }
+            });
+            hls.loadSource(streamUrl);
+            hls.attachMedia(player);
+        } else {
+            // Safari and other native-HLS browsers can play the rewritten playlist directly.
+            player.src = streamUrl;
+            player.load();
+        }
         status.textContent = "播放地址已获取" + (playback.resolution ? " · " + playback.resolution : "")
             + "，正在加载视频数据…";
         player.play().catch(() => {
