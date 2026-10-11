@@ -128,22 +128,28 @@ class CardFilePluginManager:
                 destination_blob = _git_blob_sha(destination_content)
                 marker_value = marker.read_text(encoding="ascii").strip() if marker.exists() else ""
 
+                legacy_blobs = _LEGACY_BUNDLED_CARD_BLOBS.get(filename, set())
                 if marker_value and marker_value == destination_blob:
                     # The file still matches the last bundled version: upgrade it.
                     if destination_blob != source_blob:
                         destination.write_bytes(source_content)
                         self.logger.info("已更新未修改的内置卡片 %s", filename)
                     marker.write_text(source_blob, encoding="ascii")
+                elif (
+                    destination_blob in legacy_blobs
+                    and not marker_value.startswith("customized:")
+                ):
+                    # A previous release may have written a non-empty marker for
+                    # an older template. Upgrade only when the file bytes match
+                    # an exact known bundled blob; a customized marker always wins.
+                    if destination_blob != source_blob:
+                        destination.write_bytes(source_content)
+                        self.logger.info("已迁移旧版内置卡片 %s", filename)
+                    marker.write_text(source_blob, encoding="ascii")
                 elif not marker_value:
-                    # Older releases created empty markers. Upgrade only exact,
-                    # known bundled versions; an unknown file may be user-edited.
-                    if (
-                        destination_blob == source_blob
-                        or destination_blob in _LEGACY_BUNDLED_CARD_BLOBS.get(filename, set())
-                    ):
-                        if destination_blob != source_blob:
-                            destination.write_bytes(source_content)
-                            self.logger.info("已迁移旧版内置卡片 %s", filename)
+                    # Empty markers are from older releases. Current templates can
+                    # be marked directly; unknown content is treated as customized.
+                    if destination_blob == source_blob:
                         marker.write_text(source_blob, encoding="ascii")
                     else:
                         marker.write_text(f"customized:{destination_blob}", encoding="ascii")
