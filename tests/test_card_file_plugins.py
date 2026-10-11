@@ -473,3 +473,47 @@ def test_custom_legacy_card_keeps_shared_telegram_context(tmp_path):
 
     assert bundled_card.telegram is None
     assert legacy_card.telegram is legacy_client
+
+
+def test_legacy_quark_manifest_upgrades_category_fids_schema_without_replacing_code(tmp_path):
+    plugin_dir = tmp_path / "data-cards"
+    bundled_dir = tmp_path / "bundled-cards"
+    plugin_dir.mkdir()
+    bundled_dir.mkdir()
+
+    (plugin_dir / "quark.py").write_text(
+        '''from moviesync.cards import CardManifest, StorageTargetCard
+
+class QuarkCard(StorageTargetCard):
+    manifest = CardManifest(id="quark", name="Quark", type="storage_target",
+        config_fields=({"key": "category_fids", "label": "分类目录 FID", "type": "json"},))
+
+def create_card(context):
+    return QuarkCard()
+''',
+        encoding="utf-8",
+    )
+    (bundled_dir / "quark.py").write_text(
+        '''from moviesync.cards import CardManifest, StorageTargetCard
+
+class QuarkCard(StorageTargetCard):
+    manifest = CardManifest(id="quark", name="Quark", type="storage_target",
+        config_fields=({"key": "category_fids", "label": "分类目录 FID",
+            "type": "textarea", "editor": "fid_lines", "default": ""},))
+
+def create_card(context):
+    return QuarkCard()
+''',
+        encoding="utf-8",
+    )
+
+    manager = CardFilePluginManager(
+        plugin_dir, CardRegistry(), logging.getLogger("test-quark-schema"), bundled_dir
+    )
+    loaded = manager.load_file("quark.py")
+    field = next(item for item in loaded.manifest.config_fields if item["key"] == "category_fids")
+
+    assert field["type"] == "textarea"
+    assert field["editor"] == "fid_lines"
+    # The persistent Python card is intentionally left untouched.
+    assert '"type": "json"' in (plugin_dir / "quark.py").read_text(encoding="utf-8")

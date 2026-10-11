@@ -1291,10 +1291,13 @@
                     ? Object.entries(rawValue).filter(([, fid]) => String(fid ?? "").trim()).map(([category, fid]) => category + "=" + fid).join("\n")
                     : rawValue;
                 const secret = Boolean(field.secret);
-                const common = 'data-card-field="' + escapeHtml(key) + '" data-card-type="' + escapeHtml(type) + '"';
+                const controlType = field.editor === "fid_lines" ? "textarea" : type;
+                const common = 'data-card-field="' + escapeHtml(key) + '" data-card-type="' + escapeHtml(controlType) + '"';
                 let control = "";
                 if (type === "boolean") {
                     control = '<label class="flex items-center gap-2 mt-2 text-xs text-slate-300"><input type="checkbox" ' + common + (value ? ' checked' : '') + ' class="h-4 w-4 accent-blue-500">启用</label>';
+                } else if (field.editor === "fid_lines") {
+                    control = '<textarea ' + common + ' rows="4" class="glass-input mt-1 w-full rounded-lg border border-slate-800 px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-blue-500" placeholder="' + escapeHtml(field.placeholder || "") + '">' + escapeHtml(value) + '</textarea>';
                 } else if (type === "json" && field.editor === "channel_chips") {
                     const items = Array.isArray(value) ? value : [];
                     const chips = items.filter(item => item && item.id).map(item =>
