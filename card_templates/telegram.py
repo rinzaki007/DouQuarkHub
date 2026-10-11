@@ -63,15 +63,15 @@ class TelegramResourceSource(ResourceSourceCard):
                 "key": "channels",
                 "label": "资源频道",
                 "type": "json",
-                "editor": "object_list",
+                "editor": "channel_chips",
                 "item_fields": (
                     {"key": "id", "label": "频道用户名", "placeholder": "例如 movie_channel", "required": True},
                     {"key": "name", "label": "显示名称", "placeholder": "可留空，默认使用频道用户名"},
                 ),
                 "default": [],
                 "description": (
-                    "添加后会以紧凑卡片显示，可直接删除；填写公开频道用户名时不需要输入 @。"
-                    "频道列表留空时不会搜索 Telegram 资源。"
+                    "输入频道用户名并点击“添加频道”，频道会显示为紧凑标签；点击标签上的 × 删除。"
+                    "用户名不需要输入 @，显示名称可选；频道列表留空时不会搜索 Telegram 资源。"
                 ),
             },
         ),
