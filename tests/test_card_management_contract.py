@@ -673,6 +673,20 @@ def test_quark_category_fids_use_simple_text_editor_and_keep_legacy_dict_support
     assert parsed["category_fids"]["电视剧"] == "456"
 
 
+def test_generic_card_form_has_compact_telegram_channel_chips_and_quark_textarea():
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+    admin = (root / "templates" / "admin.html").read_text(encoding="utf-8")
+    plugin_manager = (root / "moviesync" / "card_plugins.py").read_text(encoding="utf-8")
+
+    assert 'field.editor === "channel_chips"' in admin
+    assert "data-card-add-channel" in admin
+    assert "data-card-remove-channel" in admin
+    assert 'type === "textarea"' in admin
+    assert 'for key in ("type", "editor", "item_fields", "placeholder", "description", "label")' in plugin_manager
+
+
 def test_telegram_channels_use_form_editor_and_filename_rules_are_global():
     from card_templates.filename_recognition import FilenameRecognitionCard
     from card_templates.telegram import TelegramResourceSource
@@ -685,7 +699,7 @@ def test_telegram_channels_use_form_editor_and_filename_rules_are_global():
     }
 
     assert channels["type"] == "json"
-    assert channels["editor"] == "object_list"
+    assert channels["editor"] == "channel_chips"
     assert [field["key"] for field in channels["item_fields"]] == ["id", "name"]
     assert "JSON 数组" not in channels["description"]
     assert "magic_regex" not in fields
