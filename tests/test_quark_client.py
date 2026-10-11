@@ -1,5 +1,9 @@
 """Regression tests for Quark share parsing and transfer safety."""
 
+from types import SimpleNamespace
+
+import pytest
+
 from moviesync.clients.http import ApiError
 from moviesync.clients.quark import QuarkClient
 
