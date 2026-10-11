@@ -318,3 +318,97 @@ def test_quark_playback_card_loads_as_an_independent_single_file_plugin(tmp_path
     assert card.card_id == "quark_playback"
     assert card.card_type == "playback_provider"
     assert registry.get("quark_playback") is card
+
+
+
+def test_quark_playback_prefers_hls_playlist_over_direct_file(monkeypatch):
+    client = QuarkClient("cookie=test")
+    response = SimpleNamespace(status_code=200)
+    payload = {
+        "code": 0,
+        "data": {
+            "file_name": "sample.mp4",
+            "video_list": [
+                {"resolution": "normal", "video_info": {
+                    "url": "https://video-play-h-zb.drive.quark.cn/qv/sample.mp4?token=direct",
+                    "format": "mp4",
+                }},
+                {"resolution": "high", "video_info": {
+                    "url": "https://video-play-h-zb.drive.quark.cn/qv/sample/media.m3u8?token=playlist",
+                    "format": "m3u8",
+                }},
+            ],
+        },
+    }
+    monkeypatch.setattr(client.http, "request_json", lambda *args, **kwargs: (response, payload))
+
+    info = client.get_playback_info("fid-123")
+
+    assert info["url"].endswith("/media.m3u8?token=playlist")
+    assert info["mime_type"] == "application/vnd.apple.mpegurl"
+    assert info["resolution"] == "high"
+
+
+def test_hls_playlist_rewrites_relative_segment_and_key_uris():
+    from moviesync.web.routes import _rewrite_hls_playlist
+
+    playlist_url = "https://video-play-h-zb.drive.quark.cn/qv/sample/media.m3u8?playlist_sig=abc"
+    body = (
+        "#EXTM3U\n"
+        '#EXT-X-KEY:METHOD=AES-128,URI="key.bin?key_sig=secret"\n'
+        "#EXTINF:5.0,\n"
+        "media-0.ts?segment_sig=xyz\n"
+        "#EXT-X-ENDLIST\n"
+    )
+
+    rewritten = _rewrite_hls_playlist(body, playlist_url)
+
+    assert "#EXTM3U" in rewritten
+    assert "EXT-X-ENDLIST" in rewritten
+    assert "playback/hls-segment?url=" in rewritten
+    assert "segment_sig%3Dxyz" in rewritten
+    assert "key_sig%3Dsecret" in rewritten
+    assert "media-0.ts?segment_sig=xyz" not in rewritten
+
+
+def test_hls_segment_proxy_preserves_range_and_rejects_untrusted_hosts(tmp_path, monkeypatch):
+    monkeypatch.delenv("MOVIESYNC_AUTO_INSTALL_BUNDLED_CARDS", raising=False)
+    app = create_app({"MOVIESYNC_DATA_DIR": str(tmp_path)}, start_scheduler=False)
+    client = app.test_client()
+    client.post("/api/setup", json={"username": "admin", "password": "password123"})
+
+    upstream = SimpleNamespace(
+        status_code=206,
+        headers={
+            "Content-Type": "video/mp2t",
+            "Content-Length": "4",
+            "Content-Range": "bytes 0-3/100",
+            "Accept-Ranges": "bytes",
+        },
+        iter_content=lambda chunk_size: iter([b"data"]),
+        close=lambda: None,
+    )
+    calls = []
+    app.extensions["moviesync"]["http"].session.request = (
+        lambda *args, **kwargs: calls.append((args, kwargs)) or upstream
+    )
+    url = (
+        "https%3A%2F%2Fvideo-play-h-zb.drive.quark.cn%2Fqv%2Fsample%2Fmedia-0.ts"
+        "%3Fsegment_sig%3Dtest"
+    )
+    response = client.get(
+        "/api/playback/hls-segment?url=" + url,
+        headers={"Range": "bytes=0-3"},
+    )
+
+    assert response.status_code == 206
+    assert response.data == b"data"
+    assert response.headers["Content-Range"] == "bytes 0-3/100"
+    assert calls[0][1]["headers"]["Range"] == "bytes=0-3"
+    assert calls[0][1]["allow_redirects"] is False
+
+    rejected = client.get(
+        "/api/playback/hls-segment?url=https%3A%2F%2Fevil.example%2Fqv%2Fsample.ts"
+    )
+    assert rejected.status_code == 400
+    assert len(calls) == 1
