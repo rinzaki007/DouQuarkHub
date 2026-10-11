@@ -156,8 +156,12 @@ class CardFilePluginManager:
             for source in bundled_dir.glob("*.py")
             if _PLUGIN_FILE_RE.fullmatch(source.name)
         }
-        for marker in sorted(marker_dir.glob("*.py.seeded")):
-            filename = marker.name.removesuffix(".seeded")
+        retired_filenames = set(_RETIRED_BUNDLED_CARD_BLOBS)
+        marked_filenames = {
+            marker.name.removesuffix(".seeded")
+            for marker in marker_dir.glob("*.py.seeded")
+        }
+        for filename in sorted(retired_filenames | marked_filenames):
             if filename in bundled_filenames:
                 continue
             try:
@@ -165,8 +169,9 @@ class CardFilePluginManager:
             except ValueError:
                 continue
             destination = self.plugin_dir / filename
+            marker = marker_dir / f"{filename}.seeded"
             try:
-                marker_value = marker.read_text(encoding="ascii").strip()
+                marker_value = marker.read_text(encoding="ascii").strip() if marker.is_file() else ""
                 if not destination.is_file():
                     marker.unlink(missing_ok=True)
                     continue
