@@ -96,6 +96,60 @@ def test_quark_playback_error_includes_safe_upstream_status_and_message(monkeypa
     assert "do-not-log" not in str(exc.value)
 
 
+
+def test_quark_playback_falls_back_to_original_download_on_plf_invalid(monkeypatch):
+    client = QuarkClient("cookie=do-not-log")
+    transcode_response = SimpleNamespace(status_code=400)
+    transcode_payload = {"code": 14018, "message": "data invalid: [plf_invalid]"}
+    download_response = SimpleNamespace(status_code=200)
+    download_payload = {
+        "code": 0,
+        "data": [{
+            "fid": "fid-123",
+            "file_name": "sample.mp4",
+            "size": 12345,
+            "download_url": "https://download.example/sample.mp4?sign=temporary",
+        }],
+    }
+    calls = []
+
+    def fake_request(method, url, **kwargs):
+        calls.append((method, url, kwargs))
+        if "file/v2/play/project" in url:
+            return transcode_response, transcode_payload
+        return download_response, download_payload
+
+    monkeypatch.setattr(client.http, "request_json", fake_request)
+
+    info = client.get_playback_info("fid-123")
+
+    assert info["url"] == "https://download.example/sample.mp4?sign=temporary"
+    assert info["file_name"] == "sample.mp4"
+    assert info["mime_type"] == "video/mp4"
+    assert info["resolution"] == "原始文件"
+    assert len(calls) == 2
+    assert calls[1][0] == "POST"
+    assert calls[1][1].startswith("https://drive-pc.quark.cn/1/clouddrive/file/download?")
+    assert calls[1][2]["json"] == {"fids": ["fid-123"]}
+    assert "do-not-log" not in repr(info)
+
+
+def test_quark_playback_does_not_fallback_for_unrelated_api_errors(monkeypatch):
+    client = QuarkClient("cookie=do-not-log")
+    response = SimpleNamespace(status_code=400)
+    payload = {"code": 31001, "message": "require login"}
+    calls = []
+    monkeypatch.setattr(
+        client.http,
+        "request_json",
+        lambda *args, **kwargs: (calls.append((args, kwargs)) or (response, payload)),
+    )
+
+    with pytest.raises(RuntimeError, match=r"HTTP 400.*code=31001.*require login"):
+        client.get_playback_info("fid-123")
+
+    assert len(calls) == 1
+
 def test_quark_playback_parses_https_url_and_rejects_invalid_fid(monkeypatch):
     client = QuarkClient("cookie=test")
     response = SimpleNamespace(status_code=200)
