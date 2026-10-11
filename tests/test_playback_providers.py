@@ -8,6 +8,7 @@ from moviesync.app import create_app
 from moviesync.cards import CardManifest, CardRegistry, PlaybackProviderCard
 from moviesync.clients.quark import QuarkClient
 from moviesync.services.playback_providers import PlaybackProviderManager
+from moviesync.card_plugins import CardFilePluginManager
 
 
 class FakePlaybackCard(PlaybackProviderCard):
@@ -106,3 +107,27 @@ def test_playback_routes_keep_core_available_without_playback_card(tmp_path):
 
     anonymous = app.test_client()
     assert anonymous.get("/api/playback/providers").status_code == 401
+
+
+
+def test_quark_playback_card_loads_as_an_independent_single_file_plugin(tmp_path):
+    import logging
+    from pathlib import Path
+
+    class ConfigStore:
+        def get_card_config(self, card_id):
+            return {"cookie": "cookie=placeholder"} if card_id == "quark" else {}
+
+        def load(self):
+            return {"cards": {}}
+
+    plugin_dir = tmp_path / "cards"
+    registry = CardRegistry()
+    manager = CardFilePluginManager(plugin_dir, registry, logging.getLogger("test-playback"))
+    manager.load_all({"config_store": ConfigStore()})
+    source = Path(__file__).resolve().parents[1] / "card_templates" / "quark_playback.py"
+    card = manager.install("quark_playback.py", source.read_bytes())
+
+    assert card.card_id == "quark_playback"
+    assert card.card_type == "playback_provider"
+    assert registry.get("quark_playback") is card
