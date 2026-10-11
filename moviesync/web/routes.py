@@ -8,6 +8,7 @@ from __future__ import annotations
 import math
 import secrets
 from functools import wraps
+from urllib.parse import urlparse
 
 from flask import (
     Blueprint,
