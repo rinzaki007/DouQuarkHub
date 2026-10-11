@@ -101,5 +101,29 @@ def test_share_parser_rejects_invalid_id_before_network_request():
     assert error == "分享链接 ID 无效"
     assert client.http.calls == []
 
+def test_list_drive_files_reports_api_failure_instead_of_empty_directory(monkeypatch):
+    client = QuarkClient("cookie=test")
+    response = SimpleNamespace(status_code=200)
+    monkeypatch.setattr(client.http, "request_json", lambda *args, **kwargs: (response, {"code": 14001, "message": "invalid cookie"}))
+
+    with pytest.raises(RuntimeError, match="目录读取失败"):
+        client.list_drive_files("0")
 
 
+def test_list_drive_files_normalizes_destination_items(monkeypatch):
+    client = QuarkClient("cookie=test")
+    response = SimpleNamespace(status_code=200)
+    payload = {
+        "code": 0,
+        "data": {"list": [
+            {"fid": "folder1", "file_name": "电影", "dir_file": True, "size": 0},
+            {"fid": "file1", "file_name": "sample.mkv", "file_type": 1, "size": 1024},
+        ]},
+    }
+    monkeypatch.setattr(client.http, "request_json", lambda *args, **kwargs: (response, payload))
+
+    files = client.list_drive_files("0")
+
+    assert files[0]["is_dir"] is True
+    assert files[1]["is_video"] is True
+    assert files[1]["size"] == 1024
