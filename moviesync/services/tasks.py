@@ -204,6 +204,7 @@ class TaskManager:
                 or ""
             ),
             "target_fid": str(payload.get("target_fid") or "0"),
+            "storage_target_id": str(payload.get("storage_target_id") or candidate.get("storage_target_id") or ""),
             "created_at": now,
             "started_at": None,
             "finished_at": None,
