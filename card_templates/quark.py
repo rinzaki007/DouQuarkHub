@@ -40,6 +40,7 @@ class QuarkStorageCard(StorageTargetCard):
             "storage.accepts.quark_share",
             "storage.resolve_resource",
             "storage.list_files",
+            "storage.list_destination_files",
             "storage.create_folder",
             "storage.transfer",
         ),
@@ -215,6 +216,10 @@ class QuarkStorageCard(StorageTargetCard):
 
     def list_files(self, resource: object) -> list[dict[str, Any]]:
         return self.resolve_resource(resource).get("files") or []
+
+    def list_destination_files(self, parent_id: str = "0") -> list[dict[str, Any]]:
+        """列出本人夸克网盘目标目录，供转存结果核对使用。"""
+        return self._client().list_drive_files(parent_id)
 
     def create_folder(self, name: str, parent_id: str = "0") -> str:
         fid, error = self._client().get_or_create_subfolder(name, parent_id)
