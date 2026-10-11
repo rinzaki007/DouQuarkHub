@@ -32,6 +32,11 @@ _LEGACY_BUNDLED_CARD_BLOBS = {
     "tmdb.py": {
         "76292d41d3af54ffbd17fe31de4512427af87b10",
     },
+    # Previous bundled Quark card lacked destination-directory listing. Upgrade only
+    # this exact known template; customized persistent card files remain untouched.
+    "quark.py": {
+        "9c2e605ae0cded760ba778f7e0020b7142226fcb",
+    },
     "douban.py": {
         "4c601e750bfb312a3d7e028908568965f819d0f6",
         "d2cb3df5d76fdf7d35f24d05471d878796101899",

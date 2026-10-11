@@ -59,6 +59,19 @@ def test_http_client_rejects_non_object_json_payload(monkeypatch):
     assert len(session.calls) == 2
 
 
+def test_http_client_can_explicitly_accept_json_array_payload(monkeypatch):
+    payload = [{"id": "123", "title": "测试电影"}]
+    client, session = make_client(monkeypatch, [FakeResponse(200, payload)])
+
+    response, data = client.request_json(
+        "GET", "https://example.test/search", timeout=2, allow_non_dict=True
+    )
+
+    assert response.status_code == 200
+    assert data == payload
+    assert len(session.calls) == 1
+
+
 def test_http_client_rejects_non_json_response_after_retry(monkeypatch):
     client, session = make_client(
         monkeypatch,
