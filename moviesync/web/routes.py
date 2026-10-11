@@ -773,6 +773,10 @@ def _card_config_view(card, raw_config):
     for declared in card.manifest.config_fields:
         field = dict(declared)
         key = str(field.get("key") or "")
+        # Specialized editors define their input representation. In particular,
+        # fid_lines must remain plain text even if an older manifest says "json".
+        if field.get("editor") == "fid_lines":
+            field["type"] = "textarea"
         secret = bool(field.get("secret")) or any(marker in key.lower() for marker in sensitive_markers)
         field["secret"] = secret
         value = raw_config.get(key, field.get("default", {} if field.get("type") == "json" else ""))
@@ -811,7 +815,12 @@ def resource_card_config(card_id):
     incoming = data.get("config", {})
     if not isinstance(incoming, dict):
         return _json_error("卡片设置格式不正确")
-    fields_by_key = {str(field.get("key")): field for field in card.manifest.config_fields}
+    fields_by_key = {}
+    for declared in card.manifest.config_fields:
+        field = dict(declared)
+        if field.get("editor") == "fid_lines":
+            field["type"] = "textarea"
+        fields_by_key[str(field.get("key"))] = field
     unknown = set(incoming) - set(fields_by_key)
     if unknown:
         return _json_error("包含这张卡片不支持的设置项：" + ", ".join(sorted(unknown)))
