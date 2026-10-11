@@ -47,6 +47,7 @@ def _trusted_quark_media_url(value: str) -> bool:
             and not parsed.username
             and not parsed.password
             and (host == "drive.quark.cn" or host.endswith(".drive.quark.cn"))
+            and parsed.port in (None, 443)
             and parsed.path.startswith("/qv/")
         )
     except (TypeError, ValueError):
@@ -842,6 +843,28 @@ def playback_hls_segment():
         )
         upstream.close()
         return Response("视频分片请求失败，请重新点击视频", status=502, content_type="text/plain; charset=utf-8")
+
+    segment_type = str(upstream.headers.get("Content-Type") or "").split(";", 1)[0].strip().lower()
+    if urlparse(target).path.lower().endswith(".m3u8") or segment_type in {
+        "application/vnd.apple.mpegurl",
+        "application/x-mpegurl",
+        "audio/mpegurl",
+    }:
+        try:
+            nested_bytes = b"".join(upstream.iter_content(chunk_size=16 * 1024))
+            nested_text = nested_bytes.decode("utf-8-sig")
+            rewritten_nested = _rewrite_hls_playlist(nested_text, str(getattr(upstream, "url", "") or target))
+        except (UnicodeDecodeError, ValueError):
+            upstream.close()
+            return Response("夸克返回的 HLS 子播放列表无法解析", status=502, content_type="text/plain; charset=utf-8")
+        finally:
+            upstream.close()
+        return Response(
+            rewritten_nested,
+            status=upstream.status_code,
+            content_type="application/vnd.apple.mpegurl; charset=utf-8",
+            headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"},
+        )
 
     headers = {
         "Content-Type": upstream.headers.get("Content-Type") or "video/mp2t",
