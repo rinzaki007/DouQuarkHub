@@ -482,22 +482,28 @@ def test_legacy_quark_manifest_upgrades_category_fids_schema_without_replacing_c
     bundled_dir.mkdir()
 
     (plugin_dir / "quark.py").write_text(
-        'from moviesync.cards import CardManifest, StorageTargetCard\\n'
-        'class QuarkCard(StorageTargetCard):\\n'
-        '    manifest = CardManifest(id="quark", name="Quark", type="storage_target", '
-        'config_fields=({"key": "category_fids", "label": "分类目录 FID", "type": "json"},))\\n'
-        'def create_card(context):\\n'
-        '    return QuarkCard()\\n',
+        '''from moviesync.cards import CardManifest, StorageTargetCard
+
+class QuarkCard(StorageTargetCard):
+    manifest = CardManifest(id="quark", name="Quark", type="storage_target",
+        config_fields=({"key": "category_fids", "label": "分类目录 FID", "type": "json"},))
+
+def create_card(context):
+    return QuarkCard()
+''',
         encoding="utf-8",
     )
     (bundled_dir / "quark.py").write_text(
-        'from moviesync.cards import CardManifest, StorageTargetCard\\n'
-        'class QuarkCard(StorageTargetCard):\\n'
-        '    manifest = CardManifest(id="quark", name="Quark", type="storage_target", '
-        'config_fields=({"key": "category_fids", "label": "分类目录 FID", "type": "textarea", '
-        '"editor": "fid_lines", "default": "", "placeholder": "电影=123\\\\n电视剧=456"},))\\n'
-        'def create_card(context):\\n'
-        '    return QuarkCard()\\n',
+        '''from moviesync.cards import CardManifest, StorageTargetCard
+
+class QuarkCard(StorageTargetCard):
+    manifest = CardManifest(id="quark", name="Quark", type="storage_target",
+        config_fields=({"key": "category_fids", "label": "分类目录 FID",
+            "type": "textarea", "editor": "fid_lines", "default": ""},))
+
+def create_card(context):
+    return QuarkCard()
+''',
         encoding="utf-8",
     )
 
@@ -511,4 +517,3 @@ def test_legacy_quark_manifest_upgrades_category_fids_schema_without_replacing_c
     assert field["editor"] == "fid_lines"
     # The persistent Python card is intentionally left untouched.
     assert '"type": "json"' in (plugin_dir / "quark.py").read_text(encoding="utf-8")
-
