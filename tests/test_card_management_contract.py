@@ -724,8 +724,8 @@ def test_fid_lines_editor_renders_as_textarea_even_with_legacy_json_type():
 
 
 def test_legacy_fid_lines_field_is_exposed_as_textarea_by_config_api():
-    from moviesync.web.routes import _card_config_view
     from moviesync.cards import CardManifest, StorageTargetCard
+    from moviesync.web.routes import _card_config_view
 
     class LegacyQuarkCard(StorageTargetCard):
         manifest = CardManifest(
