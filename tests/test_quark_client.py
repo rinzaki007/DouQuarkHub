@@ -108,7 +108,11 @@ def test_share_parser_rejects_invalid_id_before_network_request():
 def test_list_drive_files_reports_api_failure_instead_of_empty_directory(monkeypatch):
     client = QuarkClient("cookie=test")
     response = SimpleNamespace(status_code=200)
-    monkeypatch.setattr(client.http, "request_json", lambda *args, **kwargs: (response, {"code": 14001, "message": "invalid cookie"}))
+    monkeypatch.setattr(
+        client.http,
+        "request_json",
+        lambda *args, **kwargs: (response, {"code": 14001, "message": "invalid cookie"}),
+    )
 
     with pytest.raises(RuntimeError, match="目录读取失败"):
         client.list_drive_files("0")
