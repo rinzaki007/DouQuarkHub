@@ -720,3 +720,29 @@ def test_fid_lines_editor_renders_as_textarea_even_with_legacy_json_type():
     assert 'else if (field.editor === "fid_lines")' in source
     assert source.index('else if (field.editor === "fid_lines")') < source.index('else if (type === "json")')
     assert 'else if (type === "textarea" && field.editor === "fid_lines")' in source
+
+
+
+def test_legacy_fid_lines_field_is_exposed_as_textarea_by_config_api():
+    from moviesync.web.routes import _card_config_view
+    from moviesync.cards import CardManifest, StorageTargetCard
+
+    class LegacyQuarkCard(StorageTargetCard):
+        manifest = CardManifest(
+            id="quark",
+            name="Quark",
+            type="storage_target",
+            config_fields=(
+                {"key": "category_fids", "label": "分类目录 FID",
+                 "type": "json", "editor": "fid_lines"},
+            ),
+        )
+
+    fields, config, _ = _card_config_view(
+        LegacyQuarkCard(),
+        {"category_fids": {"电影": "123", "电视剧": "456"}},
+    )
+
+    assert fields[0]["type"] == "textarea"
+    assert fields[0]["editor"] == "fid_lines"
+    assert config["category_fids"] == {"电影": "123", "电视剧": "456"}
