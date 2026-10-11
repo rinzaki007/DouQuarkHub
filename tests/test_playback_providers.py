@@ -26,7 +26,12 @@ class FakePlaybackCard(PlaybackProviderCard):
         return [{"fid": "video-1", "file_name": "sample.mp4", "is_dir": False, "is_video": True}]
 
     def resolve_playback(self, fid):
-        return {"fid": fid, "file_name": "sample.mp4", "url": "https://media.example/video.mp4", "mime_type": "video/mp4"}
+        return {
+            "fid": fid,
+            "file_name": "sample.mp4",
+            "url": "https://media.example/video.mp4",
+            "mime_type": "video/mp4",
+        }
 
 
 class FakeStore:
@@ -71,8 +76,22 @@ def test_quark_playback_parses_https_url_and_rejects_invalid_fid(monkeypatch):
         "data": {
             "file_name": "sample.mp4",
             "video_list": [
-                {"resolution": "normal", "video_info": {"url": "https://media.example/stream.mp4?sign=abc", "format": "fmp4_av", "size": 123}},
-                {"resolution": "low", "video_info": {"url": "http://bad.example/video.mp4", "format": "mp4", "size": 123}},
+                {
+                    "resolution": "normal",
+                    "video_info": {
+                        "url": "https://media.example/stream.mp4?sign=abc",
+                        "format": "fmp4_av",
+                        "size": 123,
+                    },
+                },
+                {
+                    "resolution": "low",
+                    "video_info": {
+                        "url": "http://bad.example/video.mp4",
+                        "format": "mp4",
+                        "size": 123,
+                    },
+                },
             ],
         },
     }
