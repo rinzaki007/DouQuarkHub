@@ -145,6 +145,6 @@ def test_get_playback_info_uses_browser_compatible_hls_request_and_prefers_m3u8(
     assert url.endswith("/play/project?pr=ucpro&fr=pc&uc_param_str=")
     assert kwargs["json"] == {
         "fid": "file_123",
-        "resolutions": "low,normal,high,super,2k,4k",
+        "resolutions": "normal,low,high,super,2k,4k",
         "supports": "fmp4,m3u8",
     }
