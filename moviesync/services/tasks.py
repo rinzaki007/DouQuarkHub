@@ -205,6 +205,7 @@ class TaskManager:
             ),
             "target_fid": str(payload.get("target_fid") or "0"),
             "storage_target_id": str(payload.get("storage_target_id") or candidate.get("storage_target_id") or ""),
+            "destination_listing_supported": bool(payload.get("destination_listing_supported", False)),
             "created_at": now,
             "started_at": None,
             "finished_at": None,
